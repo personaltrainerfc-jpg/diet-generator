@@ -1,11 +1,16 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import {
+  InsertUser, users,
+  InsertDiet, diets,
+  InsertMenu, menus,
+  InsertMeal, meals,
+  InsertFood, foods,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -85,8 +90,116 @@ export async function getUserByOpenId(openId: string) {
   }
 
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ── Diet helpers ──
+
+export async function createDiet(diet: InsertDiet) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(diets).values(diet);
+  return result[0].insertId;
+}
+
+export async function getUserDiets(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(diets).where(eq(diets.userId, userId)).orderBy(desc(diets.createdAt));
+}
+
+export async function getDietById(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(diets).where(eq(diets.id, dietId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function deleteDiet(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get menus for this diet
+  const dietMenus = await db.select().from(menus).where(eq(menus.dietId, dietId));
+  for (const menu of dietMenus) {
+    // Get meals for this menu
+    const menuMeals = await db.select().from(meals).where(eq(meals.menuId, menu.id));
+    for (const meal of menuMeals) {
+      await db.delete(foods).where(eq(foods.mealId, meal.id));
+    }
+    await db.delete(meals).where(eq(meals.menuId, menu.id));
+  }
+  await db.delete(menus).where(eq(menus.dietId, dietId));
+  await db.delete(diets).where(eq(diets.id, dietId));
+}
+
+// ── Menu helpers ──
+
+export async function createMenu(menu: InsertMenu) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(menus).values(menu);
+  return result[0].insertId;
+}
+
+export async function getMenusByDietId(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(menus).where(eq(menus.dietId, dietId));
+}
+
+// ── Meal helpers ──
+
+export async function createMeal(meal: InsertMeal) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(meals).values(meal);
+  return result[0].insertId;
+}
+
+export async function getMealsByMenuId(menuId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(meals).where(eq(meals.menuId, menuId));
+}
+
+// ── Food helpers ──
+
+export async function createFood(food: InsertFood) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(foods).values(food);
+  return result[0].insertId;
+}
+
+export async function getFoodsByMealId(mealId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(foods).where(eq(foods.mealId, mealId));
+}
+
+// ── Full diet with all nested data ──
+
+export async function getFullDiet(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const diet = await getDietById(dietId);
+  if (!diet) return null;
+
+  const dietMenus = await getMenusByDietId(dietId);
+  const fullMenus = await Promise.all(
+    dietMenus.map(async (menu) => {
+      const menuMeals = await getMealsByMenuId(menu.id);
+      const fullMeals = await Promise.all(
+        menuMeals.map(async (meal) => {
+          const mealFoods = await getFoodsByMealId(meal.id);
+          return { ...meal, foods: mealFoods };
+        })
+      );
+      return { ...menu, meals: fullMeals };
+    })
+  );
+
+  return { ...diet, menus: fullMenus };
+}

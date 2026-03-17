@@ -1,0 +1,447 @@
+import { trpc } from "@/lib/trpc";
+import { useRoute, useLocation } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
+  Loader2, ArrowLeftRight, UtensilsCrossed
+} from "lucide-react";
+import { useState, useRef } from "react";
+import type { FullMenu, FullMeal, FullFood } from "@shared/types";
+
+function MacroBadge({ icon: Icon, label, value, unit, color }: {
+  icon: React.ElementType;
+  label: string;
+  value: number;
+  unit: string;
+  color: string;
+}) {
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-${color}-50 border border-${color}-100`}>
+      <Icon className={`h-4 w-4 text-${color}-500`} />
+      <div className="text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <p className="font-semibold text-foreground">{value}{unit}</p>
+      </div>
+    </div>
+  );
+}
+
+function FoodRow({ food }: { food: FullFood }) {
+  const [showAlt, setShowAlt] = useState(false);
+  const current = showAlt
+    ? {
+        name: food.alternativeName || food.name,
+        quantity: food.alternativeQuantity || food.quantity,
+        calories: food.alternativeCalories ?? food.calories,
+        protein: food.alternativeProtein ?? food.protein,
+        carbs: food.alternativeCarbs ?? food.carbs,
+        fats: food.alternativeFats ?? food.fats,
+      }
+    : {
+        name: food.name,
+        quantity: food.quantity,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fats: food.fats,
+      };
+
+  const hasAlternative = food.alternativeName && food.alternativeName.length > 0;
+
+  return (
+    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-foreground truncate">
+            {current.name}
+          </span>
+          {showAlt && (
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-primary border-primary/30">
+              ALT
+            </Badge>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">{current.quantity}</span>
+      </div>
+
+      <div className="flex items-center gap-3 shrink-0 text-xs">
+        <span className="text-muted-foreground w-14 text-right">{current.calories} kcal</span>
+        <span className="text-red-500 w-8 text-right">{current.protein}g</span>
+        <span className="text-amber-500 w-8 text-right">{current.carbs}g</span>
+        <span className="text-blue-500 w-8 text-right">{current.fats}g</span>
+      </div>
+
+      {hasAlternative && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setShowAlt(!showAlt)}
+              className={`h-7 w-7 rounded-md flex items-center justify-center transition-colors shrink-0 ${
+                showAlt
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary"
+              }`}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {showAlt ? "Ver alimento original" : "Ver alternativa"}
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+
+function MealCard({ meal }: { meal: FullMeal }) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <UtensilsCrossed className="h-4 w-4 text-primary" />
+            {meal.mealName}
+          </CardTitle>
+          <div className="flex items-center gap-2 text-xs">
+            <Badge variant="secondary" className="gap-1 font-normal">
+              <Flame className="h-3 w-3 text-orange-500" />
+              {meal.calories} kcal
+            </Badge>
+          </div>
+        </div>
+        <div className="flex gap-4 text-xs text-muted-foreground mt-1">
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+            P: {meal.protein}g
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            C: {meal.carbs}g
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+            G: {meal.fats}g
+          </span>
+        </div>
+      </CardHeader>
+      <Separator />
+      <CardContent className="pt-2 pb-3">
+        {/* Table header */}
+        <div className="flex items-center gap-3 py-1.5 px-3 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <div className="flex-1">Alimento</div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="w-14 text-right">Kcal</span>
+            <span className="w-8 text-right text-red-400">Prot</span>
+            <span className="w-8 text-right text-amber-400">Carb</span>
+            <span className="w-8 text-right text-blue-400">Gras</span>
+          </div>
+          <div className="w-7 shrink-0" />
+        </div>
+        <div className="divide-y divide-border/50">
+          {meal.foods.map(food => (
+            <FoodRow key={food.id} food={food} />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MenuView({ menu }: { menu: FullMenu }) {
+  return (
+    <div className="space-y-4">
+      {/* Menu summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-50 border border-orange-100">
+          <Flame className="h-5 w-5 text-orange-500" />
+          <div>
+            <p className="text-xs text-muted-foreground">Calorías</p>
+            <p className="font-bold text-foreground">{menu.totalCalories}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
+          <Beef className="h-5 w-5 text-red-500" />
+          <div>
+            <p className="text-xs text-muted-foreground">Proteínas</p>
+            <p className="font-bold text-foreground">{menu.totalProtein}g</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
+          <Wheat className="h-5 w-5 text-amber-500" />
+          <div>
+            <p className="text-xs text-muted-foreground">Carbohidratos</p>
+            <p className="font-bold text-foreground">{menu.totalCarbs}g</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
+          <Droplets className="h-5 w-5 text-blue-500" />
+          <div>
+            <p className="text-xs text-muted-foreground">Grasas</p>
+            <p className="font-bold text-foreground">{menu.totalFats}g</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Meals */}
+      <div className="space-y-4">
+        {menu.meals
+          .sort((a, b) => a.mealNumber - b.mealNumber)
+          .map(meal => (
+            <MealCard key={meal.id} meal={meal} />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+export default function DietDetail() {
+  const [, params] = useRoute("/diet/:id");
+  const [, setLocation] = useLocation();
+  const dietId = Number(params?.id);
+  const [downloading, setDownloading] = useState(false);
+
+  const { data: diet, isLoading, error } = trpc.diet.getById.useQuery(
+    { id: dietId },
+    { enabled: !isNaN(dietId) }
+  );
+
+  const handleDownloadPdf = async () => {
+    if (!diet) return;
+    setDownloading(true);
+    try {
+      // Generate PDF content as HTML and open in new window for print
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        throw new Error("No se pudo abrir la ventana de impresión");
+      }
+
+      const html = generatePrintHtml(diet);
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !diet) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-20">
+        <p className="text-muted-foreground">Dieta no encontrada.</p>
+        <Button variant="outline" className="mt-4" onClick={() => setLocation("/history")}>
+          Volver al historial
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <button
+            onClick={() => setLocation("/history")}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver al historial
+          </button>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+            {diet.name}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date(diet.createdAt).toLocaleDateString("es-ES", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+            {" · "}
+            {diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleDownloadPdf}
+          disabled={downloading}
+          className="shrink-0"
+        >
+          {downloading ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          PDF
+        </Button>
+      </div>
+
+      {/* Config summary */}
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary" className="gap-1.5 py-1">
+          <Flame className="h-3.5 w-3.5 text-orange-500" />
+          {diet.totalCalories} kcal
+        </Badge>
+        <Badge variant="outline" className="gap-1 py-1 text-red-600 border-red-200">
+          Proteínas: {diet.proteinPercent}%
+        </Badge>
+        <Badge variant="outline" className="gap-1 py-1 text-amber-600 border-amber-200">
+          Carbos: {diet.carbsPercent}%
+        </Badge>
+        <Badge variant="outline" className="gap-1 py-1 text-blue-600 border-blue-200">
+          Grasas: {diet.fatsPercent}%
+        </Badge>
+        {diet.avoidFoods && diet.avoidFoods.length > 0 && (
+          <Badge variant="destructive" className="gap-1 py-1">
+            Evitar: {(diet.avoidFoods as string[]).join(", ")}
+          </Badge>
+        )}
+      </div>
+
+      {/* Menus */}
+      {diet.menus.length === 1 ? (
+        <MenuView menu={diet.menus[0]} />
+      ) : (
+        <Tabs defaultValue="1" className="w-full">
+          <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1">
+            {diet.menus
+              .sort((a, b) => a.menuNumber - b.menuNumber)
+              .map(menu => (
+                <TabsTrigger
+                  key={menu.id}
+                  value={String(menu.menuNumber)}
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  Menú {menu.menuNumber}
+                </TabsTrigger>
+              ))}
+          </TabsList>
+          {diet.menus
+            .sort((a, b) => a.menuNumber - b.menuNumber)
+            .map(menu => (
+              <TabsContent key={menu.id} value={String(menu.menuNumber)} className="mt-4">
+                <MenuView menu={menu} />
+              </TabsContent>
+            ))}
+        </Tabs>
+      )}
+    </div>
+  );
+}
+
+function generatePrintHtml(diet: any): string {
+  let menusHtml = "";
+
+  for (const menu of diet.menus.sort((a: any, b: any) => a.menuNumber - b.menuNumber)) {
+    let mealsHtml = "";
+    for (const meal of menu.meals.sort((a: any, b: any) => a.mealNumber - b.mealNumber)) {
+      let foodsHtml = "";
+      for (const food of meal.foods) {
+        foodsHtml += `
+          <tr>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${food.name}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${food.quantity}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${food.calories}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${food.protein}g</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${food.carbs}g</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;text-align:center;">${food.fats}g</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:12px;color:#666;">${food.alternativeName || "-"} ${food.alternativeQuantity ? `(${food.alternativeQuantity})` : ""}</td>
+          </tr>`;
+      }
+
+      mealsHtml += `
+        <div style="margin-bottom:20px;">
+          <h3 style="font-size:15px;font-weight:600;margin:0 0 4px;color:#333;">${meal.mealName}</h3>
+          <p style="font-size:12px;color:#888;margin:0 0 8px;">
+            ${meal.calories} kcal · P: ${meal.protein}g · C: ${meal.carbs}g · G: ${meal.fats}g
+          </p>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#f8f8f8;">
+                <th style="padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Alimento</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Cantidad</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Kcal</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Prot</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Carb</th>
+                <th style="padding:6px 10px;text-align:center;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Gras</th>
+                <th style="padding:6px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#888;font-weight:600;">Alternativa</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${foodsHtml}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    menusHtml += `
+      <div style="margin-bottom:30px;page-break-inside:avoid;">
+        <h2 style="font-size:18px;font-weight:700;margin:0 0 6px;color:#1a1a1a;">
+          Menú ${menu.menuNumber}
+        </h2>
+        <p style="font-size:13px;color:#666;margin:0 0 16px;">
+          Total: ${menu.totalCalories} kcal · P: ${menu.totalProtein}g · C: ${menu.totalCarbs}g · G: ${menu.totalFats}g
+        </p>
+        ${mealsHtml}
+      </div>`;
+  }
+
+  const avoidText = diet.avoidFoods && diet.avoidFoods.length > 0
+    ? `<p style="font-size:12px;color:#888;">Alimentos a evitar: ${diet.avoidFoods.join(", ")}</p>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>${diet.name} - Diet Generator</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 20px; }
+      @page { margin: 1.5cm; }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #1a1a1a;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 30px 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div style="border-bottom:2px solid #1a1a1a;padding-bottom:16px;margin-bottom:24px;">
+    <h1 style="font-size:24px;font-weight:800;margin:0 0 4px;">${diet.name}</h1>
+    <p style="font-size:13px;color:#666;margin:0;">
+      ${diet.totalCalories} kcal/día · ${diet.mealsPerDay} comidas · 
+      P: ${diet.proteinPercent}% · C: ${diet.carbsPercent}% · G: ${diet.fatsPercent}%
+    </p>
+    ${avoidText}
+  </div>
+  ${menusHtml}
+  <div style="border-top:1px solid #eee;padding-top:12px;margin-top:20px;">
+    <p style="font-size:11px;color:#aaa;text-align:center;">
+      Generado con Diet Generator · ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
+    </p>
+  </div>
+</body>
+</html>`;
+}
