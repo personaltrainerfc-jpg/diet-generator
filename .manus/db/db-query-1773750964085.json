@@ -1,0 +1,25 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'jua5l95oavqy6eqfsgbwun';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3cKE5Q7ZQPRmheK.root --database JuA5L95oAvQY6eqfSgbwUN --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'jua5l95oavqy6eqfsgbwun';",
+  "rows": [
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "menus"
+    },
+    {
+      "TABLE_NAME": "meals"
+    },
+    {
+      "TABLE_NAME": "foods"
+    },
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\nusers\nmenus\nmeals\nfoods\n__drizzle_migrations\n",
+  "stderr": "",
+  "execution_time_ms": 370
+}

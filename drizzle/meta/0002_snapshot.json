@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "80938ede-c175-4fb6-89b5-922322ef67ac",
+  "id": "ad3ce211-210e-483e-ad8f-e90b238b4600",
   "prevId": "cd822b2c-f34e-4e8f-bb2c-66d312e6199e",
   "tables": {
     "diets": {
@@ -75,8 +75,7 @@
           "type": "json",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "('[]')"
+          "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",

@@ -1,0 +1,11 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `diets` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`totalCalories` int NOT NULL,\n\t`proteinPercent` int NOT NULL,\n\t`carbsPercent` int NOT NULL,\n\t`fatsPercent` int NOT NULL,\n\t`mealsPerDay` int NOT NULL,\n\t`totalMenus` int NOT NULL,\n\t`avoidFoods` json DEFAULT ('[]'),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `diets_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3cKE5Q7ZQPRmheK.root --database JuA5L95oAvQY6eqfSgbwUN --execute CREATE TABLE IF NOT EXISTS `diets` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`totalCalories` int NOT NULL,\n\t`proteinPercent` int NOT NULL,\n\t`carbsPercent` int NOT NULL,\n\t`fatsPercent` int NOT NULL,\n\t`mealsPerDay` int NOT NULL,\n\t`totalMenus` int NOT NULL,\n\t`avoidFoods` json DEFAULT ('[]'),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `diets_id` PRIMARY KEY(`id`)\n);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 11 column 33 near \"'[]'),",
+    "\t`createdAt` timestamp NOT NULL DEFAULT (now()),",
+    "\tCONSTRAINT `diets_id` PRIMARY KEY(`id`)",
+    ")\""
+  ]
+}

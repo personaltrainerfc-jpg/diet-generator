@@ -11,3 +11,4 @@
 - [x] Generación de PDF descargable con formato profesional
 - [x] Notificación al propietario cuando se genera una nueva dieta
 - [x] Tests unitarios con Vitest
+- [x] Bug: Error al insertar dieta en BD - campo avoidFoods no se serializa correctamente como JSON (tablas no existían + sintaxis TiDB incompatible)

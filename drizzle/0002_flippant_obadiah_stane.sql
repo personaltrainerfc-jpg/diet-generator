@@ -8,7 +8,7 @@ CREATE TABLE `diets` (
 	`fatsPercent` int NOT NULL,
 	`mealsPerDay` int NOT NULL,
 	`totalMenus` int NOT NULL,
-	`avoidFoods` json DEFAULT ('[]'),
+	`avoidFoods` json,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	CONSTRAINT `diets_id` PRIMARY KEY(`id`)
 );

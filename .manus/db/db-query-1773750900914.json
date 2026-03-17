@@ -1,0 +1,18 @@
+{
+  "query": "SELECT TABLE_NAME, TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3cKE5Q7ZQPRmheK.root --database JuA5L95oAvQY6eqfSgbwUN --execute SELECT TABLE_NAME, TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations",
+      "TABLE_ROWS": "1"
+    },
+    {
+      "TABLE_NAME": "users",
+      "TABLE_ROWS": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\tTABLE_ROWS\n__drizzle_migrations\t1\nusers\t1\n",
+  "stderr": "",
+  "execution_time_ms": 396
+}
