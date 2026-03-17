@@ -26,6 +26,8 @@ export const diets = mysqlTable("diets", {
   mealsPerDay: int("mealsPerDay").notNull(),
   totalMenus: int("totalMenus").notNull(),
   avoidFoods: json("avoidFoods").$type<string[]>(),
+  dietType: varchar("dietType", { length: 50 }).default("equilibrada").notNull(),
+  cookingLevel: varchar("cookingLevel", { length: 50 }).default("moderate").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

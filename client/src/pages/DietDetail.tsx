@@ -27,11 +27,12 @@ import {
 import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
   Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
-  Search, Plus, Trash2, Copy
+  Search, Plus, Trash2, Copy, ShoppingCart
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
 import { toast } from "sonner";
+import { LOGO_URL } from "@shared/constants";
 
 // ── Editable Meal Name ──
 function EditableMealName({ meal, onSave }: { meal: FullMeal; onSave: (name: string) => void }) {
@@ -763,6 +764,7 @@ export default function DietDetail() {
   const [, setLocation] = useLocation();
   const dietId = Number(params?.id);
   const [downloading, setDownloading] = useState(false);
+  const [showShoppingList, setShowShoppingList] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -931,6 +933,18 @@ export default function DietDetail() {
             </TooltipTrigger>
             <TooltipContent>Duplicar dieta</TooltipContent>
           </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowShoppingList(true)}
+              >
+                <ShoppingCart className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Lista de la compra</TooltipContent>
+          </Tooltip>
           <Button
             variant="outline"
             onClick={handleDownloadPdf}
@@ -967,6 +981,19 @@ export default function DietDetail() {
           </Badge>
         )}
       </div>
+
+      {/* Shopping List Dialog */}
+      <Dialog open={showShoppingList} onOpenChange={setShowShoppingList}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              Lista de la Compra
+            </DialogTitle>
+          </DialogHeader>
+          <ShoppingListContent dietId={dietId} />
+        </DialogContent>
+      </Dialog>
 
       {/* Menus */}
       {diet.menus.length === 1 ? (
@@ -1017,10 +1044,56 @@ export default function DietDetail() {
   );
 }
 
+// ── Shopping List Content ──
+function ShoppingListContent({ dietId }: { dietId: number }) {
+  const { data, isLoading } = trpc.diet.shoppingList.useQuery({ id: dietId });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!data || data.items.length === 0) {
+    return <p className="text-muted-foreground text-center py-4">No hay alimentos en esta dieta.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        {data.items.length} alimentos diferentes en "{data.dietName}"
+      </p>
+      <div className="border rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left px-3 py-2 font-medium">Alimento</th>
+              <th className="text-right px-3 py-2 font-medium">Cantidad Total</th>
+              <th className="text-right px-3 py-2 font-medium">Apariciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((item, i) => (
+              <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/30"}>
+                <td className="px-3 py-2">{item.name}</td>
+                <td className="px-3 py-2 text-right font-medium">{item.totalQuantity}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground">{item.appearances}x</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /**
  * PDF Grid Layout: Columns = Menus, Rows = Meals
  * Similar to the reference PDF with yellow headers and clean grid.
  * Shows only food names, quantities and alternatives (NO calories/macros).
+ * Includes NoLimitPerformance logo.
  */
 function generateGridPdfHtml(diet: any): string {
   const sortedMenus = [...diet.menus].sort((a: any, b: any) => a.menuNumber - b.menuNumber);
@@ -1107,11 +1180,12 @@ function generateGridPdfHtml(diet: any): string {
 </head>
 <body>
   <div style="text-align:center;margin-bottom:20px;">
+    <img src="${LOGO_URL}" alt="NoLimitPerformance" style="height:80px;margin:0 auto 10px;display:block;" />
     <h1 style="font-size:22px;font-weight:900;margin:0 0 4px;color:#111;text-transform:uppercase;letter-spacing:1px;">
       ${diet.name}
     </h1>
     <p style="font-size:12px;color:#888;margin:0;">
-      ${diet.mealsPerDay} comidas/día · ${diet.totalCalories} kcal · Generado el ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
+      ${diet.mealsPerDay} comidas/día · Generado el ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
     </p>
   </div>
 
@@ -1125,7 +1199,7 @@ function generateGridPdfHtml(diet: any): string {
   </table>
 
   <div style="text-align:center;margin-top:16px;">
-    <p style="font-size:9px;color:#ccc;">Generado con Diet Generator</p>
+    <p style="font-size:9px;color:#ccc;">NoLimitPerformance #MetabolicHacking</p>
   </div>
 </body>
 </html>`;

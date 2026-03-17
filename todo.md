@@ -28,3 +28,9 @@
 - [x] Al sustituir un alimento, la alternativa se actualiza automáticamente con un alimento equivalente coherente
 - [x] Nombres de comidas coherentes según número de comidas (3: desayuno/comida/cena, 4: +snack mañana, 5: +snack tarde)
 - [x] Contenido de comidas coherente con el momento del día (desayuno con alimentos de desayuno, comida/cena con platos principales, snacks ligeros)
+- [x] Logo NoLimitPerformance en la cabecera del PDF exportado
+- [x] Lista de la compra automática con todos los alimentos y cantidades totales
+- [x] Plantillas rápidas predefinidas (volumen, definición, keto, mantenimiento)
+- [x] Selector de tipo de dieta en formulario (paleo, keto, mediterránea, real food, equilibrada)
+- [x] Selector de nivel de cocina en formulario (cocinar más o menos)
+- [x] Prompt del LLM adaptado según tipo de dieta y nivel de cocina seleccionados

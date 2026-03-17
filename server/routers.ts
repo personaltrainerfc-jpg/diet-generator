@@ -25,6 +25,8 @@ const dietConfigSchema = z.object({
   mealsPerDay: z.number().int().min(1).max(10),
   totalMenus: z.number().int().min(1).max(7),
   avoidFoods: z.array(z.string()).default([]),
+  dietType: z.string().default("equilibrada"),
+  cookingLevel: z.string().default("moderate"),
 });
 
 function buildDietPrompt(config: z.infer<typeof dietConfigSchema>): string {
@@ -35,6 +37,26 @@ function buildDietPrompt(config: z.infer<typeof dietConfigSchema>): string {
   const avoidText = config.avoidFoods.length > 0
     ? `\nALIMENTOS A EVITAR (NO incluir bajo ningún concepto): ${config.avoidFoods.join(", ")}`
     : "";
+
+  // Diet type specific instructions
+  const dietTypeInstructions: Record<string, string> = {
+    equilibrada: "Dieta equilibrada y variada sin restricciones especiales. Incluye todo tipo de alimentos de forma balanceada.",
+    mediterranea: "Dieta MEDITERRÁNEA: Prioriza aceite de oliva virgen extra, pescado azul y blanco, legumbres, frutas, verduras de temporada, frutos secos, cereales integrales. Limita carnes rojas. Usa hierbas aromáticas y especias mediterráneas.",
+    keto: "Dieta KETO/CETOGÉNICA: MUY baja en carbohidratos (máximo 20-50g/día). Alta en grasas saludables (aguacate, aceite de oliva, frutos secos, mantequilla, queso). Proteína moderada. PROHIBIDO: pan, arroz, pasta, patatas, frutas altas en azúcar, legumbres, cereales. Permitido: verduras bajas en carbos (espinacas, brócoli, calabacín, coliflor), carnes, pescados, huevos, lácteos enteros.",
+    paleo: "Dieta PALEO: Solo alimentos que podrían obtenerse mediante caza y recolección. PERMITIDO: carnes, pescados, huevos, verduras, frutas, frutos secos, semillas, aceite de oliva/coco. PROHIBIDO: cereales (arroz, trigo, avena), legumbres, lácteos, azúcar refinado, alimentos procesados, pan, pasta.",
+    realfood: "Dieta REAL FOOD: Solo alimentos reales y mínimamente procesados. PROHIBIDO: ultraprocesados, azúcares añadidos, harinas refinadas, aceites de semillas, aditivos artificiales. PERMITIDO: carnes frescas, pescados, huevos, verduras, frutas, legumbres, cereales integrales, frutos secos, lácteos naturales, aceite de oliva.",
+    vegetariana: "Dieta VEGETARIANA: Sin carne ni pescado. PERMITIDO: huevos, lácteos, legumbres, tofu, tempe, seitán, cereales, verduras, frutas, frutos secos. Asegura proteína completa combinando legumbres + cereales.",
+    vegana: "Dieta VEGANA: Sin ningún producto de origen animal. PERMITIDO: legumbres, tofu, tempe, seitán, cereales, verduras, frutas, frutos secos, semillas, leches vegetales. PROHIBIDO: carne, pescado, huevos, lácteos, miel. Asegura proteína completa y vitamina B12.",
+  };
+
+  const cookingInstructions: Record<string, string> = {
+    minimal: "NIVEL DE COCINA MÍNIMO: Recetas MUY rápidas y sencillas (menos de 15 minutos). Prioriza: alimentos que se comen crudos o con mínima preparación (ensaladas, tostadas, yogures, fruta, jamón, queso, atún de lata, huevos cocidos, alimentos precocinados saludables). Evita: guisos largos, horno, elaboraciones complejas.",
+    moderate: "NIVEL DE COCINA MODERADO: Recetas normales (15-30 minutos). Incluye: plancha, sartén, horno básico, hervidos rápidos. Recetas sencillas pero con algo de elaboración.",
+    elaborate: "NIVEL DE COCINA ELABORADO: Recetas completas sin restricción de tiempo. Incluye: guisos, estofados, horno, preparaciones complejas, marinados, salsas caseras. Máxima variedad y creatividad culinaria.",
+  };
+
+  const dietTypeText = dietTypeInstructions[config.dietType] || dietTypeInstructions.equilibrada;
+  const cookingText = cookingInstructions[config.cookingLevel] || cookingInstructions.moderate;
 
   // Build a compact food reference from the database (top common foods)
   const commonCategories = [
@@ -105,6 +127,12 @@ ESTRUCTURA DE COMIDAS (OBLIGATORIO - RESPETAR EXACTAMENTE):
 
 ${mealStructure}
 ${avoidText}
+
+TIPO DE DIETA (OBLIGATORIO - RESPETAR ESTRICTAMENTE):
+${dietTypeText}
+
+NIVEL DE COCINA:
+${cookingText}
 
 COHERENCIA POR MOMENTO DEL DÍA (MUY IMPORTANTE):
 - DESAYUNO: SOLO alimentos de desayuno: tostadas, pan, avena, cereales, yogur, fruta, huevos (revueltos, cocidos), leche, café, mantequilla, mermelada, jamón serrano/cocido en tostada, aguacate en tostada. PROHIBIDO: pescado a la plancha, filetes de carne, guisos, arroces, pastas, legumbres.
@@ -267,6 +295,8 @@ export const appRouter = router({
           mealsPerDay: input.mealsPerDay,
           totalMenus: input.totalMenus,
           avoidFoods: input.avoidFoods,
+          dietType: input.dietType,
+          cookingLevel: input.cookingLevel,
         });
 
         for (const menu of generatedDiet.menus) {
@@ -748,6 +778,46 @@ Responde SOLO con JSON.`;
         return { success: true, foodId };
       }),
 
+    // ── Shopping list ──
+    shoppingList: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const diet = await getFullDiet(input.id);
+        if (!diet) throw new Error("Dieta no encontrada");
+        if (diet.userId !== ctx.user.id) throw new Error("No tienes acceso a esta dieta");
+
+        // Aggregate all foods across all menus
+        const foodMap = new Map<string, { name: string; totalGrams: number; count: number }>();
+
+        for (const menu of diet.menus) {
+          for (const meal of menu.meals) {
+            for (const food of meal.foods) {
+              const key = food.name.toLowerCase().trim();
+              const qtyMatch = food.quantity.match(/(\d+)/);
+              const grams = qtyMatch ? parseInt(qtyMatch[1]) : 0;
+
+              if (foodMap.has(key)) {
+                const existing = foodMap.get(key)!;
+                existing.totalGrams += grams;
+                existing.count += 1;
+              } else {
+                foodMap.set(key, { name: food.name, totalGrams: grams, count: 1 });
+              }
+            }
+          }
+        }
+
+        const items = Array.from(foodMap.values())
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(item => ({
+            name: item.name,
+            totalQuantity: item.totalGrams > 0 ? `${item.totalGrams}g` : `${item.count} uds`,
+            appearances: item.count,
+          }));
+
+        return { dietName: diet.name, items };
+      }),
+
     // ── Duplicate diet ──
     duplicate: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -767,6 +837,8 @@ Responde SOLO con JSON.`;
           mealsPerDay: original.mealsPerDay,
           totalMenus: original.totalMenus,
           avoidFoods: (original.avoidFoods as string[]) || [],
+          dietType: (original as any).dietType || 'equilibrada',
+          cookingLevel: (original as any).cookingLevel || 'moderate',
         });
 
         // Copy all menus, meals and foods

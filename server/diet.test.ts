@@ -319,6 +319,8 @@ describe("diet.generate", () => {
       mealsPerDay: 4,
       totalMenus: 1,
       avoidFoods: [],
+      dietType: "equilibrada",
+      cookingLevel: "moderate",
     });
     expect(result.dietId).toBe(1);
   });
@@ -336,6 +338,8 @@ describe("diet.generate", () => {
         mealsPerDay: 4,
         totalMenus: 1,
         avoidFoods: [],
+        dietType: "equilibrada",
+        cookingLevel: "moderate",
       })
     ).rejects.toThrow(/macronutrientes/);
   });
@@ -353,6 +357,8 @@ describe("diet.generate", () => {
         mealsPerDay: 4,
         totalMenus: 1,
         avoidFoods: [],
+        dietType: "equilibrada",
+        cookingLevel: "moderate",
       })
     ).rejects.toThrow();
   });
@@ -563,6 +569,23 @@ describe("diet.updateFood", () => {
     await expect(
       caller.diet.updateFood({ foodId: 1, quantity: "120g" })
     ).rejects.toThrow();
+  });
+});
+
+describe("diet.shoppingList", () => {
+  it("returns shopping list items for a diet", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.shoppingList({ id: 1 });
+    expect(result).toHaveProperty("dietName");
+    expect(result).toHaveProperty("items");
+    expect(Array.isArray(result.items)).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.shoppingList({ id: 1 })).rejects.toThrow();
   });
 });
 

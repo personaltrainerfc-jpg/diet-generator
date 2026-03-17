@@ -11,8 +11,10 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
-  Loader2, X, Plus, Sparkles, AlertCircle
+  Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot
 } from "lucide-react";
+import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES } from "@shared/constants";
+import type { DietType, CookingLevel } from "@shared/constants";
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -25,6 +27,8 @@ export default function Home() {
   const [totalMenus, setTotalMenus] = useState(1);
   const [avoidFoods, setAvoidFoods] = useState<string[]>([]);
   const [newAvoidFood, setNewAvoidFood] = useState("");
+  const [dietType, setDietType] = useState<DietType>("equilibrada");
+  const [cookingLevel, setCookingLevel] = useState<CookingLevel>("moderate");
 
   const macroSum = proteinPercent + carbsPercent + fatsPercent;
   const proteinGrams = Math.round((totalCalories * proteinPercent / 100) / 4);
@@ -53,6 +57,18 @@ export default function Home() {
     setAvoidFoods(avoidFoods.filter(f => f !== food));
   };
 
+  const applyTemplate = (template: typeof QUICK_TEMPLATES[number]) => {
+    setTotalCalories(template.totalCalories);
+    setProteinPercent(template.proteinPercent);
+    setCarbsPercent(template.carbsPercent);
+    setFatsPercent(template.fatsPercent);
+    setMealsPerDay(template.mealsPerDay);
+    setDietType(template.dietType);
+    setCookingLevel(template.cookingLevel);
+    setName(`Dieta ${template.name}`);
+    toast.success(`Plantilla "${template.name}" aplicada`);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (macroSum < 95 || macroSum > 105) {
@@ -68,6 +84,8 @@ export default function Home() {
       mealsPerDay,
       totalMenus,
       avoidFoods,
+      dietType,
+      cookingLevel,
     });
   };
 
@@ -81,6 +99,35 @@ export default function Home() {
           Configura los parámetros y genera menús personalizados con IA.
         </p>
       </div>
+
+      {/* Plantillas rápidas */}
+      <Card className="shadow-sm border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Plantillas Rápidas
+          </CardTitle>
+          <CardDescription>
+            Selecciona una plantilla para rellenar automáticamente los parámetros.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {QUICK_TEMPLATES.map(template => (
+              <button
+                key={template.name}
+                type="button"
+                onClick={() => applyTemplate(template)}
+                className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all cursor-pointer text-center group"
+              >
+                <span className="text-2xl">{template.icon}</span>
+                <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{template.name}</span>
+                <span className="text-xs text-muted-foreground">{template.totalCalories} kcal</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Nombre de la dieta */}
@@ -99,6 +146,78 @@ export default function Home() {
               className="text-base"
               required
             />
+          </CardContent>
+        </Card>
+
+        {/* Tipo de dieta */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Salad className="h-5 w-5 text-green-600" />
+              Tipo de Dieta
+            </CardTitle>
+            <CardDescription>
+              Selecciona el estilo de alimentación que deseas seguir.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {DIET_TYPES.map(dt => (
+                <button
+                  key={dt.value}
+                  type="button"
+                  onClick={() => setDietType(dt.value)}
+                  className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                    dietType === dt.value
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "border-border hover:border-primary/50 hover:bg-muted/50"
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${dietType === dt.value ? "text-primary" : "text-foreground"}`}>
+                    {dt.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    {dt.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Nivel de cocina */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CookingPot className="h-5 w-5 text-orange-600" />
+              Nivel de Cocina
+            </CardTitle>
+            <CardDescription>
+              Indica cuánto tiempo y esfuerzo quieres dedicar a cocinar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {COOKING_LEVELS.map(cl => (
+                <button
+                  key={cl.value}
+                  type="button"
+                  onClick={() => setCookingLevel(cl.value)}
+                  className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                    cookingLevel === cl.value
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "border-border hover:border-primary/50 hover:bg-muted/50"
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${cookingLevel === cl.value ? "text-primary" : "text-foreground"}`}>
+                    {cl.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    {cl.description}
+                  </span>
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
