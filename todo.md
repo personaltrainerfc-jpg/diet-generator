@@ -25,3 +25,6 @@
 - [x] Duplicar dieta existente para modificar parámetros y regenerar
 - [x] Añadir alimentos manualmente buscando en la BD (sin IA)
 - [x] Rediseñar PDF con formato grid: columnas = menús, filas = comidas, estilo profesional tipo referencia
+- [x] Al sustituir un alimento, la alternativa se actualiza automáticamente con un alimento equivalente coherente
+- [x] Nombres de comidas coherentes según número de comidas (3: desayuno/comida/cena, 4: +snack mañana, 5: +snack tarde)
+- [x] Contenido de comidas coherente con el momento del día (desayuno con alimentos de desayuno, comida/cena con platos principales, snacks ligeros)

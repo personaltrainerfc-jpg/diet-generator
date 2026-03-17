@@ -59,6 +59,38 @@ function buildDietPrompt(config: z.infer<typeof dietConfigSchema>): string {
     .filter(Boolean)
     .join("\n");
 
+  // Define meal structure based on number of meals
+  let mealStructure = "";
+  if (config.mealsPerDay === 3) {
+    mealStructure = `Las 3 comidas DEBEN ser exactamente:
+1. DESAYUNO: Alimentos típicos de desayuno (tostadas, avena, yogur, fruta, huevos revueltos, bowls de avena, cereales, café con leche). NUNCA incluir pescado, carne a la plancha, guisos o platos de almuerzo/cena.
+2. COMIDA PRINCIPAL: Platos completos tipo almuerzo (arroz/pasta/legumbres con carne o pescado, ensaladas completas, guisos, verduras con proteína).
+3. CENA PRINCIPAL: Platos ligeros pero completos tipo cena (pescado/carne a la plancha con verduras, tortillas, cremas de verduras con proteína, ensaladas templadas).`;
+  } else if (config.mealsPerDay === 4) {
+    mealStructure = `Las 4 comidas DEBEN ser exactamente:
+1. DESAYUNO: Alimentos típicos de desayuno (tostadas, avena, yogur, fruta, huevos revueltos, bowls de avena, cereales). NUNCA incluir pescado, carne a la plancha, guisos o platos de almuerzo/cena.
+2. SNACK MEDIA MAÑANA: Snack ligero (fruta, yogur, frutos secos, tostada pequeña, batido de proteínas). NO es una comida principal.
+3. COMIDA PRINCIPAL: Platos completos tipo almuerzo (arroz/pasta/legumbres con carne o pescado, ensaladas completas, guisos, verduras con proteína).
+4. CENA PRINCIPAL: Platos ligeros pero completos tipo cena (pescado/carne a la plancha con verduras, tortillas, cremas de verduras con proteína, ensaladas templadas).`;
+  } else if (config.mealsPerDay === 5) {
+    mealStructure = `Las 5 comidas DEBEN ser exactamente:
+1. DESAYUNO: Alimentos típicos de desayuno (tostadas, avena, yogur, fruta, huevos revueltos, bowls de avena, cereales). NUNCA incluir pescado, carne a la plancha, guisos o platos de almuerzo/cena.
+2. SNACK MEDIA MAÑANA: Snack ligero (fruta, yogur, frutos secos, tostada pequeña, batido de proteínas). NO es una comida principal.
+3. COMIDA PRINCIPAL: Platos completos tipo almuerzo (arroz/pasta/legumbres con carne o pescado, ensaladas completas, guisos, verduras con proteína).
+4. SNACK MEDIA TARDE: Snack ligero (fruta, yogur, frutos secos, tostada pequeña, batido de proteínas). NO es una comida principal.
+5. CENA PRINCIPAL: Platos ligeros pero completos tipo cena (pescado/carne a la plancha con verduras, tortillas, cremas de verduras con proteína, ensaladas templadas).`;
+  } else if (config.mealsPerDay === 6) {
+    mealStructure = `Las 6 comidas DEBEN ser exactamente:
+1. DESAYUNO: Alimentos típicos de desayuno.
+2. SNACK MEDIA MAÑANA: Snack ligero.
+3. COMIDA PRINCIPAL: Plato completo tipo almuerzo.
+4. SNACK MEDIA TARDE: Snack ligero.
+5. CENA PRINCIPAL: Plato ligero pero completo tipo cena.
+6. RECENA/SNACK NOCTURNO: Snack muy ligero (yogur, fruta, caseína).`;
+  } else {
+    mealStructure = `Distribuye las ${config.mealsPerDay} comidas de forma lógica a lo largo del día, empezando por desayuno y terminando por cena. Los snacks intermedios deben ser ligeros. Los desayunos NUNCA deben incluir pescado ni carne a la plancha.`;
+  }
+
   return `Eres un nutricionista profesional. Genera exactamente ${config.totalMenus} menú(s) diario(s) completo(s) con las siguientes especificaciones:
 
 OBJETIVOS NUTRICIONALES DIARIOS:
@@ -67,10 +99,18 @@ OBJETIVOS NUTRICIONALES DIARIOS:
 - Carbohidratos: ${carbsGrams}g (${config.carbsPercent}%)
 - Grasas: ${fatsGrams}g (${config.fatsPercent}%)
 
-ESTRUCTURA:
+ESTRUCTURA DE COMIDAS (OBLIGATORIO - RESPETAR EXACTAMENTE):
 - Número de comidas por día: ${config.mealsPerDay}
 - Número de menús a generar: ${config.totalMenus}
+
+${mealStructure}
 ${avoidText}
+
+COHERENCIA POR MOMENTO DEL DÍA (MUY IMPORTANTE):
+- DESAYUNO: SOLO alimentos de desayuno: tostadas, pan, avena, cereales, yogur, fruta, huevos (revueltos, cocidos), leche, café, mantequilla, mermelada, jamón serrano/cocido en tostada, aguacate en tostada. PROHIBIDO: pescado a la plancha, filetes de carne, guisos, arroces, pastas, legumbres.
+- SNACKS (media mañana/tarde): Snacks ligeros: fruta, yogur, frutos secos, tostada pequeña, batido de proteínas, queso fresco, barrita. PROHIBIDO: platos principales, guisos, arroces.
+- COMIDA PRINCIPAL: Platos completos: arroz, pasta, legumbres, patatas, verduras salteadas, ensaladas completas, siempre acompañados de carne o pescado. Inspirarse en: judías verdes con cebolla y jamón + carne/pescado, guisantes + carne/pescado, ensaladas con proteína.
+- CENA PRINCIPAL: Platos más ligeros que la comida pero completos: pescado/carne a la plancha con verduras, tortillas, cremas de verduras con proteína, ensaladas templadas.
 
 REFERENCIA NUTRICIONAL DE ALIMENTOS (valores por 100g):
 ${foodRef}
@@ -86,11 +126,11 @@ COMBINACIONES Y RECETAS HABITUALES QUE DEBES USAR COMO INSPIRACIÓN:
 
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
-2. Para CADA alimento, proporciona UNA alternativa equivalente con macros similares.
+2. Para CADA alimento, proporciona UNA alternativa equivalente con macros similares Y coherente con el momento del día (la alternativa de un alimento de desayuno debe ser otro alimento de desayuno).
 3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades).
-6. Los nombres de las comidas deben ser descriptivos (ej: "Desayuno", "Media Mañana", "Almuerzo", "Merienda", "Cena").
+6. Usa EXACTAMENTE los nombres de comida indicados en la estructura de comidas.
 7. Asegúrate de que la suma de macros de todas las comidas se aproxime a los objetivos diarios.
 8. Todos los valores numéricos deben ser enteros (sin decimales).
 9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
@@ -530,6 +570,8 @@ export const appRouter = router({
         alternativeCarbs: z.number().int().min(0).optional(),
         alternativeFats: z.number().int().min(0).optional(),
         recalcFromDb: z.boolean().optional(), // If true, recalculate macros from food DB based on new quantity
+        generateAlternative: z.boolean().optional(), // If true, auto-generate a new alternative via LLM
+        mealName: z.string().optional(), // Name of the meal (for context when generating alternative)
       }))
       .mutation(async ({ ctx, input }) => {
         const food = await getFoodById(input.foodId);
@@ -548,7 +590,7 @@ export const appRouter = router({
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
-        const { foodId, recalcFromDb, ...updateData } = input;
+        const { foodId, recalcFromDb, generateAlternative, mealName: inputMealName, ...updateData } = input;
 
         // If recalcFromDb is true and quantity changed, recalculate macros proportionally
         if (recalcFromDb && updateData.quantity) {
@@ -578,6 +620,67 @@ export const appRouter = router({
                 updateData.fats = Math.round(food.fats * ratio);
               }
             }
+          }
+        }
+
+        // If replacing the food (name changed), auto-generate a new alternative
+        if (generateAlternative && updateData.name && updateData.name !== food.name) {
+          try {
+            const newFoodName = updateData.name;
+            const qty = updateData.quantity || food.quantity;
+            const cal = updateData.calories ?? food.calories;
+            const prot = updateData.protein ?? food.protein;
+            const carb = updateData.carbs ?? food.carbs;
+            const fat = updateData.fats ?? food.fats;
+            const contextMealName = inputMealName || mealResult[0].mealName || "comida";
+
+            const altPrompt = `Dado el alimento "${newFoodName}" (${qty}, ${cal}kcal, P${prot}g, C${carb}g, G${fat}g) que forma parte de la comida "${contextMealName}", sugiere UNA alternativa equivalente que:
+1. Tenga macros similares (misma cantidad aproximada de cal/prot/carbs/grasas)
+2. Sea coherente con el momento del día (si es desayuno, debe ser un alimento de desayuno; si es comida/cena, un alimento de comida/cena; si es snack, un snack)
+3. Sea un alimento real, común y accesible
+4. Indique la cantidad precisa en gramos
+
+Responde SOLO con JSON.`;
+
+            const altSchema = {
+              name: "food_alternative",
+              strict: true,
+              schema: {
+                type: "object" as const,
+                properties: {
+                  alternativeName: { type: "string" as const },
+                  alternativeQuantity: { type: "string" as const },
+                  alternativeCalories: { type: "integer" as const },
+                  alternativeProtein: { type: "integer" as const },
+                  alternativeCarbs: { type: "integer" as const },
+                  alternativeFats: { type: "integer" as const },
+                },
+                required: ["alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                additionalProperties: false,
+              },
+            };
+
+            const altResponse = await invokeLLM({
+              messages: [
+                { role: "system", content: "Eres un nutricionista profesional. Sugiere alternativas de alimentos coherentes con el momento del día. Todos los valores numéricos deben ser enteros." },
+                { role: "user", content: altPrompt },
+              ],
+              response_format: { type: "json_schema", json_schema: altSchema },
+            });
+
+            const altContent = altResponse.choices[0]?.message?.content;
+            if (altContent && typeof altContent === "string") {
+              const alt = JSON.parse(altContent);
+              updateData.alternativeName = alt.alternativeName;
+              updateData.alternativeQuantity = alt.alternativeQuantity;
+              updateData.alternativeCalories = alt.alternativeCalories;
+              updateData.alternativeProtein = alt.alternativeProtein;
+              updateData.alternativeCarbs = alt.alternativeCarbs;
+              updateData.alternativeFats = alt.alternativeFats;
+            }
+          } catch (e) {
+            console.warn("Failed to generate alternative:", e);
+            // Continue without updating alternative - not critical
           }
         }
 

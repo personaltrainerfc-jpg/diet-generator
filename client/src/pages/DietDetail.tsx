@@ -345,8 +345,9 @@ function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string
 }
 
 // ── Food Row ──
-function FoodRow({ food, onUpdateFood, onDeleteFood }: {
+function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
   food: FullFood;
+  mealName: string;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void;
 }) {
@@ -385,6 +386,8 @@ function FoodRow({ food, onUpdateFood, onDeleteFood }: {
       protein: Math.round(selected.protein * factor),
       carbs: Math.round(selected.carbs * factor),
       fats: Math.round(selected.fats * factor),
+      generateAlternative: true,
+      mealName: mealName,
     };
     onUpdateFood(food.id, updateData);
   };
@@ -568,6 +571,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             <FoodRow
               key={food.id}
               food={food}
+              mealName={meal.mealName}
               onUpdateFood={onUpdateFood}
               onDeleteFood={onDeleteFood}
             />
