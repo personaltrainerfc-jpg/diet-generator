@@ -21,3 +21,7 @@
 - [x] Añadir comidas completas a un menú ya generado (ej: pasar de 3 a 4 comidas)
 - [x] Eliminar comidas completas de un menú ya generado (ej: pasar de 5 a 4 comidas)
 - [x] Ajustar gramos de cada alimento individualmente después de generar la dieta
+- [x] Recalcular macros automáticamente al cambiar gramos de un alimento (proporcional a la BD nutricional)
+- [x] Duplicar dieta existente para modificar parámetros y regenerar
+- [x] Añadir alimentos manualmente buscando en la BD (sin IA)
+- [x] Rediseñar PDF con formato grid: columnas = menús, filas = comidas, estilo profesional tipo referencia

@@ -1,0 +1,13 @@
+PDF Reference Format Notes:
+- Layout: Grid/table format with columns = days of the week (Lunes to Domingo)
+- Header: Title at top center with client name + period (e.g. "DIDAC GRAU - MESOCICLO A1 (Feb-Mar)")
+- Column headers: Yellow/gold background with day names in bold
+- Rows: Each row = one meal type (Comida, Snack, Cena, POST ENTRENO)
+- Meal name: Bold at top of each cell
+- Foods listed below with quantities in parentheses, separated by commas
+- Clean white background with subtle borders between cells
+- No calories or macros shown - only food names and quantities
+- Alternating row heights based on content
+- Professional, clean, minimal design
+- Color scheme: Yellow/gold headers, white cells, black text
+- Each menu = one column (day)

@@ -27,7 +27,7 @@ import {
 import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
   Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
-  Search, Replace, Plus, Trash2
+  Search, Plus, Trash2, Copy
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
@@ -88,7 +88,7 @@ function EditableMealName({ meal, onSave }: { meal: FullMeal; onSave: (name: str
   );
 }
 
-// ── Food Search Dialog ──
+// ── Food Search Dialog (for replacing food) ──
 function FoodSearchDialog({
   open,
   onClose,
@@ -163,7 +163,145 @@ function FoodSearchDialog({
   );
 }
 
-// ── Editable Quantity (gramos) ──
+// ── Add Food Dialog (manual from DB) ──
+function AddFoodDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [selectedFood, setSelectedFood] = useState<{ name: string; calories: number; protein: number; carbs: number; fats: number } | null>(null);
+  const [grams, setGrams] = useState(100);
+
+  const { data: results, isLoading } = trpc.foodDb.search.useQuery(
+    { query },
+    { enabled: query.length >= 2 }
+  );
+
+  const handleAdd = () => {
+    if (!selectedFood) return;
+    const factor = grams / 100;
+    onAdd({
+      name: selectedFood.name,
+      quantity: `${grams}g`,
+      calories: Math.round(selectedFood.calories * factor),
+      protein: Math.round(selectedFood.protein * factor),
+      carbs: Math.round(selectedFood.carbs * factor),
+      fats: Math.round(selectedFood.fats * factor),
+    });
+    setQuery("");
+    setSelectedFood(null);
+    setGrams(100);
+    onClose();
+  };
+
+  const handleClose = () => {
+    setQuery("");
+    setSelectedFood(null);
+    setGrams(100);
+    onClose();
+  };
+
+  const previewFactor = grams / 100;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg">Añadir alimento</DialogTitle>
+        </DialogHeader>
+
+        {!selectedFood ? (
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar alimento en la base de datos..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-0.5">
+              {isLoading && query.length >= 2 && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {results && results.length === 0 && query.length >= 2 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No se encontraron alimentos</p>
+              )}
+              {results?.map((food, i) => (
+                <button
+                  key={`${food.name}-${i}`}
+                  onClick={() => setSelectedFood(food)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/70 transition-colors text-left"
+                >
+                  <span className="font-medium text-sm">{food.name}</span>
+                  <span className="text-xs text-muted-foreground shrink-0 ml-3">
+                    {food.calories} kcal · P{food.protein}g · C{food.carbs}g · G{food.fats}g
+                    <span className="text-[10px] ml-1 opacity-60">/100g</span>
+                  </span>
+                </button>
+              ))}
+              {query.length < 2 && (
+                <p className="text-xs text-muted-foreground text-center py-6">Escribe al menos 2 caracteres para buscar</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="font-semibold text-sm">{selectedFood.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Por 100g: {selectedFood.calories} kcal · P{selectedFood.protein}g · C{selectedFood.carbs}g · G{selectedFood.fats}g
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cantidad (gramos)</label>
+              <Input
+                type="number"
+                value={grams}
+                onChange={(e) => setGrams(Math.max(1, Number(e.target.value)))}
+                min={1}
+                max={2000}
+                className="w-32"
+                autoFocus
+              />
+            </div>
+
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Macros para {grams}g:</p>
+              <div className="flex gap-4 text-sm">
+                <span className="text-orange-600 font-semibold">{Math.round(selectedFood.calories * previewFactor)} kcal</span>
+                <span className="text-red-500">P: {Math.round(selectedFood.protein * previewFactor)}g</span>
+                <span className="text-amber-500">C: {Math.round(selectedFood.carbs * previewFactor)}g</span>
+                <span className="text-blue-500">G: {Math.round(selectedFood.fats * previewFactor)}g</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSelectedFood(null)}>
+                <ArrowLeft className="h-4 w-4 mr-1" /> Volver
+              </Button>
+              <Button onClick={handleAdd}>
+                <Plus className="h-4 w-4 mr-1" /> Añadir
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Editable Quantity (gramos) with auto-recalc ──
 function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState(value);
@@ -198,7 +336,7 @@ function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string
     <button
       onClick={() => { setInputVal(value); setEditing(true); }}
       className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer transition-colors inline-flex items-center gap-1"
-      title="Clic para editar cantidad"
+      title="Clic para editar cantidad (los macros se recalcularán automáticamente)"
     >
       {value}
       <Pencil className="h-2.5 w-2.5 opacity-0 group-hover/food:opacity-60" />
@@ -252,7 +390,8 @@ function FoodRow({ food, onUpdateFood, onDeleteFood }: {
   };
 
   const handleQuantityChange = (newQuantity: string) => {
-    onUpdateFood(food.id, { foodId: food.id, quantity: newQuantity });
+    // Send with recalcFromDb flag so backend recalculates macros proportionally
+    onUpdateFood(food.id, { foodId: food.id, quantity: newQuantity, recalcFromDb: true });
   };
 
   return (
@@ -290,7 +429,7 @@ function FoodRow({ food, onUpdateFood, onDeleteFood }: {
                 onClick={() => setSearchOpen(true)}
                 className="h-7 w-7 rounded-md flex items-center justify-center bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover/food:opacity-100"
               >
-                <Replace className="h-3.5 w-3.5" />
+                <Search className="h-3.5 w-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent>Sustituir alimento</TooltipContent>
@@ -343,14 +482,17 @@ function FoodRow({ food, onUpdateFood, onDeleteFood }: {
 }
 
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, isDeletable }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, isDeletable }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void;
   onDeleteMeal: (mealId: number) => void;
+  onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
   isDeletable: boolean;
 }) {
+  const [addFoodOpen, setAddFoodOpen] = useState(false);
+
   return (
     <Card className="shadow-sm group/meal">
       <CardHeader className="pb-3">
@@ -431,7 +573,21 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             />
           ))}
         </div>
+        {/* Add food button */}
+        <button
+          onClick={() => setAddFoodOpen(true)}
+          className="w-full mt-2 py-2 rounded-lg border border-dashed border-muted-foreground/30 text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Añadir alimento
+        </button>
       </CardContent>
+
+      <AddFoodDialog
+        open={addFoodOpen}
+        onClose={() => setAddFoodOpen(false)}
+        onAdd={(food) => onAddFood(meal.id, food)}
+      />
     </Card>
   );
 }
@@ -500,13 +656,14 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, addingMeal }: {
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, addingMeal }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void;
   onDeleteMeal: (mealId: number) => void;
   onAddMeal: (menuId: number, mealName: string) => void;
+  onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
   addingMeal: boolean;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -557,6 +714,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             onUpdateFood={onUpdateFood}
             onDeleteFood={onDeleteFood}
             onDeleteMeal={onDeleteMeal}
+            onAddFood={onAddFood}
             isDeletable={canDeleteMeal}
           />
         ))}
@@ -625,6 +783,14 @@ export default function DietDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const addFoodMut = trpc.diet.addFood.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Alimento añadido");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const deleteFoodMut = trpc.diet.deleteFood.useMutation({
     onSuccess: () => {
       utils.diet.getById.invalidate({ id: dietId });
@@ -649,6 +815,14 @@ export default function DietDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const duplicateMut = trpc.diet.duplicate.useMutation({
+    onSuccess: (data) => {
+      toast.success("Dieta duplicada correctamente");
+      setLocation(`/diet/${data.dietId}`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const handleMealNameChange = useCallback((mealId: number, name: string) => {
     updateMealNameMut.mutate({ mealId, mealName: name });
   }, [updateMealNameMut]);
@@ -656,6 +830,10 @@ export default function DietDetail() {
   const handleUpdateFood = useCallback((foodId: number, data: Record<string, unknown>) => {
     updateFoodMut.mutate(data as any);
   }, [updateFoodMut]);
+
+  const handleAddFood = useCallback((mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => {
+    addFoodMut.mutate({ mealId, ...food });
+  }, [addFoodMut]);
 
   const handleDeleteFood = useCallback((foodId: number) => {
     deleteFoodMut.mutate({ foodId });
@@ -675,7 +853,7 @@ export default function DietDetail() {
     try {
       const printWindow = window.open("", "_blank");
       if (!printWindow) throw new Error("No se pudo abrir la ventana de impresión");
-      const html = generatePrintHtml(diet);
+      const html = generateGridPdfHtml(diet);
       printWindow.document.write(html);
       printWindow.document.close();
       printWindow.onload = () => printWindow.print();
@@ -731,19 +909,37 @@ export default function DietDetail() {
             {diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleDownloadPdf}
-          disabled={downloading}
-          className="shrink-0"
-        >
-          {downloading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
-          PDF
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => duplicateMut.mutate({ id: dietId })}
+                disabled={duplicateMut.isPending}
+              >
+                {duplicateMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Duplicar dieta</TooltipContent>
+          </Tooltip>
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            PDF
+          </Button>
+        </div>
       </div>
 
       {/* Config summary */}
@@ -777,6 +973,7 @@ export default function DietDetail() {
           onDeleteFood={handleDeleteFood}
           onDeleteMeal={handleDeleteMeal}
           onAddMeal={handleAddMeal}
+          onAddFood={handleAddFood}
           addingMeal={addMealMut.isPending}
         />
       ) : (
@@ -805,6 +1002,7 @@ export default function DietDetail() {
                   onDeleteFood={handleDeleteFood}
                   onDeleteMeal={handleDeleteMeal}
                   onAddMeal={handleAddMeal}
+                  onAddFood={handleAddFood}
                   addingMeal={addMealMut.isPending}
                 />
               </TabsContent>
@@ -816,54 +1014,71 @@ export default function DietDetail() {
 }
 
 /**
- * PDF: Only meal name, food names, quantities and alternatives.
- * NO calories or macros.
+ * PDF Grid Layout: Columns = Menus, Rows = Meals
+ * Similar to the reference PDF with yellow headers and clean grid.
+ * Shows only food names, quantities and alternatives (NO calories/macros).
  */
-function generatePrintHtml(diet: any): string {
-  let menusHtml = "";
+function generateGridPdfHtml(diet: any): string {
+  const sortedMenus = [...diet.menus].sort((a: any, b: any) => a.menuNumber - b.menuNumber);
 
-  for (const menu of diet.menus.sort((a: any, b: any) => a.menuNumber - b.menuNumber)) {
-    let mealsHtml = "";
-    for (const meal of menu.meals.sort((a: any, b: any) => a.mealNumber - b.mealNumber)) {
-      let foodsHtml = "";
-      for (const food of meal.foods) {
-        const altText = food.alternativeName
-          ? `${food.alternativeName}${food.alternativeQuantity ? ` (${food.alternativeQuantity})` : ""}`
-          : "-";
-        foodsHtml += `
-          <tr>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:14px;font-weight:500;">${food.name}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:14px;text-align:center;color:#555;">${food.quantity}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;color:#777;font-style:italic;">${altText}</td>
-          </tr>`;
+  // Collect all unique meal names across all menus (by mealNumber)
+  const maxMeals = Math.max(...sortedMenus.map((m: any) => m.meals.length));
+  const mealRows: { mealNumber: number; mealName: string }[] = [];
+
+  for (let i = 0; i < maxMeals; i++) {
+    // Find the first menu that has this meal number to get the name
+    let name = `Comida ${i + 1}`;
+    for (const menu of sortedMenus) {
+      const sorted = [...menu.meals].sort((a: any, b: any) => a.mealNumber - b.mealNumber);
+      if (sorted[i]) {
+        name = sorted[i].mealName;
+        break;
+      }
+    }
+    mealRows.push({ mealNumber: i + 1, mealName: name });
+  }
+
+  const colWidth = Math.floor(100 / (sortedMenus.length + 0.001));
+
+  // Build header row
+  const headerCells = sortedMenus.map((menu: any) =>
+    `<th style="background:#f5c518;color:#1a1a1a;padding:10px 8px;font-size:13px;font-weight:700;text-align:center;border:1px solid #e0b800;width:${colWidth}%;">
+      Menú ${menu.menuNumber}
+    </th>`
+  ).join("");
+
+  // Build body rows (one per meal)
+  const bodyRows = mealRows.map((mealRow, idx) => {
+    const cells = sortedMenus.map((menu: any) => {
+      const sorted = [...menu.meals].sort((a: any, b: any) => a.mealNumber - b.mealNumber);
+      const meal = sorted[idx];
+      if (!meal) {
+        return `<td style="padding:12px 10px;border:1px solid #e8e8e8;vertical-align:top;background:#fff;"></td>`;
       }
 
-      mealsHtml += `
-        <div style="margin-bottom:24px;">
-          <h3 style="font-size:16px;font-weight:700;margin:0 0 10px;color:#222;border-left:3px solid #16a34a;padding-left:10px;">${meal.mealName}</h3>
-          <table style="width:100%;border-collapse:collapse;">
-            <thead>
-              <tr style="background:#f5f5f5;">
-                <th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#999;font-weight:600;letter-spacing:0.5px;">Alimento</th>
-                <th style="padding:8px 12px;text-align:center;font-size:11px;text-transform:uppercase;color:#999;font-weight:600;letter-spacing:0.5px;">Cantidad</th>
-                <th style="padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#999;font-weight:600;letter-spacing:0.5px;">Alternativa</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${foodsHtml}
-            </tbody>
-          </table>
-        </div>`;
-    }
+      const mealName = meal.mealName;
+      const foodLines = meal.foods.map((f: any) => {
+        let line = `${f.name} (${f.quantity})`;
+        return line;
+      }).join(", ");
 
-    menusHtml += `
-      <div style="margin-bottom:36px;page-break-inside:avoid;">
-        <h2 style="font-size:20px;font-weight:800;margin:0 0 16px;color:#111;padding-bottom:8px;border-bottom:2px solid #16a34a;">
-          Menú ${menu.menuNumber}
-        </h2>
-        ${mealsHtml}
-      </div>`;
-  }
+      // Alternative line
+      const altFoods = meal.foods
+        .filter((f: any) => f.alternativeName)
+        .map((f: any) => `${f.alternativeName} (${f.alternativeQuantity || f.quantity})`)
+        .join(", ");
+
+      let cellContent = `<div style="margin-bottom:2px;"><strong style="font-size:12px;color:#1a1a1a;">${mealName}</strong></div>`;
+      cellContent += `<div style="font-size:11px;color:#333;line-height:1.5;">${foodLines}.</div>`;
+      if (altFoods) {
+        cellContent += `<div style="font-size:10px;color:#888;font-style:italic;margin-top:4px;border-top:1px dashed #ddd;padding-top:3px;">Alt: ${altFoods}.</div>`;
+      }
+
+      return `<td style="padding:10px;border:1px solid #e8e8e8;vertical-align:top;background:${idx % 2 === 0 ? '#fff' : '#fafafa'};">${cellContent}</td>`;
+    }).join("");
+
+    return `<tr>${cells}</tr>`;
+  }).join("");
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -872,31 +1087,41 @@ function generatePrintHtml(diet: any): string {
   <title>${diet.name}</title>
   <style>
     @media print {
-      body { margin: 0; padding: 20px; }
-      @page { margin: 1.5cm; }
+      body { margin: 0; padding: 10px; }
+      @page { margin: 1cm; size: landscape; }
+      table { page-break-inside: avoid; }
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
       color: #1a1a1a;
-      max-width: 800px;
       margin: 0 auto;
-      padding: 30px 20px;
-      line-height: 1.5;
+      padding: 20px;
+      line-height: 1.4;
+      max-width: 1200px;
     }
   </style>
 </head>
 <body>
-  <div style="border-bottom:3px solid #16a34a;padding-bottom:16px;margin-bottom:28px;">
-    <h1 style="font-size:26px;font-weight:900;margin:0 0 6px;color:#111;">${diet.name}</h1>
-    <p style="font-size:14px;color:#666;margin:0;">
-      ${diet.mealsPerDay} comidas al día · ${diet.menus.length} menú(s)
+  <div style="text-align:center;margin-bottom:20px;">
+    <h1 style="font-size:22px;font-weight:900;margin:0 0 4px;color:#111;text-transform:uppercase;letter-spacing:1px;">
+      ${diet.name}
+    </h1>
+    <p style="font-size:12px;color:#888;margin:0;">
+      ${diet.mealsPerDay} comidas/día · ${diet.totalCalories} kcal · Generado el ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
     </p>
   </div>
-  ${menusHtml}
-  <div style="border-top:1px solid #eee;padding-top:12px;margin-top:24px;">
-    <p style="font-size:11px;color:#bbb;text-align:center;">
-      Generado con Diet Generator · ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
-    </p>
+
+  <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+    <thead>
+      <tr>${headerCells}</tr>
+    </thead>
+    <tbody>
+      ${bodyRows}
+    </tbody>
+  </table>
+
+  <div style="text-align:center;margin-top:16px;">
+    <p style="font-size:9px;color:#ccc;">Generado con Diet Generator</p>
   </div>
 </body>
 </html>`;

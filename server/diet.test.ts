@@ -464,3 +464,124 @@ describe("foodDb.search", () => {
     await expect(caller.foodDb.search({ query: "pollo" })).rejects.toThrow();
   });
 });
+
+describe("diet.addFood", () => {
+  it("adds a food to a meal and returns success", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.addFood({
+      mealId: 1,
+      name: "Pechuga de pollo",
+      quantity: "150g",
+      calories: 165,
+      protein: 31,
+      carbs: 0,
+      fats: 4,
+    });
+    expect(result.success).toBe(true);
+    expect(result.foodId).toBeDefined();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.addFood({
+        mealId: 1,
+        name: "Pechuga de pollo",
+        quantity: "150g",
+        calories: 165,
+        protein: 31,
+        carbs: 0,
+        fats: 4,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects empty food name", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.addFood({
+        mealId: 1,
+        name: "",
+        quantity: "150g",
+        calories: 165,
+        protein: 31,
+        carbs: 0,
+        fats: 4,
+      })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.duplicate", () => {
+  it("duplicates a diet and returns new dietId", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.duplicate({ id: 1 });
+    expect(result.dietId).toBeDefined();
+    expect(typeof result.dietId).toBe("number");
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.duplicate({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("diet.updateFood", () => {
+  it("updates food quantity with recalcFromDb", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateFood({
+      foodId: 1,
+      quantity: "120g",
+      recalcFromDb: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("updates food name directly", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateFood({
+      foodId: 1,
+      name: "Arroz integral",
+      calories: 350,
+      protein: 8,
+      carbs: 70,
+      fats: 3,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.updateFood({ foodId: 1, quantity: "120g" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.updateMealName", () => {
+  it("updates meal name successfully", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateMealName({
+      mealId: 1,
+      mealName: "Pre-entreno",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty meal name", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.updateMealName({ mealId: 1, mealName: "" })
+    ).rejects.toThrow();
+  });
+});

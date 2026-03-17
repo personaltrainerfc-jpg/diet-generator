@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 import {
   Flame, UtensilsCrossed, Calendar, Trash2, Eye,
-  History as HistoryIcon, Loader2, ChefHat
+  History as HistoryIcon, Loader2, ChefHat, Copy
 } from "lucide-react";
 
 export default function History() {
@@ -33,6 +33,17 @@ export default function History() {
     },
     onError: (error) => {
       toast.error(error.message || "Error al eliminar la dieta");
+    },
+  });
+
+  const duplicateMutation = trpc.diet.duplicate.useMutation({
+    onSuccess: (data) => {
+      toast.success("Dieta duplicada correctamente");
+      utils.diet.list.invalidate();
+      setLocation(`/diet/${data.dietId}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al duplicar la dieta");
     },
   });
 
@@ -100,6 +111,18 @@ export default function History() {
                     >
                       <Eye className="h-4 w-4 mr-1.5" />
                       Ver
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => duplicateMutation.mutate({ id: diet.id })}
+                      disabled={duplicateMutation.isPending}
+                    >
+                      {duplicateMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <><Copy className="h-4 w-4 mr-1.5" />Duplicar</>
+                      )}
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

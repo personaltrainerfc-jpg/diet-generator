@@ -529,6 +529,7 @@ export const appRouter = router({
         alternativeProtein: z.number().int().min(0).optional(),
         alternativeCarbs: z.number().int().min(0).optional(),
         alternativeFats: z.number().int().min(0).optional(),
+        recalcFromDb: z.boolean().optional(), // If true, recalculate macros from food DB based on new quantity
       }))
       .mutation(async ({ ctx, input }) => {
         const food = await getFoodById(input.foodId);
@@ -547,7 +548,39 @@ export const appRouter = router({
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
-        const { foodId, ...updateData } = input;
+        const { foodId, recalcFromDb, ...updateData } = input;
+
+        // If recalcFromDb is true and quantity changed, recalculate macros proportionally
+        if (recalcFromDb && updateData.quantity) {
+          const newQtyMatch = updateData.quantity.match(/(\d+)/);
+          const newGrams = newQtyMatch ? parseInt(newQtyMatch[1]) : null;
+          if (newGrams) {
+            // Try to find the food in the database
+            const dbFood = foodDatabase.find(f =>
+              f.name.toLowerCase() === food.name.toLowerCase()
+            ) || searchFoods(food.name, 1)[0];
+
+            if (dbFood) {
+              const factor = newGrams / 100;
+              updateData.calories = Math.round(dbFood.calories * factor);
+              updateData.protein = Math.round(dbFood.protein * factor);
+              updateData.carbs = Math.round(dbFood.carbs * factor);
+              updateData.fats = Math.round(dbFood.fats * factor);
+            } else {
+              // Fallback: proportional recalculation from current values
+              const oldQtyMatch = food.quantity.match(/(\d+)/);
+              const oldGrams = oldQtyMatch ? parseInt(oldQtyMatch[1]) : 100;
+              if (oldGrams > 0) {
+                const ratio = newGrams / oldGrams;
+                updateData.calories = Math.round(food.calories * ratio);
+                updateData.protein = Math.round(food.protein * ratio);
+                updateData.carbs = Math.round(food.carbs * ratio);
+                updateData.fats = Math.round(food.fats * ratio);
+              }
+            }
+          }
+        }
+
         // Remove undefined values
         const cleanData = Object.fromEntries(
           Object.entries(updateData).filter(([_, v]) => v !== undefined)
@@ -562,6 +595,120 @@ export const appRouter = router({
         await updateMenuMacros(mealResult[0].menuId);
 
         return { success: true };
+      }),
+
+    // ── Add food manually (from food database) ──
+    addFood: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        name: z.string().min(1).max(255),
+        quantity: z.string().min(1).max(100),
+        calories: z.number().int().min(0),
+        protein: z.number().int().min(0),
+        carbs: z.number().int().min(0),
+        fats: z.number().int().min(0),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify ownership: meal -> menu -> diet -> user
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, input.mealId)).limit(1);
+        if (!mealResult[0]) throw new Error("Comida no encontrada");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const foodId = await createFood({
+          mealId: input.mealId,
+          name: input.name,
+          quantity: input.quantity,
+          calories: input.calories,
+          protein: input.protein,
+          carbs: input.carbs,
+          fats: input.fats,
+          alternativeName: null,
+          alternativeQuantity: null,
+          alternativeCalories: null,
+          alternativeProtein: null,
+          alternativeCarbs: null,
+          alternativeFats: null,
+        });
+
+        // Recalculate meal and menu macros
+        await updateMealMacros(input.mealId);
+        await updateMenuMacros(mealResult[0].menuId);
+
+        return { success: true, foodId };
+      }),
+
+    // ── Duplicate diet ──
+    duplicate: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const original = await getFullDiet(input.id);
+        if (!original) throw new Error("Dieta no encontrada");
+        if (original.userId !== ctx.user.id) throw new Error("No tienes acceso a esta dieta");
+
+        // Create a copy of the diet
+        const newDietId = await createDiet({
+          userId: ctx.user.id,
+          name: `${original.name} (copia)`,
+          totalCalories: original.totalCalories,
+          proteinPercent: original.proteinPercent,
+          carbsPercent: original.carbsPercent,
+          fatsPercent: original.fatsPercent,
+          mealsPerDay: original.mealsPerDay,
+          totalMenus: original.totalMenus,
+          avoidFoods: (original.avoidFoods as string[]) || [],
+        });
+
+        // Copy all menus, meals and foods
+        for (const menu of original.menus) {
+          const newMenuId = await createMenu({
+            dietId: newDietId,
+            menuNumber: menu.menuNumber,
+            totalCalories: menu.totalCalories,
+            totalProtein: menu.totalProtein,
+            totalCarbs: menu.totalCarbs,
+            totalFats: menu.totalFats,
+          });
+
+          for (const meal of menu.meals) {
+            const newMealId = await createMeal({
+              menuId: newMenuId,
+              mealNumber: meal.mealNumber,
+              mealName: meal.mealName,
+              calories: meal.calories,
+              protein: meal.protein,
+              carbs: meal.carbs,
+              fats: meal.fats,
+            });
+
+            for (const food of meal.foods) {
+              await createFood({
+                mealId: newMealId,
+                name: food.name,
+                quantity: food.quantity,
+                calories: food.calories,
+                protein: food.protein,
+                carbs: food.carbs,
+                fats: food.fats,
+                alternativeName: food.alternativeName,
+                alternativeQuantity: food.alternativeQuantity,
+                alternativeCalories: food.alternativeCalories,
+                alternativeProtein: food.alternativeProtein,
+                alternativeCarbs: food.alternativeCarbs,
+                alternativeFats: food.alternativeFats,
+              });
+            }
+          }
+        }
+
+        return { dietId: newDietId };
       }),
   }),
 });
