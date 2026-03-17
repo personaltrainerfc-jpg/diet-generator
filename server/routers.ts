@@ -11,6 +11,7 @@ import {
   updateMealName, updateFood, getMealById, getFoodById,
   updateMealMacros, updateMenuMacros,
   getMealsByMenuId, getMenusByDietId, getDietById,
+  deleteMeal, deleteFood, getMenuById,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
@@ -327,6 +328,188 @@ export const appRouter = router({
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
         await updateMealName(input.mealId, input.mealName);
+        return { success: true };
+      }),
+
+    // ── Add a new meal to a menu (via LLM) ──
+    addMeal: protectedProcedure
+      .input(z.object({
+        menuId: z.number(),
+        mealName: z.string().min(1).max(255).default("Nueva comida"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify ownership: menu -> diet -> user
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { menus: menusTable, diets: dietsTable, meals: mealsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, input.menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        // Get existing meals to determine next mealNumber
+        const existingMeals = await getMealsByMenuId(input.menuId);
+        const nextMealNumber = existingMeals.length > 0
+          ? Math.max(...existingMeals.map(m => m.mealNumber)) + 1
+          : 1;
+
+        // Get diet config to generate a meal with appropriate macros
+        const diet = dietResult[0];
+        const totalMealsAfter = existingMeals.length + 1;
+        const approxCalories = Math.round(diet.totalCalories / totalMealsAfter);
+        const proteinGrams = Math.round((approxCalories * diet.proteinPercent / 100) / 4);
+        const carbsGrams = Math.round((approxCalories * diet.carbsPercent / 100) / 4);
+        const fatsGrams = Math.round((approxCalories * diet.fatsPercent / 100) / 9);
+
+        // Use LLM to generate a single meal
+        const prompt = `Genera UNA comida llamada "${input.mealName}" con aproximadamente ${approxCalories} kcal, ${proteinGrams}g proteína, ${carbsGrams}g carbohidratos, ${fatsGrams}g grasa. Incluye entre 2 y 5 alimentos con una alternativa para cada uno. Responde SOLO con JSON.`;
+
+        const singleMealSchema = {
+          name: "single_meal",
+          strict: true,
+          schema: {
+            type: "object" as const,
+            properties: {
+              mealName: { type: "string" as const },
+              calories: { type: "integer" as const },
+              protein: { type: "integer" as const },
+              carbs: { type: "integer" as const },
+              fats: { type: "integer" as const },
+              foods: {
+                type: "array" as const,
+                items: {
+                  type: "object" as const,
+                  properties: {
+                    name: { type: "string" as const },
+                    quantity: { type: "string" as const },
+                    calories: { type: "integer" as const },
+                    protein: { type: "integer" as const },
+                    carbs: { type: "integer" as const },
+                    fats: { type: "integer" as const },
+                    alternativeName: { type: "string" as const },
+                    alternativeQuantity: { type: "string" as const },
+                    alternativeCalories: { type: "integer" as const },
+                    alternativeProtein: { type: "integer" as const },
+                    alternativeCarbs: { type: "integer" as const },
+                    alternativeFats: { type: "integer" as const },
+                  },
+                  required: ["name", "quantity", "calories", "protein", "carbs", "fats", "alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["mealName", "calories", "protein", "carbs", "fats", "foods"] as const,
+            additionalProperties: false,
+          },
+        };
+
+        const llmResponse = await invokeLLM({
+          messages: [
+            { role: "system", content: "Eres un nutricionista profesional. Genera comidas equilibradas con alimentos reales y cantidades precisas en gramos. Todos los valores numéricos deben ser enteros." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_schema", json_schema: singleMealSchema },
+        });
+
+        const content = llmResponse.choices[0]?.message?.content;
+        if (!content || typeof content !== "string") throw new Error("No se pudo generar la comida");
+
+        let generated: any;
+        try { generated = JSON.parse(content); } catch { throw new Error("Error al procesar la comida generada"); }
+
+        // Save to DB
+        const mealId = await createMeal({
+          menuId: input.menuId,
+          mealNumber: nextMealNumber,
+          mealName: generated.mealName || input.mealName,
+          calories: generated.calories,
+          protein: generated.protein,
+          carbs: generated.carbs,
+          fats: generated.fats,
+        });
+
+        for (const food of generated.foods) {
+          await createFood({
+            mealId,
+            name: food.name,
+            quantity: food.quantity,
+            calories: food.calories,
+            protein: food.protein,
+            carbs: food.carbs,
+            fats: food.fats,
+            alternativeName: food.alternativeName,
+            alternativeQuantity: food.alternativeQuantity,
+            alternativeCalories: food.alternativeCalories,
+            alternativeProtein: food.alternativeProtein,
+            alternativeCarbs: food.alternativeCarbs,
+            alternativeFats: food.alternativeFats,
+          });
+        }
+
+        // Recalculate menu macros
+        await updateMenuMacros(input.menuId);
+
+        return { success: true, mealId };
+      }),
+
+    // ── Delete a meal from a menu ──
+    deleteMeal: protectedProcedure
+      .input(z.object({ mealId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        // Check that there's at least 1 meal remaining
+        const remainingMeals = await getMealsByMenuId(meal.menuId);
+        if (remainingMeals.length <= 1) throw new Error("No puedes eliminar la última comida del menú");
+
+        await deleteMeal(input.mealId);
+
+        // Recalculate menu macros
+        await updateMenuMacros(meal.menuId);
+
+        return { success: true };
+      }),
+
+    // ── Delete a food from a meal ──
+    deleteFood: protectedProcedure
+      .input(z.object({ foodId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const food = await getFoodById(input.foodId);
+        if (!food) throw new Error("Alimento no encontrado");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, food.mealId)).limit(1);
+        if (!mealResult[0]) throw new Error("Comida no encontrada");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        await deleteFood(input.foodId);
+
+        // Recalculate meal and menu macros
+        await updateMealMacros(food.mealId);
+        await updateMenuMacros(mealResult[0].menuId);
+
         return { success: true };
       }),
 

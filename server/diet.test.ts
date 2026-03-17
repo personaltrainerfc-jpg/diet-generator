@@ -76,6 +76,9 @@ vi.mock("./db", () => ({
     ],
   }),
   deleteDiet: vi.fn().mockResolvedValue(undefined),
+  deleteMeal: vi.fn().mockResolvedValue(undefined),
+  deleteFood: vi.fn().mockResolvedValue(undefined),
+  getMenuById: vi.fn().mockResolvedValue({ id: 1, dietId: 1, menuNumber: 1, totalCalories: 2000, totalProtein: 150, totalCarbs: 225, totalFats: 56, createdAt: new Date() }),
   createMenu: vi.fn().mockResolvedValue(1),
   createMeal: vi.fn().mockResolvedValue(1),
   createFood: vi.fn().mockResolvedValue(1),
@@ -109,69 +112,116 @@ vi.mock("./db", () => ({
   }),
   updateMealMacros: vi.fn().mockResolvedValue({ calories: 500, protein: 38, carbs: 56, fats: 14 }),
   updateMenuMacros: vi.fn().mockResolvedValue({ totalCalories: 2000, totalProtein: 150, totalCarbs: 225, totalFats: 56 }),
-  getMealsByMenuId: vi.fn().mockResolvedValue([]),
+  getMealsByMenuId: vi.fn().mockResolvedValue([
+    { id: 1, menuId: 1, mealNumber: 1, mealName: "Desayuno", calories: 500, protein: 38, carbs: 56, fats: 14 },
+    { id: 2, menuId: 1, mealNumber: 2, mealName: "Almuerzo", calories: 700, protein: 50, carbs: 80, fats: 20 },
+  ]),
   getMenusByDietId: vi.fn().mockResolvedValue([]),
   getDietById: vi.fn().mockResolvedValue({ id: 1, userId: 1 }),
   getDb: vi.fn().mockResolvedValue({
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([{ id: 1, menuId: 1, dietId: 1, userId: 1 }]),
+    limit: vi.fn().mockResolvedValue([{ id: 1, menuId: 1, dietId: 1, userId: 1, totalCalories: 2000, proteinPercent: 30, carbsPercent: 45, fatsPercent: 25, mealsPerDay: 4 }]),
   }),
 }));
 
-// Mock the LLM module
-vi.mock("./_core/llm", () => ({
-  invokeLLM: vi.fn().mockResolvedValue({
-    id: "test",
-    created: Date.now(),
-    model: "test",
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: "assistant",
-          content: JSON.stringify({
-            menus: [
-              {
-                menuNumber: 1,
-                totalCalories: 2000,
-                totalProtein: 150,
-                totalCarbs: 225,
-                totalFats: 56,
-                meals: [
-                  {
-                    mealNumber: 1,
-                    mealName: "Desayuno",
-                    calories: 500,
-                    protein: 38,
-                    carbs: 56,
-                    fats: 14,
-                    foods: [
-                      {
-                        name: "Avena",
-                        quantity: "80g",
-                        calories: 300,
-                        protein: 10,
-                        carbs: 50,
-                        fats: 6,
-                        alternativeName: "Arroz inflado",
-                        alternativeQuantity: "60g",
-                        alternativeCalories: 290,
-                        alternativeProtein: 8,
-                        alternativeCarbs: 52,
-                        alternativeFats: 5,
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          }),
+// Mock the LLM module - returns different structures based on the prompt
+const dietResponse = JSON.stringify({
+  menus: [
+    {
+      menuNumber: 1,
+      totalCalories: 2000,
+      totalProtein: 150,
+      totalCarbs: 225,
+      totalFats: 56,
+      meals: [
+        {
+          mealNumber: 1,
+          mealName: "Desayuno",
+          calories: 500,
+          protein: 38,
+          carbs: 56,
+          fats: 14,
+          foods: [
+            {
+              name: "Avena",
+              quantity: "80g",
+              calories: 300,
+              protein: 10,
+              carbs: 50,
+              fats: 6,
+              alternativeName: "Arroz inflado",
+              alternativeQuantity: "60g",
+              alternativeCalories: 290,
+              alternativeProtein: 8,
+              alternativeCarbs: 52,
+              alternativeFats: 5,
+            },
+          ],
         },
-        finish_reason: "stop",
-      },
-    ],
+      ],
+    },
+  ],
+});
+
+const singleMealResponse = JSON.stringify({
+  mealName: "Merienda",
+  calories: 400,
+  protein: 30,
+  carbs: 45,
+  fats: 12,
+  foods: [
+    {
+      name: "Yogur griego",
+      quantity: "200g",
+      calories: 200,
+      protein: 20,
+      carbs: 10,
+      fats: 8,
+      alternativeName: "Queso fresco batido",
+      alternativeQuantity: "200g",
+      alternativeCalories: 180,
+      alternativeProtein: 18,
+      alternativeCarbs: 12,
+      alternativeFats: 6,
+    },
+    {
+      name: "Pl\u00e1tano",
+      quantity: "120g",
+      calories: 200,
+      protein: 10,
+      carbs: 35,
+      fats: 4,
+      alternativeName: "Manzana",
+      alternativeQuantity: "150g",
+      alternativeCalories: 190,
+      alternativeProtein: 8,
+      alternativeCarbs: 38,
+      alternativeFats: 3,
+    },
+  ],
+});
+
+vi.mock("./_core/llm", () => ({
+  invokeLLM: vi.fn().mockImplementation(({ messages }: any) => {
+    const userMsg = messages.find((m: any) => m.role === "user")?.content || "";
+    const isSingleMeal = userMsg.includes("UNA comida");
+    return Promise.resolve({
+      id: "test",
+      created: Date.now(),
+      model: "test",
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: isSingleMeal ? singleMealResponse : dietResponse,
+          },
+          finish_reason: "stop",
+        },
+      ],
+    });
   }),
 }));
 
@@ -320,6 +370,52 @@ describe("diet.delete", () => {
     const ctx = createUnauthContext();
     const caller = appRouter.createCaller(ctx);
     await expect(caller.diet.delete({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("diet.addMeal", () => {
+  it("adds a meal to a menu and returns success", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.addMeal({ menuId: 1, mealName: "Merienda" });
+    expect(result.success).toBe(true);
+    expect(result.mealId).toBeDefined();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.addMeal({ menuId: 1, mealName: "Merienda" })).rejects.toThrow();
+  });
+});
+
+describe("diet.deleteMeal", () => {
+  it("deletes a meal successfully", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.deleteMeal({ mealId: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.deleteMeal({ mealId: 1 })).rejects.toThrow();
+  });
+});
+
+describe("diet.deleteFood", () => {
+  it("deletes a food successfully", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.deleteFood({ foodId: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.deleteFood({ foodId: 1 })).rejects.toThrow();
   });
 });
 

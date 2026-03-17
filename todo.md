@@ -18,3 +18,6 @@
 - [x] Integrar base de datos de 1146 alimentos del usuario como referencia para el LLM
 - [x] Incluir recetas/combinaciones habituales del usuario en el prompt del LLM (judías verdes con cebolla y jamón, guisantes + carne/pescado, tostadas, yogures, bowls)
 - [x] PDF: mostrar solo nombre de comida, alimentos, cantidades y alternativas (SIN calorías ni macros)
+- [x] Añadir comidas completas a un menú ya generado (ej: pasar de 3 a 4 comidas)
+- [x] Eliminar comidas completas de un menú ya generado (ej: pasar de 5 a 4 comidas)
+- [x] Ajustar gramos de cada alimento individualmente después de generar la dieta

@@ -12,13 +12,24 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
-  Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X, Search, Replace
+  Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
+  Search, Replace, Plus, Trash2
 } from "lucide-react";
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
 import { toast } from "sonner";
 
@@ -96,7 +107,7 @@ function FoodSearchDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setQuery(""); onClose(); } }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-lg">
@@ -129,6 +140,7 @@ function FoodSearchDialog({
               key={`${food.name}-${i}`}
               onClick={() => {
                 onSelect(food);
+                setQuery("");
                 onClose();
               }}
               className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/70 transition-colors text-left"
@@ -151,7 +163,7 @@ function FoodSearchDialog({
   );
 }
 
-// ── Editable Quantity ──
+// ── Editable Quantity (gramos) ──
 function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [inputVal, setInputVal] = useState(value);
@@ -166,7 +178,7 @@ function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="inline-flex items-center gap-1">
         <Input
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
@@ -175,7 +187,7 @@ function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string
             if (e.key === "Escape") { setInputVal(value); setEditing(false); }
           }}
           onBlur={handleSave}
-          className="h-5 text-xs w-20 px-1"
+          className="h-5 text-xs w-24 px-1.5"
           autoFocus
         />
       </div>
@@ -185,18 +197,20 @@ function EditableQuantity({ value, onSave }: { value: string; onSave: (v: string
   return (
     <button
       onClick={() => { setInputVal(value); setEditing(true); }}
-      className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer transition-colors"
+      className="text-xs text-muted-foreground hover:text-primary hover:underline cursor-pointer transition-colors inline-flex items-center gap-1"
       title="Clic para editar cantidad"
     >
       {value}
+      <Pencil className="h-2.5 w-2.5 opacity-0 group-hover/food:opacity-60" />
     </button>
   );
 }
 
-// ── Food Row with edit capabilities ──
-function FoodRow({ food, onUpdateFood }: {
+// ── Food Row ──
+function FoodRow({ food, onUpdateFood, onDeleteFood }: {
   food: FullFood;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
+  onDeleteFood: (foodId: number) => void;
 }) {
   const [showAlt, setShowAlt] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -222,7 +236,6 @@ function FoodRow({ food, onUpdateFood }: {
   const hasAlternative = food.alternativeName && food.alternativeName.length > 0;
 
   const handleFoodReplace = (selected: { name: string; calories: number; protein: number; carbs: number; fats: number }) => {
-    // Parse current quantity to get grams
     const qtyMatch = food.quantity.match(/(\d+)/);
     const grams = qtyMatch ? parseInt(qtyMatch[1]) : 100;
     const factor = grams / 100;
@@ -244,7 +257,7 @@ function FoodRow({ food, onUpdateFood }: {
 
   return (
     <>
-      <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group">
+      <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group/food">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm text-foreground truncate">
@@ -270,12 +283,12 @@ function FoodRow({ food, onUpdateFood }: {
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* Replace food button */}
+          {/* Replace food */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={() => setSearchOpen(true)}
-                className="h-7 w-7 rounded-md flex items-center justify-center bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover/food:opacity-100"
               >
                 <Replace className="h-3.5 w-3.5" />
               </button>
@@ -303,6 +316,19 @@ function FoodRow({ food, onUpdateFood }: {
               </TooltipContent>
             </Tooltip>
           )}
+
+          {/* Delete food */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onDeleteFood(food.id)}
+                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover/food:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Eliminar alimento</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -316,13 +342,17 @@ function FoodRow({ food, onUpdateFood }: {
   );
 }
 
-function MealCard({ meal, onMealNameChange, onUpdateFood }: {
+// ── Meal Card ──
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, isDeletable }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
+  onDeleteFood: (foodId: number) => void;
+  onDeleteMeal: (mealId: number) => void;
+  isDeletable: boolean;
 }) {
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm group/meal">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">
@@ -331,11 +361,37 @@ function MealCard({ meal, onMealNameChange, onUpdateFood }: {
               onSave={(name) => onMealNameChange(meal.id, name)}
             />
           </CardTitle>
-          <div className="flex items-center gap-2 text-xs">
-            <Badge variant="secondary" className="gap-1 font-normal">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="gap-1 font-normal text-xs">
               <Flame className="h-3 w-3 text-orange-500" />
               {meal.calories} kcal
             </Badge>
+            {isDeletable && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover/meal:opacity-100">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminar comida</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      ¿Estás seguro de que quieres eliminar "{meal.mealName}" y todos sus alimentos? Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDeleteMeal(meal.id)}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
         <div className="flex gap-4 text-xs text-muted-foreground mt-1">
@@ -363,11 +419,16 @@ function MealCard({ meal, onMealNameChange, onUpdateFood }: {
             <span className="w-8 text-right text-amber-400">Carb</span>
             <span className="w-8 text-right text-blue-400">Gras</span>
           </div>
-          <div className="w-16 shrink-0" />
+          <div className="w-[5.5rem] shrink-0" />
         </div>
         <div className="divide-y divide-border/50">
           {meal.foods.map(food => (
-            <FoodRow key={food.id} food={food} onUpdateFood={onUpdateFood} />
+            <FoodRow
+              key={food.id}
+              food={food}
+              onUpdateFood={onUpdateFood}
+              onDeleteFood={onDeleteFood}
+            />
           ))}
         </div>
       </CardContent>
@@ -375,13 +436,86 @@ function MealCard({ meal, onMealNameChange, onUpdateFood }: {
   );
 }
 
-function MenuView({ menu, onMealNameChange, onUpdateFood }: {
+// ── Add Meal Dialog ──
+function AddMealDialog({ open, onClose, onAdd, isLoading }: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (name: string) => void;
+  isLoading: boolean;
+}) {
+  const [name, setName] = useState("");
+
+  const handleSubmit = () => {
+    const trimmed = name.trim() || "Nueva comida";
+    onAdd(trimmed);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !isLoading) { setName(""); onClose(); } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Añadir nueva comida</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">
+              Nombre de la comida
+            </label>
+            <Input
+              placeholder="Ej: Merienda, Pre-entreno, Snack..."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isLoading) handleSubmit();
+              }}
+              disabled={isLoading}
+              autoFocus
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Se generará automáticamente con alimentos y macros proporcionales al resto del menú.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={isLoading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Añadir comida
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Menu View ──
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, addingMeal }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
+  onDeleteFood: (foodId: number) => void;
+  onDeleteMeal: (mealId: number) => void;
+  onAddMeal: (menuId: number, mealName: string) => void;
+  addingMeal: boolean;
 }) {
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const sortedMeals = [...menu.meals].sort((a, b) => a.mealNumber - b.mealNumber);
+  const canDeleteMeal = sortedMeals.length > 1;
+
   return (
     <div className="space-y-4">
+      {/* Macro summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-50 border border-orange-100">
           <Flame className="h-5 w-5 text-orange-500" />
@@ -413,22 +547,55 @@ function MenuView({ menu, onMealNameChange, onUpdateFood }: {
         </div>
       </div>
 
+      {/* Meals */}
       <div className="space-y-4">
-        {menu.meals
-          .sort((a, b) => a.mealNumber - b.mealNumber)
-          .map(meal => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              onMealNameChange={onMealNameChange}
-              onUpdateFood={onUpdateFood}
-            />
-          ))}
+        {sortedMeals.map(meal => (
+          <MealCard
+            key={meal.id}
+            meal={meal}
+            onMealNameChange={onMealNameChange}
+            onUpdateFood={onUpdateFood}
+            onDeleteFood={onDeleteFood}
+            onDeleteMeal={onDeleteMeal}
+            isDeletable={canDeleteMeal}
+          />
+        ))}
       </div>
+
+      {/* Add meal button */}
+      <Button
+        variant="outline"
+        className="w-full border-dashed border-2 hover:border-primary hover:text-primary"
+        onClick={() => setAddDialogOpen(true)}
+        disabled={addingMeal}
+      >
+        {addingMeal ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Generando comida...
+          </>
+        ) : (
+          <>
+            <Plus className="h-4 w-4 mr-2" />
+            Añadir comida
+          </>
+        )}
+      </Button>
+
+      <AddMealDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onAdd={(name) => {
+          setAddDialogOpen(false);
+          onAddMeal(menu.id, name);
+        }}
+        isLoading={addingMeal}
+      />
     </div>
   );
 }
 
+// ── Main Page ──
 export default function DietDetail() {
   const [, params] = useRoute("/diet/:id");
   const [, setLocation] = useLocation();
@@ -458,6 +625,30 @@ export default function DietDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const deleteFoodMut = trpc.diet.deleteFood.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Alimento eliminado");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteMealMut = trpc.diet.deleteMeal.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Comida eliminada");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const addMealMut = trpc.diet.addMeal.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Comida añadida correctamente");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const handleMealNameChange = useCallback((mealId: number, name: string) => {
     updateMealNameMut.mutate({ mealId, mealName: name });
   }, [updateMealNameMut]);
@@ -466,22 +657,31 @@ export default function DietDetail() {
     updateFoodMut.mutate(data as any);
   }, [updateFoodMut]);
 
+  const handleDeleteFood = useCallback((foodId: number) => {
+    deleteFoodMut.mutate({ foodId });
+  }, [deleteFoodMut]);
+
+  const handleDeleteMeal = useCallback((mealId: number) => {
+    deleteMealMut.mutate({ mealId });
+  }, [deleteMealMut]);
+
+  const handleAddMeal = useCallback((menuId: number, mealName: string) => {
+    addMealMut.mutate({ menuId, mealName });
+  }, [addMealMut]);
+
   const handleDownloadPdf = async () => {
     if (!diet) return;
     setDownloading(true);
     try {
       const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        throw new Error("No se pudo abrir la ventana de impresión");
-      }
+      if (!printWindow) throw new Error("No se pudo abrir la ventana de impresión");
       const html = generatePrintHtml(diet);
       printWindow.document.write(html);
       printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      printWindow.onload = () => printWindow.print();
     } catch (e) {
       console.error(e);
+      toast.error("Error al generar el PDF");
     } finally {
       setDownloading(false);
     }
@@ -574,6 +774,10 @@ export default function DietDetail() {
           menu={diet.menus[0]}
           onMealNameChange={handleMealNameChange}
           onUpdateFood={handleUpdateFood}
+          onDeleteFood={handleDeleteFood}
+          onDeleteMeal={handleDeleteMeal}
+          onAddMeal={handleAddMeal}
+          addingMeal={addMealMut.isPending}
         />
       ) : (
         <Tabs defaultValue="1" className="w-full">
@@ -598,6 +802,10 @@ export default function DietDetail() {
                   menu={menu}
                   onMealNameChange={handleMealNameChange}
                   onUpdateFood={handleUpdateFood}
+                  onDeleteFood={handleDeleteFood}
+                  onDeleteMeal={handleDeleteMeal}
+                  onAddMeal={handleAddMeal}
+                  addingMeal={addMealMut.isPending}
                 />
               </TabsContent>
             ))}
@@ -608,8 +816,8 @@ export default function DietDetail() {
 }
 
 /**
- * PDF generation: Only shows meal name, food names, quantities and alternatives.
- * NO calories or macros shown to the end user.
+ * PDF: Only meal name, food names, quantities and alternatives.
+ * NO calories or macros.
  */
 function generatePrintHtml(diet: any): string {
   let menusHtml = "";

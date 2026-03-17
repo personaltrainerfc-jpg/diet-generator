@@ -240,6 +240,28 @@ export async function updateMenuMacros(menuId: number) {
   return totals;
 }
 
+// ── Delete meal and its foods ──
+
+export async function deleteMeal(mealId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(foods).where(eq(foods.mealId, mealId));
+  await db.delete(meals).where(eq(meals.id, mealId));
+}
+
+export async function deleteFood(foodId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(foods).where(eq(foods.id, foodId));
+}
+
+export async function getMenuById(menuId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(menus).where(eq(menus.id, menuId)).limit(1);
+  return result[0] ?? null;
+}
+
 // ── Full diet with all nested data ──
 
 export async function getFullDiet(dietId: number) {
