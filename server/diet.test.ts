@@ -83,6 +83,7 @@ vi.mock("./db", () => ({
   createMeal: vi.fn().mockResolvedValue(1),
   createFood: vi.fn().mockResolvedValue(1),
   updateMealName: vi.fn().mockResolvedValue(undefined),
+  updateMealNotes: vi.fn().mockResolvedValue(undefined),
   updateFood: vi.fn().mockResolvedValue(undefined),
   getMealById: vi.fn().mockResolvedValue({
     id: 1,
@@ -118,11 +119,37 @@ vi.mock("./db", () => ({
   ]),
   getMenusByDietId: vi.fn().mockResolvedValue([]),
   getDietById: vi.fn().mockResolvedValue({ id: 1, userId: 1 }),
-  getDb: vi.fn().mockResolvedValue({
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([{ id: 1, menuId: 1, dietId: 1, userId: 1, totalCalories: 2000, proteinPercent: 30, carbsPercent: 45, fatsPercent: 25, mealsPerDay: 4 }]),
+  getFoodsByMealId: vi.fn().mockResolvedValue([
+    { id: 1, mealId: 1, name: "Avena", quantity: "80g", calories: 300, protein: 10, carbs: 50, fats: 6, alternativeName: "Arroz inflado", alternativeQuantity: "60g", alternativeCalories: 290, alternativeProtein: 8, alternativeCarbs: 52, alternativeFats: 5 },
+  ]),
+  getDb: vi.fn().mockImplementation(async () => {
+    const defaultRow = { id: 1, menuId: 1, dietId: 1, userId: 1, totalCalories: 2000, proteinPercent: 30, carbsPercent: 45, fatsPercent: 25, mealsPerDay: 4 };
+    const foodRows = [
+      { id: 1, mealId: 1, name: "Avena", quantity: "80g", calories: 300, protein: 10, carbs: 50, fats: 6 },
+    ];
+    function makeWhereChain() {
+      const obj: any = Object.assign(
+        Promise.resolve(foodRows),
+        { limit: vi.fn().mockResolvedValue([defaultRow]) }
+      );
+      return obj;
+    }
+    function makeFromChain() {
+      const obj: any = Object.assign(
+        Promise.resolve(foodRows),
+        {
+          where: vi.fn().mockImplementation(() => makeWhereChain()),
+          limit: vi.fn().mockResolvedValue([defaultRow]),
+        }
+      );
+      return obj;
+    }
+    const db: any = {
+      select: vi.fn().mockImplementation(() => ({
+        from: vi.fn().mockImplementation(() => makeFromChain()),
+      })),
+    };
+    return db;
   }),
 }));
 
@@ -605,6 +632,64 @@ describe("diet.updateMealName", () => {
     const caller = appRouter.createCaller(ctx);
     await expect(
       caller.diet.updateMealName({ mealId: 1, mealName: "" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.updateMealNotes", () => {
+  it("updates meal notes successfully", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateMealNotes({
+      mealId: 1,
+      notes: "Preparar la noche anterior",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("clears meal notes when null", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateMealNotes({
+      mealId: 1,
+      notes: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects notes longer than 1000 characters", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.updateMealNotes({
+        mealId: 1,
+        notes: "x".repeat(1001),
+      })
+    ).rejects.toThrow();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.updateMealNotes({ mealId: 1, notes: "test" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.regenerateMeal", () => {
+  it("regenerates a meal and returns success", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.regenerateMeal({ mealId: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.regenerateMeal({ mealId: 1 })
     ).rejects.toThrow();
   });
 });

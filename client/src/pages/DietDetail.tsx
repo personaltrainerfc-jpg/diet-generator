@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,7 @@ import {
 import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
   Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
-  Search, Plus, Trash2, Copy, ShoppingCart
+  Search, Plus, Trash2, Copy, ShoppingCart, RefreshCw, StickyNote, FileDown
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
@@ -65,10 +66,10 @@ function EditableMealName({ meal, onSave }: { meal: FullMeal; onSave: (name: str
           className="h-7 text-sm font-semibold w-40"
           autoFocus
         />
-        <button onClick={handleSave} className="h-6 w-6 rounded flex items-center justify-center text-green-600 hover:bg-green-50">
+        <button onClick={handleSave} className="h-6 w-6 rounded flex items-center justify-center text-green-600 hover:bg-green-500/10">
           <Check className="h-3.5 w-3.5" />
         </button>
-        <button onClick={handleCancel} className="h-6 w-6 rounded flex items-center justify-center text-red-500 hover:bg-red-50">
+        <button onClick={handleCancel} className="h-6 w-6 rounded flex items-center justify-center text-red-500 hover:bg-red-500/10">
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -280,10 +281,10 @@ function AddFoodDialog({
             <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-xs font-medium text-muted-foreground mb-1">Macros para {grams}g:</p>
               <div className="flex gap-4 text-sm">
-                <span className="text-orange-600 font-semibold">{Math.round(selectedFood.calories * previewFactor)} kcal</span>
-                <span className="text-red-500">P: {Math.round(selectedFood.protein * previewFactor)}g</span>
-                <span className="text-amber-500">C: {Math.round(selectedFood.carbs * previewFactor)}g</span>
-                <span className="text-blue-500">G: {Math.round(selectedFood.fats * previewFactor)}g</span>
+                <span className="text-orange-500 dark:text-orange-400">{Math.round(selectedFood.calories * previewFactor)} kcal</span>
+                <span className="text-red-500 dark:text-red-400">P: {Math.round(selectedFood.protein * previewFactor)}g</span>
+                <span className="text-amber-500 dark:text-amber-400">C: {Math.round(selectedFood.carbs * previewFactor)}g</span>
+                <span className="text-blue-500 dark:text-blue-400">G: {Math.round(selectedFood.fats * previewFactor)}g</span>
               </div>
             </div>
 
@@ -394,7 +395,6 @@ function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
   };
 
   const handleQuantityChange = (newQuantity: string) => {
-    // Send with recalcFromDb flag so backend recalculates macros proportionally
     onUpdateFood(food.id, { foodId: food.id, quantity: newQuantity, recalcFromDb: true });
   };
 
@@ -420,9 +420,9 @@ function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
 
         <div className="flex items-center gap-3 shrink-0 text-xs">
           <span className="text-muted-foreground w-14 text-right">{current.calories} kcal</span>
-          <span className="text-red-500 w-8 text-right">{current.protein}g</span>
-          <span className="text-amber-500 w-8 text-right">{current.carbs}g</span>
-          <span className="text-blue-500 w-8 text-right">{current.fats}g</span>
+          <span className="text-red-500 dark:text-red-400 w-8 text-right">{current.protein}g</span>
+          <span className="text-amber-500 dark:text-amber-400 w-8 text-right">{current.carbs}g</span>
+          <span className="text-blue-500 dark:text-blue-400 w-8 text-right">{current.fats}g</span>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -465,7 +465,7 @@ function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
             <TooltipTrigger asChild>
               <button
                 onClick={() => onDeleteFood(food.id)}
-                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover/food:opacity-100"
+                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover/food:opacity-100"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -485,15 +485,77 @@ function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
   );
 }
 
+// ── Meal Notes ──
+function MealNotes({ meal, onSave }: { meal: FullMeal; onSave: (notes: string | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(meal.notes || "");
+
+  const handleSave = () => {
+    const trimmed = value.trim();
+    onSave(trimmed || null);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-2 space-y-2">
+        <Textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Instrucciones de preparación, notas personalizadas..."
+          className="text-xs min-h-[60px] resize-none"
+          autoFocus
+        />
+        <div className="flex gap-1.5 justify-end">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setValue(meal.notes || ""); setEditing(false); }}>
+            Cancelar
+          </Button>
+          <Button size="sm" className="h-7 text-xs" onClick={handleSave}>
+            Guardar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (meal.notes) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="mt-2 w-full text-left p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20 hover:border-amber-500/40 transition-colors group/notes"
+      >
+        <div className="flex items-start gap-2">
+          <StickyNote className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{meal.notes}</p>
+          <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover/notes:opacity-100 shrink-0 mt-0.5" />
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="mt-2 w-full py-1.5 rounded-lg text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+    >
+      <StickyNote className="h-3 w-3" />
+      Añadir notas
+    </button>
+  );
+}
+
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, isDeletable }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, isDeletable, isRegenerating }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void;
   onDeleteMeal: (mealId: number) => void;
   onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
+  onRegenerateMeal: (mealId: number) => void;
+  onUpdateNotes: (mealId: number, notes: string | null) => void;
   isDeletable: boolean;
+  isRegenerating: boolean;
 }) {
   const [addFoodOpen, setAddFoodOpen] = useState(false);
 
@@ -509,13 +571,30 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
           </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1 font-normal text-xs">
-              <Flame className="h-3 w-3 text-orange-500" />
+              <Flame className="h-3 w-3 text-orange-500 dark:text-orange-400" />
               {meal.calories} kcal
             </Badge>
+            {/* Regenerate meal button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onRegenerateMeal(meal.id)}
+                  disabled={isRegenerating}
+                  className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/meal:opacity-100 disabled:opacity-50"
+                >
+                  {isRegenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Regenerar comida con alimentos diferentes</TooltipContent>
+            </Tooltip>
             {isDeletable && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <button className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover/meal:opacity-100">
+                  <button className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover/meal:opacity-100">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </AlertDialogTrigger>
@@ -586,6 +665,9 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
           <Plus className="h-3.5 w-3.5" />
           Añadir alimento
         </button>
+
+        {/* Meal Notes */}
+        <MealNotes meal={meal} onSave={(notes) => onUpdateNotes(meal.id, notes)} />
       </CardContent>
 
       <AddFoodDialog
@@ -661,7 +743,7 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, addingMeal }: {
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, addingMeal, regeneratingMealId }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -669,7 +751,10 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onDeleteMeal: (mealId: number) => void;
   onAddMeal: (menuId: number, mealName: string) => void;
   onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
+  onRegenerateMeal: (mealId: number) => void;
+  onUpdateNotes: (mealId: number, notes: string | null) => void;
   addingMeal: boolean;
+  regeneratingMealId: number | null;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const sortedMeals = [...menu.meals].sort((a, b) => a.mealNumber - b.mealNumber);
@@ -679,29 +764,29 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
     <div className="space-y-4">
       {/* Macro summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-50 border border-orange-100">
-          <Flame className="h-5 w-5 text-orange-500" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+          <Flame className="h-5 w-5 text-orange-500 dark:text-orange-400" />
           <div>
             <p className="text-xs text-muted-foreground">Calorías</p>
             <p className="font-bold text-foreground">{menu.totalCalories}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-100">
-          <Beef className="h-5 w-5 text-red-500" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          <Beef className="h-5 w-5 text-red-500 dark:text-red-400" />
           <div>
             <p className="text-xs text-muted-foreground">Proteínas</p>
             <p className="font-bold text-foreground">{menu.totalProtein}g</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
-          <Wheat className="h-5 w-5 text-amber-500" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <Wheat className="h-5 w-5 text-amber-500 dark:text-amber-400" />
           <div>
             <p className="text-xs text-muted-foreground">Carbohidratos</p>
             <p className="font-bold text-foreground">{menu.totalCarbs}g</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
-          <Droplets className="h-5 w-5 text-blue-500" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+          <Droplets className="h-5 w-5 text-blue-500 dark:text-blue-400" />
           <div>
             <p className="text-xs text-muted-foreground">Grasas</p>
             <p className="font-bold text-foreground">{menu.totalFats}g</p>
@@ -720,7 +805,10 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             onDeleteFood={onDeleteFood}
             onDeleteMeal={onDeleteMeal}
             onAddFood={onAddFood}
+            onRegenerateMeal={onRegenerateMeal}
+            onUpdateNotes={onUpdateNotes}
             isDeletable={canDeleteMeal}
+            isRegenerating={regeneratingMealId === meal.id}
           />
         ))}
       </div>
@@ -765,6 +853,7 @@ export default function DietDetail() {
   const dietId = Number(params?.id);
   const [downloading, setDownloading] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [regeneratingMealId, setRegeneratingMealId] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -832,6 +921,30 @@ export default function DietDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const regenerateMealMut = trpc.diet.regenerateMeal.useMutation({
+    onMutate: (vars) => {
+      setRegeneratingMealId(vars.mealId);
+      toast.info("Regenerando comida con alimentos diferentes...");
+    },
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Comida regenerada con nuevos alimentos");
+      setRegeneratingMealId(null);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+      setRegeneratingMealId(null);
+    },
+  });
+
+  const updateNotesMut = trpc.diet.updateMealNotes.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Notas actualizadas");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const handleMealNameChange = useCallback((mealId: number, name: string) => {
     updateMealNameMut.mutate({ mealId, mealName: name });
   }, [updateMealNameMut]);
@@ -855,6 +968,14 @@ export default function DietDetail() {
   const handleAddMeal = useCallback((menuId: number, mealName: string) => {
     addMealMut.mutate({ menuId, mealName });
   }, [addMealMut]);
+
+  const handleRegenerateMeal = useCallback((mealId: number) => {
+    regenerateMealMut.mutate({ mealId });
+  }, [regenerateMealMut]);
+
+  const handleUpdateNotes = useCallback((mealId: number, notes: string | null) => {
+    updateNotesMut.mutate({ mealId, notes });
+  }, [updateNotesMut]);
 
   const handleDownloadPdf = async () => {
     if (!diet) return;
@@ -966,16 +1087,16 @@ export default function DietDetail() {
       {/* Config summary */}
       <div className="flex flex-wrap gap-2">
         <Badge variant="secondary" className="gap-1.5 py-1">
-          <Flame className="h-3.5 w-3.5 text-orange-500" />
+          <Flame className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
           {diet.totalCalories} kcal
         </Badge>
-        <Badge variant="outline" className="gap-1 py-1 text-red-600 border-red-200">
+        <Badge variant="outline" className="gap-1 py-1 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800">
           Proteínas: {diet.proteinPercent}%
         </Badge>
-        <Badge variant="outline" className="gap-1 py-1 text-amber-600 border-amber-200">
+        <Badge variant="outline" className="gap-1 py-1 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800">
           Carbos: {diet.carbsPercent}%
         </Badge>
-        <Badge variant="outline" className="gap-1 py-1 text-blue-600 border-blue-200">
+        <Badge variant="outline" className="gap-1 py-1 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
           Grasas: {diet.fatsPercent}%
         </Badge>
         {diet.avoidFoods && (diet.avoidFoods as string[]).length > 0 && (
@@ -994,7 +1115,7 @@ export default function DietDetail() {
               Lista de la Compra
             </DialogTitle>
           </DialogHeader>
-          <ShoppingListContent dietId={dietId} />
+          <ShoppingListContent dietId={dietId} dietName={diet.name} />
         </DialogContent>
       </Dialog>
 
@@ -1008,7 +1129,10 @@ export default function DietDetail() {
           onDeleteMeal={handleDeleteMeal}
           onAddMeal={handleAddMeal}
           onAddFood={handleAddFood}
+          onRegenerateMeal={handleRegenerateMeal}
+          onUpdateNotes={handleUpdateNotes}
           addingMeal={addMealMut.isPending}
+          regeneratingMealId={regeneratingMealId}
         />
       ) : (
         <Tabs defaultValue="1" className="w-full">
@@ -1037,7 +1161,10 @@ export default function DietDetail() {
                   onDeleteMeal={handleDeleteMeal}
                   onAddMeal={handleAddMeal}
                   onAddFood={handleAddFood}
+                  onRegenerateMeal={handleRegenerateMeal}
+                  onUpdateNotes={handleUpdateNotes}
                   addingMeal={addMealMut.isPending}
+                  regeneratingMealId={regeneratingMealId}
                 />
               </TabsContent>
             ))}
@@ -1048,8 +1175,21 @@ export default function DietDetail() {
 }
 
 // ── Shopping List Content ──
-function ShoppingListContent({ dietId }: { dietId: number }) {
+function ShoppingListContent({ dietId, dietName }: { dietId: number; dietName: string }) {
   const { data, isLoading } = trpc.diet.shoppingList.useQuery({ id: dietId });
+
+  const handleDownloadShoppingPdf = () => {
+    if (!data) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      toast.error("No se pudo abrir la ventana de impresión");
+      return;
+    }
+    const html = generateShoppingListPdfHtml(data.dietName, data.items);
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+  };
 
   if (isLoading) {
     return (
@@ -1065,9 +1205,15 @@ function ShoppingListContent({ dietId }: { dietId: number }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        {data.items.length} alimentos diferentes en "{data.dietName}"
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {data.items.length} alimentos diferentes en "{data.dietName}"
+        </p>
+        <Button variant="outline" size="sm" onClick={handleDownloadShoppingPdf} className="gap-1.5">
+          <FileDown className="h-3.5 w-3.5" />
+          PDF
+        </Button>
+      </div>
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -1093,10 +1239,72 @@ function ShoppingListContent({ dietId }: { dietId: number }) {
 }
 
 /**
+ * Shopping List PDF HTML
+ */
+function generateShoppingListPdfHtml(dietName: string, items: { name: string; totalQuantity: string; appearances: number }[]): string {
+  const rows = items.map((item, i) =>
+    `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9f9f9'};">
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;font-size:13px;">
+        <span style="display:inline-block;width:16px;height:16px;border:2px solid #ccc;border-radius:3px;margin-right:10px;vertical-align:middle;"></span>
+        ${item.name}
+      </td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:600;font-size:13px;">${item.totalQuantity}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#888;font-size:12px;">${item.appearances}x</td>
+    </tr>`
+  ).join("");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista de la Compra - ${dietName}</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 10px; }
+      @page { margin: 1.5cm; }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      color: #1a1a1a;
+      margin: 0 auto;
+      padding: 20px;
+      max-width: 700px;
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align:center;margin-bottom:24px;">
+    <img src="${LOGO_URL}" alt="NoLimitPerformance" style="height:60px;margin:0 auto 10px;display:block;" />
+    <h1 style="font-size:20px;font-weight:800;margin:0 0 4px;text-transform:uppercase;letter-spacing:1px;">
+      Lista de la Compra
+    </h1>
+    <p style="font-size:12px;color:#888;margin:0;">${dietName} · ${items.length} alimentos</p>
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;">
+    <thead>
+      <tr style="background:#f5c518;">
+        <th style="text-align:left;padding:10px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Alimento</th>
+        <th style="text-align:right;padding:10px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Cantidad</th>
+        <th style="text-align:right;padding:10px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Usos</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+    </tbody>
+  </table>
+
+  <div style="text-align:center;margin-top:20px;">
+    <p style="font-size:9px;color:#ccc;">NoLimitPerformance #MetabolicHacking</p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
  * PDF Grid Layout: Columns = Menus, Rows = Meals
- * Similar to the reference PDF with yellow headers and clean grid.
  * Shows only food names, quantities and alternatives (NO calories/macros).
- * Includes NoLimitPerformance logo.
+ * Includes NoLimitPerformance logo and notes.
  */
 function generateGridPdfHtml(diet: any): string {
   const sortedMenus = [...diet.menus].sort((a: any, b: any) => a.menuNumber - b.menuNumber);
@@ -1106,7 +1314,6 @@ function generateGridPdfHtml(diet: any): string {
   const mealRows: { mealNumber: number; mealName: string }[] = [];
 
   for (let i = 0; i < maxMeals; i++) {
-    // Find the first menu that has this meal number to get the name
     let name = `Comida ${i + 1}`;
     for (const menu of sortedMenus) {
       const sorted = [...menu.meals].sort((a: any, b: any) => a.mealNumber - b.mealNumber);
@@ -1152,6 +1359,10 @@ function generateGridPdfHtml(diet: any): string {
       cellContent += `<div style="font-size:11px;color:#333;line-height:1.5;">${foodLines}.</div>`;
       if (altFoods) {
         cellContent += `<div style="font-size:10px;color:#888;font-style:italic;margin-top:4px;border-top:1px dashed #ddd;padding-top:3px;">Alt: ${altFoods}.</div>`;
+      }
+      // Notes
+      if (meal.notes) {
+        cellContent += `<div style="font-size:9px;color:#666;margin-top:4px;border-top:1px solid #eee;padding-top:3px;font-style:italic;">📝 ${meal.notes}</div>`;
       }
 
       return `<td style="padding:10px;border:1px solid #e8e8e8;vertical-align:top;background:${idx % 2 === 0 ? '#fff' : '#fafafa'};">${cellContent}</td>`;

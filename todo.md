@@ -37,3 +37,8 @@
 - [x] Menús siempre diferentes entre días (no repetir platos/combinaciones de un menú a otro)
 - [x] Al añadir un alimento manualmente, generar automáticamente su alternativa/sustituto
 - [x] Al sustituir un alimento, asegurar que siempre se genera la alternativa del nuevo alimento
+- [x] Integrar filosofía de menús del usuario (7 dietas reales) como referencia en el prompt LLM
+- [x] Botón para regenerar una comida completa con alimentos diferentes (alternativa al menú propuesto)
+- [x] Notas/instrucciones de preparación por comida
+- [x] Exportar lista de la compra a PDF
+- [x] Modo oscuro

@@ -82,6 +82,7 @@ export interface FullMeal {
   protein: number;
   carbs: number;
   fats: number;
+  notes: string | null;
   foods: FullFood[];
 }
 

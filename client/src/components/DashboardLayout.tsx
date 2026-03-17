@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Leaf } from "lucide-react";
+import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Leaf, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -97,6 +98,31 @@ export default function DashboardLayout({
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
+  );
+}
+
+function ThemeToggleButton({ isCollapsed }: { isCollapsed: boolean }) {
+  const { theme, toggleTheme } = useTheme();
+  if (!toggleTheme) return null;
+  return (
+    <button
+      onClick={toggleTheme}
+      className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+    >
+      <div className="h-8 w-8 flex items-center justify-center shrink-0">
+        {theme === 'dark' ? (
+          <Sun className="h-4 w-4 text-amber-400" />
+        ) : (
+          <Moon className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+      {!isCollapsed && (
+        <span className="text-sm text-muted-foreground">
+          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -206,6 +232,7 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3">
+            <ThemeToggleButton isCollapsed={isCollapsed} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">

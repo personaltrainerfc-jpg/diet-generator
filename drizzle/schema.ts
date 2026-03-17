@@ -57,6 +57,7 @@ export const meals = mysqlTable("meals", {
   protein: int("protein").notNull(),
   carbs: int("carbs").notNull(),
   fats: int("fats").notNull(),
+  notes: text("notes"),
 });
 
 export type Meal = typeof meals.$inferSelect;

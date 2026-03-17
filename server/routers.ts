@@ -8,13 +8,14 @@ import { z } from "zod";
 import {
   createDiet, getUserDiets, getFullDiet, deleteDiet,
   createMenu, createMeal, createFood,
-  updateMealName, updateFood, getMealById, getFoodById,
+  updateMealName, updateMealNotes, updateFood, getMealById, getFoodById,
   updateMealMacros, updateMenuMacros,
   getMealsByMenuId, getMenusByDietId, getDietById,
   deleteMeal, deleteFood, getMenuById,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
+import { MEAL_PHILOSOPHY } from "@shared/mealPhilosophy";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -143,14 +144,7 @@ COHERENCIA POR MOMENTO DEL DÍA (MUY IMPORTANTE):
 REFERENCIA NUTRICIONAL DE ALIMENTOS (valores por 100g):
 ${foodRef}
 
-COMBINACIONES Y RECETAS HABITUALES QUE DEBES USAR COMO INSPIRACIÓN:
-- Judías verdes con cebolla y jamón serrano + carne o pescado a la plancha
-- Guisantes salteados + carne o pescado
-- Desayunos a base de tostadas con aceite y jamón, o con aguacate
-- Yogures (griegos, desnatados, skyr) con fruta y avena
-- Bowls de avena con fruta, frutos secos y yogur
-- Ensaladas completas con proteína (pollo, atún, huevo)
-- Arroz o pasta con verduras y proteína
+${MEAL_PHILOSOPHY}
 
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
@@ -834,6 +828,152 @@ Responde SOLO con JSON.`;
         await updateMenuMacros(mealResult[0].menuId);
 
         return { success: true, foodId };
+      }),
+
+    // ── Update meal notes ──
+    updateMealNotes: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        notes: z.string().max(1000).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        await updateMealNotes(input.mealId, input.notes);
+        return { success: true };
+      }),
+
+    // ── Regenerate a meal (replace all foods with different ones) ──
+    regenerateMeal: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { menus: menusTable, diets: dietsTable, foods: foodsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        // Get current foods to know what to avoid
+        const currentFoods = await db.select().from(foodsTable).where(eq(foodsTable.mealId, input.mealId));
+        const currentFoodNames = currentFoods.map(f => f.name).join(", ");
+
+        const prompt = `Genera UNA comida llamada "${meal.mealName}" con aproximadamente ${meal.calories} kcal, ${meal.protein}g proteína, ${meal.carbs}g carbohidratos, ${meal.fats}g grasa.
+
+IMPORTANTE: Esta comida reemplaza una versión anterior que tenía estos alimentos: ${currentFoodNames}. DEBES usar alimentos COMPLETAMENTE DIFERENTES a los anteriores. No repitas ninguno.
+
+${MEAL_PHILOSOPHY}
+
+La comida debe ser coherente con su nombre ("${meal.mealName}"). Si es desayuno, usa alimentos de desayuno. Si es comida/cena, usa platos principales. Si es snack, usa snacks ligeros.
+
+Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO con JSON.`;
+
+        const singleMealSchema = {
+          name: "single_meal",
+          strict: true,
+          schema: {
+            type: "object" as const,
+            properties: {
+              mealName: { type: "string" as const },
+              calories: { type: "integer" as const },
+              protein: { type: "integer" as const },
+              carbs: { type: "integer" as const },
+              fats: { type: "integer" as const },
+              foods: {
+                type: "array" as const,
+                items: {
+                  type: "object" as const,
+                  properties: {
+                    name: { type: "string" as const },
+                    quantity: { type: "string" as const },
+                    calories: { type: "integer" as const },
+                    protein: { type: "integer" as const },
+                    carbs: { type: "integer" as const },
+                    fats: { type: "integer" as const },
+                    alternativeName: { type: "string" as const },
+                    alternativeQuantity: { type: "string" as const },
+                    alternativeCalories: { type: "integer" as const },
+                    alternativeProtein: { type: "integer" as const },
+                    alternativeCarbs: { type: "integer" as const },
+                    alternativeFats: { type: "integer" as const },
+                  },
+                  required: ["name", "quantity", "calories", "protein", "carbs", "fats", "alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["mealName", "calories", "protein", "carbs", "fats", "foods"] as const,
+            additionalProperties: false,
+          },
+        };
+
+        const llmResponse = await invokeLLM({
+          messages: [
+            { role: "system", content: "Eres un nutricionista profesional de NoLimitPerformance. Genera comidas equilibradas con alimentos reales y cantidades precisas en gramos. Sigue la filosofía de menús proporcionada. Todos los valores numéricos deben ser enteros." },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_schema", json_schema: singleMealSchema },
+        });
+
+        const content = llmResponse.choices[0]?.message?.content;
+        if (!content || typeof content !== "string") throw new Error("No se pudo regenerar la comida");
+
+        let generated: any;
+        try { generated = JSON.parse(content); } catch { throw new Error("Error al procesar la comida regenerada"); }
+
+        // Delete old foods
+        for (const f of currentFoods) {
+          await deleteFood(f.id);
+        }
+
+        // Update meal macros
+        await updateMealName(input.mealId, generated.mealName || meal.mealName);
+
+        // Create new foods
+        for (const food of generated.foods) {
+          await createFood({
+            mealId: input.mealId,
+            name: food.name,
+            quantity: food.quantity,
+            calories: food.calories,
+            protein: food.protein,
+            carbs: food.carbs,
+            fats: food.fats,
+            alternativeName: food.alternativeName,
+            alternativeQuantity: food.alternativeQuantity,
+            alternativeCalories: food.alternativeCalories,
+            alternativeProtein: food.alternativeProtein,
+            alternativeCarbs: food.alternativeCarbs,
+            alternativeFats: food.alternativeFats,
+          });
+        }
+
+        // Recalculate meal and menu macros
+        await updateMealMacros(input.mealId);
+        await updateMenuMacros(meal.menuId);
+
+        return { success: true };
       }),
 
     // ── Shopping list ──
