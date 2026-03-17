@@ -34,3 +34,6 @@
 - [x] Selector de tipo de dieta en formulario (paleo, keto, mediterránea, real food, equilibrada)
 - [x] Selector de nivel de cocina en formulario (cocinar más o menos)
 - [x] Prompt del LLM adaptado según tipo de dieta y nivel de cocina seleccionados
+- [x] Menús siempre diferentes entre días (no repetir platos/combinaciones de un menú a otro)
+- [x] Al añadir un alimento manualmente, generar automáticamente su alternativa/sustituto
+- [x] Al sustituir un alimento, asegurar que siempre se genera la alternativa del nuevo alimento

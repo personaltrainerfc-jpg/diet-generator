@@ -154,7 +154,7 @@ COMBINACIONES Y RECETAS HABITUALES QUE DEBES USAR COMO INSPIRACIÓN:
 
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
-2. Para CADA alimento, proporciona UNA alternativa equivalente con macros similares Y coherente con el momento del día (la alternativa de un alimento de desayuno debe ser otro alimento de desayuno).
+2. Para CADA alimento, proporciona SIEMPRE UNA alternativa equivalente con macros similares Y coherente con el momento del día (la alternativa de un alimento de desayuno debe ser otro alimento de desayuno). NUNCA dejes un alimento sin alternativa.
 3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades).
@@ -162,6 +162,7 @@ REGLAS IMPORTANTES:
 7. Asegúrate de que la suma de macros de todas las comidas se aproxime a los objetivos diarios.
 8. Todos los valores numéricos deben ser enteros (sin decimales).
 9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
+10. MENÚS DIFERENTES (MUY IMPORTANTE): Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. NO repitas los mismos platos, combinaciones ni alimentos principales entre menús. Varía las fuentes de proteína, carbohidratos y verduras en cada menú. Por ejemplo, si un menú tiene pollo con arroz, otro debe tener pescado con pasta o legumbres. Los desayunos también deben variar (tostadas en uno, avena en otro, yogur con fruta en otro). Cada menú debe parecer un día diferente de alimentación.
 
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
@@ -755,6 +756,63 @@ Responde SOLO con JSON.`;
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
+        // Auto-generate alternative for the new food via LLM
+        let altName: string | null = null;
+        let altQty: string | null = null;
+        let altCal: number | null = null;
+        let altProt: number | null = null;
+        let altCarbs: number | null = null;
+        let altFats: number | null = null;
+
+        try {
+          const contextMealName = mealResult[0].mealName || "comida";
+          const altPrompt = `Dado el alimento "${input.name}" (${input.quantity}, ${input.calories}kcal, P${input.protein}g, C${input.carbs}g, G${input.fats}g) que forma parte de la comida "${contextMealName}", sugiere UNA alternativa equivalente que:
+1. Tenga macros similares (misma cantidad aproximada de cal/prot/carbs/grasas)
+2. Sea coherente con el momento del día (si es desayuno, debe ser un alimento de desayuno; si es comida/cena, un alimento de comida/cena; si es snack, un snack)
+3. Sea un alimento real, común y accesible
+4. Indique la cantidad precisa en gramos
+Responde SOLO con JSON.`;
+
+          const altSchema = {
+            name: "food_alternative",
+            strict: true,
+            schema: {
+              type: "object" as const,
+              properties: {
+                alternativeName: { type: "string" as const },
+                alternativeQuantity: { type: "string" as const },
+                alternativeCalories: { type: "integer" as const },
+                alternativeProtein: { type: "integer" as const },
+                alternativeCarbs: { type: "integer" as const },
+                alternativeFats: { type: "integer" as const },
+              },
+              required: ["alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+              additionalProperties: false,
+            },
+          };
+
+          const altResponse = await invokeLLM({
+            messages: [
+              { role: "system", content: "Eres un nutricionista profesional. Sugiere alternativas de alimentos coherentes con el momento del día. Todos los valores numéricos deben ser enteros." },
+              { role: "user", content: altPrompt },
+            ],
+            response_format: { type: "json_schema", json_schema: altSchema },
+          });
+
+          const altContent = altResponse.choices[0]?.message?.content;
+          if (altContent && typeof altContent === "string") {
+            const alt = JSON.parse(altContent);
+            altName = alt.alternativeName;
+            altQty = alt.alternativeQuantity;
+            altCal = alt.alternativeCalories;
+            altProt = alt.alternativeProtein;
+            altCarbs = alt.alternativeCarbs;
+            altFats = alt.alternativeFats;
+          }
+        } catch (e) {
+          console.warn("Failed to generate alternative for added food:", e);
+        }
+
         const foodId = await createFood({
           mealId: input.mealId,
           name: input.name,
@@ -763,12 +821,12 @@ Responde SOLO con JSON.`;
           protein: input.protein,
           carbs: input.carbs,
           fats: input.fats,
-          alternativeName: null,
-          alternativeQuantity: null,
-          alternativeCalories: null,
-          alternativeProtein: null,
-          alternativeCarbs: null,
-          alternativeFats: null,
+          alternativeName: altName,
+          alternativeQuantity: altQty,
+          alternativeCalories: altCal,
+          alternativeProtein: altProt,
+          alternativeCarbs: altCarbs,
+          alternativeFats: altFats,
         });
 
         // Recalculate meal and menu macros

@@ -790,9 +790,12 @@ export default function DietDetail() {
   });
 
   const addFoodMut = trpc.diet.addFood.useMutation({
+    onMutate: () => {
+      toast.info("Añadiendo alimento y generando alternativa...");
+    },
     onSuccess: () => {
       utils.diet.getById.invalidate({ id: dietId });
-      toast.success("Alimento añadido");
+      toast.success("Alimento añadido con alternativa");
     },
     onError: (err) => toast.error(err.message),
   });
