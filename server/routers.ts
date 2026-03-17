@@ -8,8 +8,12 @@ import { z } from "zod";
 import {
   createDiet, getUserDiets, getFullDiet, deleteDiet,
   createMenu, createMeal, createFood,
+  updateMealName, updateFood, getMealById, getFoodById,
+  updateMealMacros, updateMenuMacros,
+  getMealsByMenuId, getMenusByDietId, getDietById,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
+import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -31,6 +35,29 @@ function buildDietPrompt(config: z.infer<typeof dietConfigSchema>): string {
     ? `\nALIMENTOS A EVITAR (NO incluir bajo ningún concepto): ${config.avoidFoods.join(", ")}`
     : "";
 
+  // Build a compact food reference from the database (top common foods)
+  const commonCategories = [
+    "Pechuga de pollo", "Solomillo de ternera", "Lomo de cerdo", "Pechuga de pavo",
+    "Salmón", "Merluza", "Atún", "Lubina", "Huevos", "Clara de huevo",
+    "Arroz blanco hervido", "Arroz integral", "Pasta", "Pasta integral", "Pan integral",
+    "Pan blanco", "Avena en copos", "Patata cruda", "Boniato",
+    "Garbanzos cocidos", "Lentejas secas", "Alubias hervidas",
+    "Brócoli", "Espinaca", "Judías verdes", "Calabacín", "Tomate", "Lechuga",
+    "Plátano", "Manzana", "Fresas", "Naranja", "Kiwi",
+    "Aceite de oliva", "Aguacate", "Almendras", "Nueces",
+    "Yogur griego natural", "Yogur desnatado 0%", "Leche semidesnatada", "Queso fresco batido 0%",
+    "Jamón serrano", "Jamón cocido bajo en grasa",
+  ];
+
+  const foodRef = commonCategories
+    .map(name => {
+      const found = foodDatabase.find(f => f.name === name);
+      if (!found) return null;
+      return `${found.name}: ${found.calories}kcal, P${found.protein}g, C${found.carbs}g, G${found.fats}g (por 100g)`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
   return `Eres un nutricionista profesional. Genera exactamente ${config.totalMenus} menú(s) diario(s) completo(s) con las siguientes especificaciones:
 
 OBJETIVOS NUTRICIONALES DIARIOS:
@@ -44,15 +71,28 @@ ESTRUCTURA:
 - Número de menús a generar: ${config.totalMenus}
 ${avoidText}
 
+REFERENCIA NUTRICIONAL DE ALIMENTOS (valores por 100g):
+${foodRef}
+
+COMBINACIONES Y RECETAS HABITUALES QUE DEBES USAR COMO INSPIRACIÓN:
+- Judías verdes con cebolla y jamón serrano + carne o pescado a la plancha
+- Guisantes salteados + carne o pescado
+- Desayunos a base de tostadas con aceite y jamón, o con aguacate
+- Yogures (griegos, desnatados, skyr) con fruta y avena
+- Bowls de avena con fruta, frutos secos y yogur
+- Ensaladas completas con proteína (pollo, atún, huevo)
+- Arroz o pasta con verduras y proteína
+
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
 2. Para CADA alimento, proporciona UNA alternativa equivalente con macros similares.
 3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
-4. Usa alimentos reales, comunes y accesibles.
+4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades).
 6. Los nombres de las comidas deben ser descriptivos (ej: "Desayuno", "Media Mañana", "Almuerzo", "Merienda", "Cena").
 7. Asegúrate de que la suma de macros de todas las comidas se aproxime a los objetivos diarios.
 8. Todos los valores numéricos deben ser enteros (sin decimales).
+9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
 
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
@@ -133,11 +173,19 @@ export const appRouter = router({
     }),
   }),
 
+  // ── Food database search ──
+  foodDb: router({
+    search: protectedProcedure
+      .input(z.object({ query: z.string().min(2).max(100) }))
+      .query(({ input }) => {
+        return searchFoods(input.query, 20);
+      }),
+  }),
+
   diet: router({
     generate: protectedProcedure
       .input(dietConfigSchema)
       .mutation(async ({ ctx, input }) => {
-        // Validate macros sum to ~100%
         const macroSum = input.proteinPercent + input.carbsPercent + input.fatsPercent;
         if (macroSum < 95 || macroSum > 105) {
           throw new Error(`La suma de macronutrientes debe ser aproximadamente 100%. Actual: ${macroSum}%`);
@@ -147,7 +195,7 @@ export const appRouter = router({
 
         const llmResponse = await invokeLLM({
           messages: [
-            { role: "system", content: "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados." },
+            { role: "system", content: "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
             { role: "user", content: prompt },
           ],
           response_format: {
@@ -168,7 +216,6 @@ export const appRouter = router({
           throw new Error("Error al procesar la respuesta del generador de dietas.");
         }
 
-        // Save to database
         const dietId = await createDiet({
           userId: ctx.user.id,
           name: input.name,
@@ -222,7 +269,6 @@ export const appRouter = router({
           }
         }
 
-        // Send notification to owner
         try {
           await notifyOwner({
             title: "Nueva dieta generada",
@@ -255,6 +301,83 @@ export const appRouter = router({
         if (!diet) throw new Error("Dieta no encontrada");
         if (diet.userId !== ctx.user.id) throw new Error("No tienes acceso a esta dieta");
         await deleteDiet(input.id);
+        return { success: true };
+      }),
+
+    // ── Edit meal name ──
+    updateMealName: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        mealName: z.string().min(1).max(255),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        // Verify ownership through chain: meal -> menu -> diet -> user
+        const menuList = await getMenusByDietId(0); // We need to find the menu
+        // Simplified: get menu by meal's menuId, then diet, then check user
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { menus, diets } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const menuResult = await db.select().from(menus).where(eq(menus.id, meal.menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(diets).where(eq(diets.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        await updateMealName(input.mealId, input.mealName);
+        return { success: true };
+      }),
+
+    // ── Update food (replace or edit quantity) ──
+    updateFood: protectedProcedure
+      .input(z.object({
+        foodId: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        quantity: z.string().min(1).max(100).optional(),
+        calories: z.number().int().min(0).optional(),
+        protein: z.number().int().min(0).optional(),
+        carbs: z.number().int().min(0).optional(),
+        fats: z.number().int().min(0).optional(),
+        alternativeName: z.string().max(255).optional(),
+        alternativeQuantity: z.string().max(100).optional(),
+        alternativeCalories: z.number().int().min(0).optional(),
+        alternativeProtein: z.number().int().min(0).optional(),
+        alternativeCarbs: z.number().int().min(0).optional(),
+        alternativeFats: z.number().int().min(0).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const food = await getFoodById(input.foodId);
+        if (!food) throw new Error("Alimento no encontrado");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, food.mealId)).limit(1);
+        if (!mealResult[0]) throw new Error("Comida no encontrada");
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
+        if (!menuResult[0]) throw new Error("Menú no encontrado");
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
+        if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const { foodId, ...updateData } = input;
+        // Remove undefined values
+        const cleanData = Object.fromEntries(
+          Object.entries(updateData).filter(([_, v]) => v !== undefined)
+        );
+
+        if (Object.keys(cleanData).length > 0) {
+          await updateFood(foodId, cleanData);
+        }
+
+        // Recalculate meal and menu macros
+        await updateMealMacros(food.mealId);
+        await updateMenuMacros(mealResult[0].menuId);
+
         return { success: true };
       }),
   }),

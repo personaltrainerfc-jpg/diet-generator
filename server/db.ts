@@ -178,6 +178,68 @@ export async function getFoodsByMealId(mealId: number) {
   return db.select().from(foods).where(eq(foods.mealId, mealId));
 }
 
+// ── Update helpers ──
+
+export async function updateMealName(mealId: number, mealName: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(meals).set({ mealName }).where(eq(meals.id, mealId));
+}
+
+export async function updateFood(foodId: number, data: Partial<InsertFood>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(foods).set(data).where(eq(foods.id, foodId));
+}
+
+export async function getMealById(mealId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(meals).where(eq(meals.id, mealId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function getFoodById(foodId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(foods).where(eq(foods.id, foodId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function updateMealMacros(mealId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const mealFoods = await getFoodsByMealId(mealId);
+  const totals = mealFoods.reduce(
+    (acc, f) => ({
+      calories: acc.calories + f.calories,
+      protein: acc.protein + f.protein,
+      carbs: acc.carbs + f.carbs,
+      fats: acc.fats + f.fats,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fats: 0 }
+  );
+  await db.update(meals).set(totals).where(eq(meals.id, mealId));
+  return totals;
+}
+
+export async function updateMenuMacros(menuId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const menuMeals = await getMealsByMenuId(menuId);
+  const totals = menuMeals.reduce(
+    (acc, m) => ({
+      totalCalories: acc.totalCalories + m.calories,
+      totalProtein: acc.totalProtein + m.protein,
+      totalCarbs: acc.totalCarbs + m.carbs,
+      totalFats: acc.totalFats + m.fats,
+    }),
+    { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFats: 0 }
+  );
+  await db.update(menus).set(totals).where(eq(menus.id, menuId));
+  return totals;
+}
+
 // ── Full diet with all nested data ──
 
 export async function getFullDiet(dietId: number) {

@@ -79,6 +79,45 @@ vi.mock("./db", () => ({
   createMenu: vi.fn().mockResolvedValue(1),
   createMeal: vi.fn().mockResolvedValue(1),
   createFood: vi.fn().mockResolvedValue(1),
+  updateMealName: vi.fn().mockResolvedValue(undefined),
+  updateFood: vi.fn().mockResolvedValue(undefined),
+  getMealById: vi.fn().mockResolvedValue({
+    id: 1,
+    menuId: 1,
+    mealNumber: 1,
+    mealName: "Desayuno",
+    calories: 500,
+    protein: 38,
+    carbs: 56,
+    fats: 14,
+  }),
+  getFoodById: vi.fn().mockResolvedValue({
+    id: 1,
+    mealId: 1,
+    name: "Avena",
+    quantity: "80g",
+    calories: 300,
+    protein: 10,
+    carbs: 50,
+    fats: 6,
+    alternativeName: "Arroz inflado",
+    alternativeQuantity: "60g",
+    alternativeCalories: 290,
+    alternativeProtein: 8,
+    alternativeCarbs: 52,
+    alternativeFats: 5,
+  }),
+  updateMealMacros: vi.fn().mockResolvedValue({ calories: 500, protein: 38, carbs: 56, fats: 14 }),
+  updateMenuMacros: vi.fn().mockResolvedValue({ totalCalories: 2000, totalProtein: 150, totalCarbs: 225, totalFats: 56 }),
+  getMealsByMenuId: vi.fn().mockResolvedValue([]),
+  getMenusByDietId: vi.fn().mockResolvedValue([]),
+  getDietById: vi.fn().mockResolvedValue({ id: 1, userId: 1 }),
+  getDb: vi.fn().mockResolvedValue({
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([{ id: 1, menuId: 1, dietId: 1, userId: 1 }]),
+  }),
 }));
 
 // Mock the LLM module
@@ -281,5 +320,51 @@ describe("diet.delete", () => {
     const ctx = createUnauthContext();
     const caller = appRouter.createCaller(ctx);
     await expect(caller.diet.delete({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("foodDb.search", () => {
+  it("returns food results for a valid query", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.foodDb.search({ query: "pollo" });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+    // Each result should have nutritional info
+    for (const food of result) {
+      expect(food).toHaveProperty("name");
+      expect(food).toHaveProperty("calories");
+      expect(food).toHaveProperty("protein");
+      expect(food).toHaveProperty("carbs");
+      expect(food).toHaveProperty("fats");
+    }
+  });
+
+  it("returns results for arroz", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.foodDb.search({ query: "arroz" });
+    expect(result.length).toBeGreaterThan(0);
+    const names = result.map((f) => f.name.toLowerCase());
+    expect(names.some((n) => n.includes("arroz"))).toBe(true);
+  });
+
+  it("returns empty array for nonsense query", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.foodDb.search({ query: "xyznonexistent" });
+    expect(result).toHaveLength(0);
+  });
+
+  it("rejects query shorter than 2 characters", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.foodDb.search({ query: "a" })).rejects.toThrow();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.foodDb.search({ query: "pollo" })).rejects.toThrow();
   });
 });

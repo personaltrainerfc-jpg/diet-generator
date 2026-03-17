@@ -12,3 +12,9 @@
 - [x] Notificación al propietario cuando se genera una nueva dieta
 - [x] Tests unitarios con Vitest
 - [x] Bug: Error al insertar dieta en BD - campo avoidFoods no se serializa correctamente como JSON (tablas no existían + sintaxis TiDB incompatible)
+- [x] Editar nombre de cada comida (ej: renombrar "Desayuno" a "Pre-entreno")
+- [x] Sustituir un alimento por otro manualmente (con búsqueda en la base de datos de alimentos)
+- [x] Editar cantidades de alimentos manualmente después de generar la dieta
+- [x] Integrar base de datos de 1146 alimentos del usuario como referencia para el LLM
+- [x] Incluir recetas/combinaciones habituales del usuario en el prompt del LLM (judías verdes con cebolla y jamón, guisantes + carne/pescado, tostadas, yogures, bowls)
+- [x] PDF: mostrar solo nombre de comida, alimentos, cantidades y alternativas (SIN calorías ni macros)
