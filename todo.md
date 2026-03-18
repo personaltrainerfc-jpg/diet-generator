@@ -50,3 +50,6 @@
 - [x] Campo opcional de preferencias por comida en el formulario de generación
 - [x] Botón "Rehacer dieta" que regenera con mismos parámetros pero menús diferentes
 - [x] Combinaciones de alimentos coherentes e inteligentes (platos reales, gastronomía mediterránea)
+- [x] Descripción de comida editable manualmente (clic para editar, guardar con Enter o blur)
+- [x] Sin repetición de alimentos entre días del mismo menú (instrucción explícita en prompt)
+- [x] PDF simplificado: primera página solo logo + nombre de la dieta (sin calorías, fecha, comidas)

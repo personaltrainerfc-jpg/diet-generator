@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   createDiet, getUserDiets, getFullDiet, deleteDiet,
   createMenu, createMeal, createFood,
-  updateMealName, updateMealNotes, updateFood, getMealById, getFoodById,
+  updateMealName, updateMealNotes, updateMealDescription, updateFood, getMealById, getFoodById,
   updateMealMacros, updateMenuMacros,
   getMealsByMenuId, getMenusByDietId, getDietById,
   deleteMeal, deleteFood, getMenuById,
@@ -169,6 +169,7 @@ REGLAS IMPORTANTES:
 9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
 10. MENÚS DIFERENTES: Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. Varía las fuentes de proteína, carbohidratos y verduras en cada menú.
 11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
+12. SIN REPETICIÓN ENTRE DÍAS: No repitas el mismo alimento principal (proteína, verdura o carbohidrato principal) en dos días/menús distintos del plan. Distribuye verduras, proteínas y carbohidratos de forma variada a lo largo de todos los días del menú. Si un día usas pechuga de pollo, otro día usa lomo de cerdo o merluza. Si un día usas brócoli, otro día usa judías verdes o calabacín. Maximiza la variedad.
 
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
@@ -890,6 +891,33 @@ Responde SOLO con JSON.`;
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
         await updateMealNotes(input.mealId, input.notes);
+        return { success: true };
+      }),
+
+    // ── Update meal description ──
+    updateMealDescription: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        description: z.string().max(500).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+
+        // Verify ownership
+        const { getDb } = await import("./db");
+        const db = await getDb();
+        if (db) {
+          const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const [menu] = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
+          if (menu) {
+            const [diet] = await db.select().from(dietsTable).where(eq(dietsTable.id, menu.dietId)).limit(1);
+            if (diet && diet.userId !== ctx.user.id) throw new Error("No tienes acceso a esta comida");
+          }
+        }
+
+        await updateMealDescription(input.mealId, input.description);
         return { success: true };
       }),
 

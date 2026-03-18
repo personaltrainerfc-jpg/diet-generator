@@ -545,7 +545,7 @@ function MealNotes({ meal, onSave }: { meal: FullMeal; onSave: (notes: string | 
 }
 
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, isDeletable, isRegenerating }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, isDeletable, isRegenerating }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -554,10 +554,13 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
   onRegenerateMeal: (mealId: number) => void;
   onUpdateNotes: (mealId: number, notes: string | null) => void;
+  onUpdateDescription: (mealId: number, description: string | null) => void;
   isDeletable: boolean;
   isRegenerating: boolean;
 }) {
   const [addFoodOpen, setAddFoodOpen] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descValue, setDescValue] = useState(meal.description || "");
 
   return (
     <Card className="shadow-sm group/meal">
@@ -633,10 +636,49 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             G: {meal.fats}g
           </span>
         </div>
-        {meal.description && (
-          <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-2">
+        {editingDesc ? (
+          <div className="mt-2 flex items-center gap-1.5">
+            <Input
+              value={descValue}
+              onChange={(e) => setDescValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const trimmed = descValue.trim();
+                  onUpdateDescription(meal.id, trimmed || null);
+                  setEditingDesc(false);
+                }
+                if (e.key === "Escape") {
+                  setDescValue(meal.description || "");
+                  setEditingDesc(false);
+                }
+              }}
+              onBlur={() => {
+                const trimmed = descValue.trim();
+                onUpdateDescription(meal.id, trimmed || null);
+                setEditingDesc(false);
+              }}
+              placeholder="Ej: Pechuga a la plancha con arroz y ensalada..."
+              className="h-7 text-sm italic"
+              autoFocus
+              maxLength={500}
+            />
+          </div>
+        ) : meal.description ? (
+          <button
+            onClick={() => { setDescValue(meal.description || ""); setEditingDesc(true); }}
+            className="mt-2 w-full text-left text-sm text-muted-foreground italic border-l-2 border-primary/30 pl-2 hover:bg-muted/30 rounded-r-md py-0.5 transition-colors group/desc"
+          >
             {meal.description}
-          </p>
+            <Pencil className="h-3 w-3 inline ml-1.5 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+          </button>
+        ) : (
+          <button
+            onClick={() => { setDescValue(""); setEditingDesc(true); }}
+            className="mt-2 w-full py-1 rounded-lg text-[11px] text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+          >
+            <Pencil className="h-3 w-3" />
+            Añadir descripción del plato
+          </button>
         )}
       </CardHeader>
       <Separator />
@@ -748,7 +790,7 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, addingMeal, regeneratingMealId }: {
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, addingMeal, regeneratingMealId }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -758,6 +800,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onAddFood: (mealId: number, food: { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number }) => void;
   onRegenerateMeal: (mealId: number) => void;
   onUpdateNotes: (mealId: number, notes: string | null) => void;
+  onUpdateDescription: (mealId: number, description: string | null) => void;
   addingMeal: boolean;
   regeneratingMealId: number | null;
 }) {
@@ -812,6 +855,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             onAddFood={onAddFood}
             onRegenerateMeal={onRegenerateMeal}
             onUpdateNotes={onUpdateNotes}
+            onUpdateDescription={onUpdateDescription}
             isDeletable={canDeleteMeal}
             isRegenerating={regeneratingMealId === meal.id}
           />
@@ -994,6 +1038,17 @@ export default function DietDetail() {
   const handleUpdateNotes = useCallback((mealId: number, notes: string | null) => {
     updateNotesMut.mutate({ mealId, notes });
   }, [updateNotesMut]);
+
+  const updateDescriptionMut = trpc.diet.updateMealDescription.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleUpdateDescription = useCallback((mealId: number, description: string | null) => {
+    updateDescriptionMut.mutate({ mealId, description });
+  }, [updateDescriptionMut]);
 
   const handleDownloadPdf = async () => {
     if (!diet) return;
@@ -1214,6 +1269,7 @@ export default function DietDetail() {
           onAddFood={handleAddFood}
           onRegenerateMeal={handleRegenerateMeal}
           onUpdateNotes={handleUpdateNotes}
+          onUpdateDescription={handleUpdateDescription}
           addingMeal={addMealMut.isPending}
           regeneratingMealId={regeneratingMealId}
         />
@@ -1246,6 +1302,7 @@ export default function DietDetail() {
                   onAddFood={handleAddFood}
                   onRegenerateMeal={handleRegenerateMeal}
                   onUpdateNotes={handleUpdateNotes}
+                  onUpdateDescription={handleUpdateDescription}
                   addingMeal={addMealMut.isPending}
                   regeneratingMealId={regeneratingMealId}
                 />
@@ -1481,12 +1538,9 @@ function generateGridPdfHtml(diet: any): string {
 <body>
   <div style="text-align:center;margin-bottom:20px;">
     <img src="${LOGO_URL}" alt="NoLimitPerformance" style="height:80px;margin:0 auto 10px;display:block;" />
-    <h1 style="font-size:22px;font-weight:900;margin:0 0 4px;color:#111;text-transform:uppercase;letter-spacing:1px;">
+    <h1 style="font-size:22px;font-weight:900;margin:0;color:#111;text-transform:uppercase;letter-spacing:1px;">
       ${diet.name}
     </h1>
-    <p style="font-size:12px;color:#888;margin:0;">
-      ${diet.mealsPerDay} comidas/día · ${diet.totalCalories} kcal
-    </p>
   </div>
 
   <table style="width:100%;border-collapse:collapse;table-layout:fixed;">

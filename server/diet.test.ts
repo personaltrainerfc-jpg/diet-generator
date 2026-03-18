@@ -84,6 +84,7 @@ vi.mock("./db", () => ({
   createFood: vi.fn().mockResolvedValue(1),
   updateMealName: vi.fn().mockResolvedValue(undefined),
   updateMealNotes: vi.fn().mockResolvedValue(undefined),
+  updateMealDescription: vi.fn().mockResolvedValue(undefined),
   updateFood: vi.fn().mockResolvedValue(undefined),
   getMealById: vi.fn().mockResolvedValue({
     id: 1,
@@ -756,6 +757,36 @@ describe("diet.regenerateMeal", () => {
     const caller = appRouter.createCaller(ctx);
     await expect(
       caller.diet.regenerateMeal({ mealId: 1 })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.updateMealDescription", () => {
+  it("updates meal description successfully", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateMealDescription({
+      mealId: 1,
+      description: "Pechuga de pollo a la plancha con arroz basmati",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("clears meal description when null", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.updateMealDescription({
+      mealId: 1,
+      description: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.diet.updateMealDescription({ mealId: 1, description: "Test" })
     ).rejects.toThrow();
   });
 });
