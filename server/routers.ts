@@ -12,6 +12,9 @@ import {
   updateMealMacros, updateMenuMacros,
   getMealsByMenuId, getMenusByDietId, getDietById,
   deleteMeal, deleteFood, getMenuById,
+  createRecipe, getUserRecipes, getFullRecipe, deleteRecipe,
+  addRecipeIngredient, deleteRecipeIngredient, updateRecipeMacros, getRecipeById,
+  updateDietCalories, copyMealToMenu, getFoodsByMealId,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
@@ -29,6 +32,17 @@ const dietConfigSchema = z.object({
   dietType: z.string().default("equilibrada"),
   cookingLevel: z.string().default("moderate"),
   preferences: z.string().max(2000).optional(),
+  useHomeMeasures: z.boolean().default(false),
+  supermarket: z.string().max(50).optional(),
+  dailyTargets: z.array(z.object({
+    day: z.number().int().min(1).max(7),
+    calories: z.number().int().min(800).max(10000),
+    proteinPercent: z.number().int().min(0).max(100),
+    carbsPercent: z.number().int().min(0).max(100),
+    fatsPercent: z.number().int().min(0).max(100),
+  })).optional(),
+  selectedRecipeIds: z.array(z.number()).optional(),
+  recipesText: z.string().optional(),
 });
 
 function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietFoods?: string[]): string {
@@ -155,7 +169,16 @@ COMBINACIONES DE ALIMENTOS COHERENTES E INTELIGENTES (OBLIGATORIO):
 - Ejemplos de combinaciones CORRECTAS: judías verdes salteadas con jamón serrano + pechuga de pollo a la plancha, lentejas estofadas con verduras + arroz, salmón al horno con patatas y espinacas, tortilla francesa con ensalada mixta, garbanzos con espinacas y huevo pochado.
 - Ejemplos de combinaciones INCORRECTAS: atún con leche y plátano, arroz con yogur y almendras como comida principal, pollo con fresas y avena en la cena.
 
-${config.preferences ? `PREFERENCIAS DEL USUARIO (RESPETAR EN LA MEDIDA DE LO POSIBLE):\n${config.preferences}\n` : ""}
+${config.useHomeMeasures ? `MEDIDAS CASERAS (OBLIGATORIO):\nExpresa TODAS las cantidades en medidas caseras en lugar de gramos. Usa medidas como: 1 puñado, 1 filete mediano, 1 taza, 2 cucharadas soperas, 1 rebanada, 1 loncha, 1 pieza mediana, medio vaso, 1 cucharadita, etc. Los valores de macros deben calcularse según la cantidad real que representa esa medida casera.\n` : ""}
+${config.supermarket ? `PRODUCTOS DE SUPERMERCADO (OBLIGATORIO):\nAjusta los alimentos propuestos a productos reales disponibles en ${config.supermarket}. Usa nombres de productos que se puedan encontrar fácilmente en ${config.supermarket}. Por ejemplo, en vez de "yogur griego", usa el nombre del producto específico de ${config.supermarket} si es conocido.\n` : ""}
+${config.dailyTargets && config.dailyTargets.length > 0 ? `CALORÍAS Y MACROS DIFERENTES POR DÍA (OBLIGATORIO):\nCada menú/día tiene objetivos nutricionales diferentes:\n${config.dailyTargets.map(dt => {
+  const pG = Math.round((dt.calories * dt.proteinPercent / 100) / 4);
+  const cG = Math.round((dt.calories * dt.carbsPercent / 100) / 4);
+  const fG = Math.round((dt.calories * dt.fatsPercent / 100) / 9);
+  return `- Día/Menú ${dt.day}: ${dt.calories} kcal, Proteínas ${pG}g (${dt.proteinPercent}%), Carbohidratos ${cG}g (${dt.carbsPercent}%), Grasas ${fG}g (${dt.fatsPercent}%)`;
+}).join("\n")}\nRespeta estos objetivos individuales para cada menú en lugar de los objetivos globales.\n` : ""}
+${config.recipesText ? `RECETAS PROPIAS DEL USUARIO (INCORPORAR OBLIGATORIAMENTE):\nEl usuario quiere que las siguientes recetas aparezcan en el menú. Incorpóralas en los días/comidas que mejor encajen respetando los macros del plan:\n${config.recipesText}\n` : ""}
+${config.preferences ? `PREFERENCIAS DEL USUARIO (CUMPLIMIENTO OBLIGATORIO Y PRIORITARIO):\nLas siguientes preferencias escritas por el usuario son de cumplimiento obligatorio y tienen prioridad sobre cualquier criterio de variedad o distribución automática. Sigue cada instrucción del usuario de forma literal:\n${config.preferences}\n` : ""}
 ${previousDietFoods && previousDietFoods.length > 0 ? `VARIEDAD GARANTIZADA - PLATOS A EVITAR (ya usados en dietas anteriores, NO repetir):\n${previousDietFoods.join(", ")}\nDEBES usar combinaciones y platos COMPLETAMENTE DIFERENTES a los listados arriba. Rota las fuentes de proteína, carbohidratos y verduras.\n` : ""}
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
@@ -292,7 +315,24 @@ export const appRouter = router({
           console.warn("Could not fetch previous diets for variety:", e);
         }
 
-        const prompt = buildDietPrompt(input, previousDietFoods);
+        // Build recipes text if user selected recipes
+        let recipesText = input.recipesText || "";
+        if (input.selectedRecipeIds && input.selectedRecipeIds.length > 0 && !recipesText) {
+          const recipeTexts: string[] = [];
+          for (const rid of input.selectedRecipeIds) {
+            const fullRecipe = await getFullRecipe(rid);
+            if (fullRecipe) {
+              const ingredientsList = fullRecipe.ingredients.map(i => `  - ${i.name}: ${i.quantity} (${i.calories}kcal, P${i.protein}g, C${i.carbs}g, G${i.fats}g)`).join("\n");
+              recipeTexts.push(`Receta "${fullRecipe.name}" (${fullRecipe.totalCalories}kcal, P${fullRecipe.totalProtein}g, C${fullRecipe.totalCarbs}g, G${fullRecipe.totalFats}g):\n${ingredientsList}`);
+            }
+          }
+          if (recipeTexts.length > 0) {
+            recipesText = recipeTexts.join("\n\n");
+          }
+        }
+        const configWithRecipes = { ...input, recipesText };
+
+        const prompt = buildDietPrompt(configWithRecipes, previousDietFoods);
 
         const llmResponse = await invokeLLM({
           messages: [
@@ -330,6 +370,10 @@ export const appRouter = router({
           dietType: input.dietType,
           cookingLevel: input.cookingLevel,
           preferences: input.preferences || null,
+          useHomeMeasures: input.useHomeMeasures ? 1 : 0,
+          supermarket: input.supermarket || null,
+          dailyTargets: input.dailyTargets || null,
+          selectedRecipeIds: input.selectedRecipeIds || null,
         });
 
         for (const menu of generatedDiet.menus) {
@@ -1208,6 +1252,10 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           dietType: (original as any).dietType || 'equilibrada',
           cookingLevel: (original as any).cookingLevel || 'moderate',
           preferences: (original as any).preferences || undefined,
+          useHomeMeasures: !!(original as any).useHomeMeasures,
+          supermarket: (original as any).supermarket || undefined,
+          dailyTargets: (original as any).dailyTargets || undefined,
+          selectedRecipeIds: (original as any).selectedRecipeIds || undefined,
         };
 
         const prompt = buildDietPrompt(config, allPreviousFoods);
@@ -1297,6 +1345,273 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
         }
 
         return { success: true };
+      }),
+  }),
+
+  // ── Recipe management ──
+  recipe: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getUserRecipes(ctx.user.id);
+    }),
+
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const recipe = await getFullRecipe(input.id);
+        if (!recipe) throw new Error("Receta no encontrada");
+        if (recipe.userId !== ctx.user.id) throw new Error("No tienes acceso a esta receta");
+        return recipe;
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        ingredients: z.array(z.object({
+          name: z.string().min(1).max(255),
+          quantity: z.string().min(1).max(100),
+          calories: z.number().int().min(0),
+          protein: z.number().int().min(0),
+          carbs: z.number().int().min(0),
+          fats: z.number().int().min(0),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const recipeId = await createRecipe({
+          userId: ctx.user.id,
+          name: input.name,
+        });
+        for (const ing of input.ingredients) {
+          await addRecipeIngredient({ recipeId, ...ing });
+        }
+        await updateRecipeMacros(recipeId);
+        return { recipeId };
+      }),
+
+    addIngredient: protectedProcedure
+      .input(z.object({
+        recipeId: z.number(),
+        name: z.string().min(1).max(255),
+        quantity: z.string().min(1).max(100),
+        calories: z.number().int().min(0),
+        protein: z.number().int().min(0),
+        carbs: z.number().int().min(0),
+        fats: z.number().int().min(0),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const recipe = await getRecipeById(input.recipeId);
+        if (!recipe || recipe.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const id = await addRecipeIngredient(input);
+        await updateRecipeMacros(input.recipeId);
+        return { id };
+      }),
+
+    removeIngredient: protectedProcedure
+      .input(z.object({ ingredientId: z.number(), recipeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const recipe = await getRecipeById(input.recipeId);
+        if (!recipe || recipe.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await deleteRecipeIngredient(input.ingredientId);
+        await updateRecipeMacros(input.recipeId);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const recipe = await getRecipeById(input.id);
+        if (!recipe || recipe.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await deleteRecipe(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ── Adjust macros on existing diet ──
+  dietAdjust: router({
+    adjustMacros: protectedProcedure
+      .input(z.object({
+        dietId: z.number(),
+        totalCalories: z.number().int().min(800).max(10000),
+        proteinPercent: z.number().int().min(0).max(100),
+        carbsPercent: z.number().int().min(0).max(100),
+        fatsPercent: z.number().int().min(0).max(100),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const macroSum = input.proteinPercent + input.carbsPercent + input.fatsPercent;
+        if (macroSum < 95 || macroSum > 105) {
+          throw new Error("La suma de macronutrientes debe estar entre 95% y 105%");
+        }
+
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const oldCalories = diet.totalCalories;
+        const ratio = input.totalCalories / oldCalories;
+
+        // Update diet-level macros
+        await updateDietCalories(input.dietId, input.totalCalories, input.proteinPercent, input.carbsPercent, input.fatsPercent);
+
+        // Recalculate all food quantities proportionally
+        const dietMenus = await getMenusByDietId(input.dietId);
+        for (const menu of dietMenus) {
+          const menuMeals = await getMealsByMenuId(menu.id);
+          for (const meal of menuMeals) {
+            const mealFoods = await getFoodsByMealId(meal.id);
+            for (const food of mealFoods) {
+              const newCals = Math.round(food.calories * ratio);
+              const newProtein = Math.round(food.protein * ratio);
+              const newCarbs = Math.round(food.carbs * ratio);
+              const newFats = Math.round(food.fats * ratio);
+              // Adjust quantity string
+              const qtyMatch = food.quantity.match(/(\d+\.?\d*)/);
+              let newQty = food.quantity;
+              if (qtyMatch) {
+                const oldQtyNum = parseFloat(qtyMatch[1]);
+                const newQtyNum = Math.round(oldQtyNum * ratio);
+                newQty = food.quantity.replace(qtyMatch[1], String(newQtyNum));
+              }
+              await updateFood(food.id, {
+                calories: newCals,
+                protein: newProtein,
+                carbs: newCarbs,
+                fats: newFats,
+                quantity: newQty,
+                alternativeCalories: food.alternativeCalories ? Math.round(food.alternativeCalories * ratio) : null,
+                alternativeProtein: food.alternativeProtein ? Math.round(food.alternativeProtein * ratio) : null,
+                alternativeCarbs: food.alternativeCarbs ? Math.round(food.alternativeCarbs * ratio) : null,
+                alternativeFats: food.alternativeFats ? Math.round(food.alternativeFats * ratio) : null,
+                alternativeQuantity: food.alternativeQuantity ? (() => {
+                  const aqm = food.alternativeQuantity!.match(/(\d+\.?\d*)/);
+                  if (aqm) return food.alternativeQuantity!.replace(aqm[1], String(Math.round(parseFloat(aqm[1]) * ratio)));
+                  return food.alternativeQuantity;
+                })() : null,
+              });
+            }
+            await updateMealMacros(meal.id);
+          }
+          await updateMenuMacros(menu.id);
+        }
+
+        return { success: true };
+      }),
+
+    // ── Copy meal to another menu ──
+    copyMeal: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        targetMenuId: z.number(),
+        replaceMealNumber: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+
+        // Verify ownership of source
+        const sourceMenu = await getMenuById(meal.menuId);
+        if (!sourceMenu) throw new Error("Menú no encontrado");
+        const sourceDiet = await getDietById(sourceMenu.dietId);
+        if (!sourceDiet || sourceDiet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        // Verify ownership of target
+        const targetMenu = await getMenuById(input.targetMenuId);
+        if (!targetMenu) throw new Error("Menú destino no encontrado");
+        const targetDiet = await getDietById(targetMenu.dietId);
+        if (!targetDiet || targetDiet.userId !== ctx.user.id) throw new Error("No tienes acceso al menú destino");
+
+        // If replaceMealNumber, delete existing meal with that number
+        if (input.replaceMealNumber) {
+          const existingMeals = await getMealsByMenuId(input.targetMenuId);
+          const toReplace = existingMeals.find(m => m.mealNumber === input.replaceMealNumber);
+          if (toReplace) {
+            await deleteMeal(toReplace.id);
+          }
+        }
+
+        const mealNumber = input.replaceMealNumber || meal.mealNumber;
+        const newMealId = await copyMealToMenu(input.mealId, input.targetMenuId, mealNumber);
+        await updateMenuMacros(input.targetMenuId);
+
+        return { newMealId };
+      }),
+
+    // ── Copy full menu (all meals) to another menu ──
+    copyMenu: protectedProcedure
+      .input(z.object({
+        sourceMenuId: z.number(),
+        targetMenuId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verify ownership
+        const sourceMenu = await getMenuById(input.sourceMenuId);
+        if (!sourceMenu) throw new Error("Menú origen no encontrado");
+        const sourceDiet = await getDietById(sourceMenu.dietId);
+        if (!sourceDiet || sourceDiet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const targetMenu = await getMenuById(input.targetMenuId);
+        if (!targetMenu) throw new Error("Menú destino no encontrado");
+        const targetDiet = await getDietById(targetMenu.dietId);
+        if (!targetDiet || targetDiet.userId !== ctx.user.id) throw new Error("No tienes acceso al destino");
+
+        // Delete existing meals in target
+        const existingMeals = await getMealsByMenuId(input.targetMenuId);
+        for (const m of existingMeals) {
+          await deleteMeal(m.id);
+        }
+
+        // Copy all meals from source
+        const sourceMeals = await getMealsByMenuId(input.sourceMenuId);
+        for (const m of sourceMeals) {
+          await copyMealToMenu(m.id, input.targetMenuId, m.mealNumber);
+        }
+        await updateMenuMacros(input.targetMenuId);
+
+        return { success: true };
+      }),
+
+    // ── Generate nutritional guide PDF ──
+    generateGuide: protectedProcedure
+      .input(z.object({ dietId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getFullDiet(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const proteinGrams = Math.round((diet.totalCalories * diet.proteinPercent / 100) / 4);
+        const carbsGrams = Math.round((diet.totalCalories * diet.carbsPercent / 100) / 4);
+        const fatsGrams = Math.round((diet.totalCalories * diet.fatsPercent / 100) / 9);
+
+        const guidePrompt = `Genera una guía nutricional personalizada en español para un usuario con el siguiente perfil:
+
+- Nombre de la dieta: ${diet.name}
+- Calorías diarias: ${diet.totalCalories} kcal
+- Proteínas: ${proteinGrams}g (${diet.proteinPercent}%)
+- Carbohidratos: ${carbsGrams}g (${diet.carbsPercent}%)
+- Grasas: ${fatsGrams}g (${diet.fatsPercent}%)
+- Tipo de dieta: ${(diet as any).dietType || 'equilibrada'}
+- Comidas por día: ${diet.mealsPerDay}
+- Alimentos excluidos: ${(diet.avoidFoods as string[] || []).join(', ') || 'Ninguno'}
+
+La guía debe incluir estas secciones:
+1. RESUMEN DEL PERFIL NUTRICIONAL: Breve descripción del perfil y objetivos.
+2. DISTRIBUCIÓN DE MACRONUTRIENTES: Explicación de por qué estos porcentajes y qué alimentos priorizar para cada macro.
+3. PAUTAS GENERALES DE ALIMENTACIÓN: Horarios recomendados, hidratación, preparación de alimentos.
+4. CONSEJOS PRÁCTICOS PERSONALIZADOS: Tips específicos según el tipo de dieta y preferencias.
+5. ALIMENTOS RECOMENDADOS: Lista de alimentos ideales para este perfil.
+6. EJEMPLO DE DÍA TIPO: Un ejemplo de distribución de comidas.
+
+Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezados, listas y negritas.`;
+
+        const llmResponse = await invokeLLM({
+          messages: [
+            { role: "system", content: "Eres un nutricionista profesional. Genera guías nutricionales completas, personalizadas y bien estructuradas en español." },
+            { role: "user", content: guidePrompt },
+          ],
+        });
+
+        const guideContent = llmResponse.choices[0]?.message?.content;
+        if (!guideContent || typeof guideContent !== "string") {
+          throw new Error("No se pudo generar la guía nutricional.");
+        }
+
+        return { content: guideContent, dietName: diet.name };
       }),
   }),
 });

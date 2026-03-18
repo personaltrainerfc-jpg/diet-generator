@@ -28,8 +28,11 @@ import {
 import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
   Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
-  Search, Plus, Trash2, Copy, ShoppingCart, RefreshCw, StickyNote, FileDown
+  Search, Plus, Trash2, Copy, ShoppingCart, RefreshCw, StickyNote, FileDown,
+  Settings2, ClipboardCopy, BookOpen, AlertCircle
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { useState, useCallback } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
 import { toast } from "sonner";
@@ -545,7 +548,7 @@ function MealNotes({ meal, onSave }: { meal: FullMeal; onSave: (notes: string | 
 }
 
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, isDeletable, isRegenerating }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, isDeletable, isRegenerating }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -555,6 +558,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onRegenerateMeal: (mealId: number) => void;
   onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
+  onCopyMeal?: (mealId: number) => void;
   isDeletable: boolean;
   isRegenerating: boolean;
 }) {
@@ -577,6 +581,20 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
               <Flame className="h-3 w-3 text-orange-500 dark:text-orange-400" />
               {meal.calories} kcal
             </Badge>
+            {/* Copy meal button */}
+            {onCopyMeal && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onCopyMeal(meal.id)}
+                    className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/meal:opacity-100"
+                  >
+                    <ClipboardCopy className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Copiar comida a otro men\u00fa</TooltipContent>
+              </Tooltip>
+            )}
             {/* Regenerate meal button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -790,7 +808,7 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, addingMeal, regeneratingMealId }: {
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, addingMeal, regeneratingMealId }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -801,6 +819,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onRegenerateMeal: (mealId: number) => void;
   onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
+  onCopyMeal?: (mealId: number) => void;
   addingMeal: boolean;
   regeneratingMealId: number | null;
 }) {
@@ -856,6 +875,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             onRegenerateMeal={onRegenerateMeal}
             onUpdateNotes={onUpdateNotes}
             onUpdateDescription={onUpdateDescription}
+            onCopyMeal={onCopyMeal}
             isDeletable={canDeleteMeal}
             isRegenerating={regeneratingMealId === meal.id}
           />
@@ -905,6 +925,17 @@ export default function DietDetail() {
   const [regeneratingMealId, setRegeneratingMealId] = useState<number | null>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateName, setDuplicateName] = useState("");
+  const [showAdjustMacros, setShowAdjustMacros] = useState(false);
+  const [showCopyMeal, setShowCopyMeal] = useState(false);
+  const [copyMealId, setCopyMealId] = useState<number | null>(null);
+  const [copyTargetMenuId, setCopyTargetMenuId] = useState<number | null>(null);
+  const [copyReplaceMealNumber, setCopyReplaceMealNumber] = useState<number | undefined>(undefined);
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideContent, setGuideContent] = useState<string | null>(null);
+  const [adjustCalories, setAdjustCalories] = useState(2000);
+  const [adjustProtein, setAdjustProtein] = useState(30);
+  const [adjustCarbs, setAdjustCarbs] = useState(45);
+  const [adjustFats, setAdjustFats] = useState(25);
 
   const utils = trpc.useUtils();
 
@@ -1050,6 +1081,54 @@ export default function DietDetail() {
     updateDescriptionMut.mutate({ mealId, description });
   }, [updateDescriptionMut]);
 
+  const adjustMacrosMut = trpc.dietAdjust.adjustMacros.useMutation({
+    onMutate: () => toast.info("Ajustando macros y cantidades..."),
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Macros ajustados correctamente");
+      setShowAdjustMacros(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const copyMealMut = trpc.dietAdjust.copyMeal.useMutation({
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Comida copiada correctamente");
+      setShowCopyMeal(false);
+      setCopyMealId(null);
+      setCopyTargetMenuId(null);
+      setCopyReplaceMealNumber(undefined);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const generateGuideMut = trpc.dietAdjust.generateGuide.useMutation({
+    onMutate: () => toast.info("Generando gu\u00eda nutricional personalizada..."),
+    onSuccess: (data) => {
+      setGuideContent(data.content);
+      setShowGuide(true);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleOpenAdjustMacros = () => {
+    if (diet) {
+      setAdjustCalories(diet.totalCalories);
+      setAdjustProtein(diet.proteinPercent);
+      setAdjustCarbs(diet.carbsPercent);
+      setAdjustFats(diet.fatsPercent);
+      setShowAdjustMacros(true);
+    }
+  };
+
+  const handleCopyMeal = (mealId: number) => {
+    setCopyMealId(mealId);
+    setCopyTargetMenuId(null);
+    setCopyReplaceMealNumber(undefined);
+    setShowCopyMeal(true);
+  };
+
   const handleDownloadPdf = async () => {
     if (!diet) return;
     setDownloading(true);
@@ -1106,7 +1185,36 @@ export default function DietDetail() {
             {diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleOpenAdjustMacros}
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Ajustar macros y calorías</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => generateGuideMut.mutate({ dietId })}
+                disabled={generateGuideMut.isPending}
+              >
+                {generateGuideMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <BookOpen className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Generar guía nutricional</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1257,6 +1365,183 @@ export default function DietDetail() {
         </DialogContent>
       </Dialog>
 
+      {/* Adjust Macros Dialog */}
+      <Dialog open={showAdjustMacros} onOpenChange={setShowAdjustMacros}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              Ajustar Macros y Calor\u00edas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 pt-2">
+            <div className="space-y-2">
+              <Label className="font-medium">Calor\u00edas totales: {adjustCalories} kcal</Label>
+              <Slider
+                value={[adjustCalories]}
+                onValueChange={([v]) => setAdjustCalories(v)}
+                min={800}
+                max={5000}
+                step={50}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>800 kcal</span>
+                <span>5000 kcal</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium">Prote\u00ednas: {adjustProtein}%</Label>
+              <Slider
+                value={[adjustProtein]}
+                onValueChange={([v]) => {
+                  setAdjustProtein(v);
+                  const remaining = 100 - v;
+                  const ratio = adjustCarbs + adjustFats > 0 ? adjustCarbs / (adjustCarbs + adjustFats) : 0.5;
+                  setAdjustCarbs(Math.round(remaining * ratio));
+                  setAdjustFats(remaining - Math.round(remaining * ratio));
+                }}
+                min={10}
+                max={60}
+                step={1}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium">Carbohidratos: {adjustCarbs}%</Label>
+              <Slider
+                value={[adjustCarbs]}
+                onValueChange={([v]) => {
+                  setAdjustCarbs(v);
+                  setAdjustFats(100 - adjustProtein - v);
+                }}
+                min={5}
+                max={100 - adjustProtein - 5}
+                step={1}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-medium">Grasas: {adjustFats}%</Label>
+              <div className="h-2 rounded-full bg-blue-200 dark:bg-blue-800">
+                <div className="h-full rounded-full bg-blue-500" style={{ width: `${adjustFats}%` }} />
+              </div>
+            </div>
+            {adjustProtein + adjustCarbs + adjustFats !== 100 && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Los porcentajes deben sumar 100% (actual: {adjustProtein + adjustCarbs + adjustFats}%)
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAdjustMacros(false)}>Cancelar</Button>
+              <Button
+                onClick={() => adjustMacrosMut.mutate({
+                  dietId,
+                  totalCalories: adjustCalories,
+                  proteinPercent: adjustProtein,
+                  carbsPercent: adjustCarbs,
+                  fatsPercent: adjustFats,
+                })}
+                disabled={adjustProtein + adjustCarbs + adjustFats !== 100 || adjustMacrosMut.isPending}
+              >
+                {adjustMacrosMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Settings2 className="h-4 w-4 mr-2" />}
+                Aplicar cambios
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Copy Meal Dialog */}
+      <Dialog open={showCopyMeal} onOpenChange={(v) => { if (!v) { setShowCopyMeal(false); setCopyMealId(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCopy className="h-5 w-5 text-primary" />
+              Copiar Comida a Otro Men\u00fa
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label className="font-medium">Men\u00fa destino</Label>
+              <div className="flex flex-wrap gap-2">
+                {diet.menus.map(m => (
+                  <Button
+                    key={m.id}
+                    variant={copyTargetMenuId === m.id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCopyTargetMenuId(m.id)}
+                  >
+                    Men\u00fa {m.menuNumber}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {copyTargetMenuId && (
+              <div className="space-y-2">
+                <Label className="font-medium">Reemplazar comida (opcional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={copyReplaceMealNumber === undefined ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCopyReplaceMealNumber(undefined)}
+                  >
+                    A\u00f1adir nueva
+                  </Button>
+                  {diet.menus.find(m => m.id === copyTargetMenuId)?.meals.map(meal => (
+                    <Button
+                      key={meal.id}
+                      variant={copyReplaceMealNumber === meal.mealNumber ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCopyReplaceMealNumber(meal.mealNumber)}
+                    >
+                      {meal.mealName}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCopyMeal(false)}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  if (copyMealId && copyTargetMenuId) {
+                    copyMealMut.mutate({
+                      mealId: copyMealId,
+                      targetMenuId: copyTargetMenuId,
+                      replaceMealNumber: copyReplaceMealNumber,
+                    });
+                  }
+                }}
+                disabled={!copyTargetMenuId || copyMealMut.isPending}
+              >
+                {copyMealMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ClipboardCopy className="h-4 w-4 mr-2" />}
+                Copiar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nutritional Guide Dialog */}
+      <Dialog open={showGuide} onOpenChange={setShowGuide}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Gu\u00eda Nutricional Personalizada
+            </DialogTitle>
+          </DialogHeader>
+          {guideContent ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+              {guideContent}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Menus */}
       {diet.menus.length === 1 ? (
         <MenuView
@@ -1303,6 +1588,7 @@ export default function DietDetail() {
                   onRegenerateMeal={handleRegenerateMeal}
                   onUpdateNotes={handleUpdateNotes}
                   onUpdateDescription={handleUpdateDescription}
+                  onCopyMeal={handleCopyMeal}
                   addingMeal={addMealMut.isPending}
                   regeneratingMealId={regeneratingMealId}
                 />

@@ -29,6 +29,10 @@ export const diets = mysqlTable("diets", {
   dietType: varchar("dietType", { length: 50 }).default("equilibrada").notNull(),
   cookingLevel: varchar("cookingLevel", { length: 50 }).default("moderate").notNull(),
   preferences: text("preferences"),
+  useHomeMeasures: int("useHomeMeasures").default(0).notNull(),
+  supermarket: varchar("supermarket", { length: 50 }),
+  dailyTargets: json("dailyTargets").$type<Array<{ day: number; calories: number; proteinPercent: number; carbsPercent: number; fatsPercent: number }>>(),
+  selectedRecipeIds: json("selectedRecipeIds").$type<number[]>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -84,3 +88,31 @@ export const foods = mysqlTable("foods", {
 
 export type Food = typeof foods.$inferSelect;
 export type InsertFood = typeof foods.$inferInsert;
+
+export const recipes = mysqlTable("recipes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  totalCalories: int("totalCalories").default(0).notNull(),
+  totalProtein: int("totalProtein").default(0).notNull(),
+  totalCarbs: int("totalCarbs").default(0).notNull(),
+  totalFats: int("totalFats").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Recipe = typeof recipes.$inferSelect;
+export type InsertRecipe = typeof recipes.$inferInsert;
+
+export const recipeIngredients = mysqlTable("recipe_ingredients", {
+  id: int("id").autoincrement().primaryKey(),
+  recipeId: int("recipeId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  quantity: varchar("quantity", { length: 100 }).notNull(),
+  calories: int("calories").default(0).notNull(),
+  protein: int("protein").default(0).notNull(),
+  carbs: int("carbs").default(0).notNull(),
+  fats: int("fats").default(0).notNull(),
+});
+
+export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
+export type InsertRecipeIngredient = typeof recipeIngredients.$inferInsert;

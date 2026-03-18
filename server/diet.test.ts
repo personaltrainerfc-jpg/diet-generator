@@ -85,6 +85,18 @@ vi.mock("./db", () => ({
   updateMealName: vi.fn().mockResolvedValue(undefined),
   updateMealNotes: vi.fn().mockResolvedValue(undefined),
   updateMealDescription: vi.fn().mockResolvedValue(undefined),
+  createRecipe: vi.fn().mockResolvedValue(1),
+  getUserRecipes: vi.fn().mockResolvedValue([]),
+  getRecipeWithIngredients: vi.fn().mockResolvedValue({ id: 1, userId: 1, name: "Pollo al curry", createdAt: new Date(), ingredients: [{ id: 1, recipeId: 1, name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 }] }),
+  deleteRecipe: vi.fn().mockResolvedValue(undefined),
+  updateDietMacros: vi.fn().mockResolvedValue(undefined),
+  copyMealToMenu: vi.fn().mockResolvedValue(5),
+  getRecipeById: vi.fn().mockResolvedValue({ id: 1, userId: 1, name: "Pollo al curry", createdAt: new Date() }),
+  updateDietCalories: vi.fn().mockResolvedValue(undefined),
+  addRecipeIngredient: vi.fn().mockResolvedValue(1),
+  deleteRecipeIngredient: vi.fn().mockResolvedValue(undefined),
+  updateRecipeMacros: vi.fn().mockResolvedValue(undefined),
+  getFullRecipe: vi.fn().mockResolvedValue({ id: 1, userId: 1, name: "Pollo al curry", createdAt: new Date(), ingredients: [{ id: 1, recipeId: 1, name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 }] }),
   updateFood: vi.fn().mockResolvedValue(undefined),
   getMealById: vi.fn().mockResolvedValue({
     id: 1,
@@ -788,5 +800,196 @@ describe("diet.updateMealDescription", () => {
     await expect(
       caller.diet.updateMealDescription({ mealId: 1, description: "Test" })
     ).rejects.toThrow();
+  });
+});
+
+describe("recipe.create", () => {
+  it("creates a recipe with ingredients", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.recipe.create({
+      name: "Pollo al curry",
+      ingredients: [
+        { name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 },
+        { name: "Arroz basmati", quantity: "100g", calories: 350, protein: 7, carbs: 78, fats: 1 },
+      ],
+    });
+    expect(result.recipeId).toBe(1);
+  });
+
+  it("rejects empty recipe name", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.recipe.create({
+        name: "",
+        ingredients: [{ name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 }],
+      })
+    ).rejects.toThrow();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.recipe.create({
+        name: "Test",
+        ingredients: [{ name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 }],
+      })
+    ).rejects.toThrow();
+  });
+});
+
+describe("recipe.list", () => {
+  it("returns user recipes", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.recipe.list();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.recipe.list()).rejects.toThrow();
+  });
+});
+
+describe("recipe.delete", () => {
+  it("deletes a recipe", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.recipe.delete({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.recipe.delete({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("dietAdjust.adjustMacros", () => {
+  it("adjusts macros for a diet", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.dietAdjust.adjustMacros({
+      dietId: 1,
+      totalCalories: 2500,
+      proteinPercent: 35,
+      carbsPercent: 40,
+      fatsPercent: 25,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid macro percentages", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.dietAdjust.adjustMacros({
+        dietId: 1,
+        totalCalories: 2500,
+        proteinPercent: 50,
+        carbsPercent: 50,
+        fatsPercent: 50,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.dietAdjust.adjustMacros({
+        dietId: 1,
+        totalCalories: 2500,
+        proteinPercent: 35,
+        carbsPercent: 40,
+        fatsPercent: 25,
+      })
+    ).rejects.toThrow();
+  });
+});
+
+describe("dietAdjust.copyMeal", () => {
+  it("copies a meal to another menu", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.dietAdjust.copyMeal({
+      mealId: 1,
+      targetMenuId: 1,
+    });
+    expect(result.newMealId).toBeDefined();
+    expect(typeof result.newMealId).toBe("number");
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.dietAdjust.copyMeal({ mealId: 1, targetMenuId: 1 })
+    ).rejects.toThrow();
+  });
+});
+
+describe("dietAdjust.generateGuide", () => {
+  it("generates a nutritional guide", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.dietAdjust.generateGuide({ dietId: 1 });
+    expect(result).toHaveProperty("content");
+    expect(typeof result.content).toBe("string");
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.dietAdjust.generateGuide({ dietId: 1 })
+    ).rejects.toThrow();
+  });
+});
+
+describe("diet.generate with new options", () => {
+  it("generates a diet with medidas caseras and supermercado options", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.generate({
+      name: "Dieta con opciones",
+      totalCalories: 2000,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      mealsPerDay: 4,
+      totalMenus: 1,
+      avoidFoods: [],
+      dietType: "equilibrada",
+      cookingLevel: "moderate",
+      useHomeMeasures: true,
+      useSupermarketProducts: true,
+      caloriesPerDay: "same",
+    });
+    expect(result.dietId).toBe(1);
+  });
+
+  it("generates a diet with variable calories per day", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.generate({
+      name: "Dieta variable",
+      totalCalories: 2000,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      mealsPerDay: 4,
+      totalMenus: 3,
+      avoidFoods: [],
+      dietType: "equilibrada",
+      cookingLevel: "moderate",
+      caloriesPerDay: "variable",
+    });
+    expect(result.dietId).toBe(1);
   });
 });

@@ -8,6 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
 import History from "./pages/History";
 import DietDetail from "./pages/DietDetail";
+import Recipes from "./pages/Recipes";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/history" component={History} />
         <Route path="/diet/:id" component={DietDetail} />
+        <Route path="/recipes" component={Recipes} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

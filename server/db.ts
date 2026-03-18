@@ -6,6 +6,8 @@ import {
   InsertMenu, menus,
   InsertMeal, meals,
   InsertFood, foods,
+  InsertRecipe, recipes,
+  InsertRecipeIngredient, recipeIngredients,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -298,4 +300,126 @@ export async function getFullDiet(dietId: number) {
   );
 
   return { ...diet, menus: fullMenus };
+}
+
+// ── Recipe helpers ──
+
+export async function createRecipe(recipe: InsertRecipe) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(recipes).values(recipe);
+  return result[0].insertId;
+}
+
+export async function getUserRecipes(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(recipes).where(eq(recipes.userId, userId)).orderBy(desc(recipes.createdAt));
+}
+
+export async function getRecipeById(recipeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(recipes).where(eq(recipes.id, recipeId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function deleteRecipe(recipeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+  await db.delete(recipes).where(eq(recipes.id, recipeId));
+}
+
+export async function addRecipeIngredient(ingredient: InsertRecipeIngredient) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(recipeIngredients).values(ingredient);
+  return result[0].insertId;
+}
+
+export async function getRecipeIngredients(recipeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+}
+
+export async function deleteRecipeIngredient(ingredientId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(recipeIngredients).where(eq(recipeIngredients.id, ingredientId));
+}
+
+export async function updateRecipeMacros(recipeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const ingredients = await getRecipeIngredients(recipeId);
+  const totals = ingredients.reduce(
+    (acc, i) => ({
+      totalCalories: acc.totalCalories + i.calories,
+      totalProtein: acc.totalProtein + i.protein,
+      totalCarbs: acc.totalCarbs + i.carbs,
+      totalFats: acc.totalFats + i.fats,
+    }),
+    { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFats: 0 }
+  );
+  await db.update(recipes).set(totals).where(eq(recipes.id, recipeId));
+  return totals;
+}
+
+export async function getFullRecipe(recipeId: number) {
+  const recipe = await getRecipeById(recipeId);
+  if (!recipe) return null;
+  const ingredients = await getRecipeIngredients(recipeId);
+  return { ...recipe, ingredients };
+}
+
+// ── Update diet macros (recalculate after adjustments) ──
+
+export async function updateDietCalories(dietId: number, totalCalories: number, proteinPercent: number, carbsPercent: number, fatsPercent: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(diets).set({ totalCalories, proteinPercent, carbsPercent, fatsPercent }).where(eq(diets.id, dietId));
+}
+
+// ── Copy meal to another menu ──
+
+export async function copyMealToMenu(mealId: number, targetMenuId: number, mealNumber: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const meal = await getMealById(mealId);
+  if (!meal) throw new Error("Comida no encontrada");
+  const mealFoods = await getFoodsByMealId(mealId);
+
+  const newMealId = await createMeal({
+    menuId: targetMenuId,
+    mealNumber,
+    mealName: meal.mealName,
+    calories: meal.calories,
+    protein: meal.protein,
+    carbs: meal.carbs,
+    fats: meal.fats,
+    notes: meal.notes,
+    description: meal.description,
+  });
+
+  for (const food of mealFoods) {
+    await createFood({
+      mealId: newMealId,
+      name: food.name,
+      quantity: food.quantity,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fats: food.fats,
+      alternativeName: food.alternativeName,
+      alternativeQuantity: food.alternativeQuantity,
+      alternativeCalories: food.alternativeCalories,
+      alternativeProtein: food.alternativeProtein,
+      alternativeCarbs: food.alternativeCarbs,
+      alternativeFats: food.alternativeFats,
+    });
+  }
+
+  return newMealId;
 }

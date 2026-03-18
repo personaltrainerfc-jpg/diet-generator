@@ -53,3 +53,11 @@
 - [x] Descripción de comida editable manualmente (clic para editar, guardar con Enter o blur)
 - [x] Sin repetición de alimentos entre días del mismo menú (instrucción explícita en prompt)
 - [x] PDF simplificado: primera página solo logo + nombre de la dieta (sin calorías, fecha, comidas)
+- [x] Ajuste de macros y calorías sobre dieta ya creada (recalcular cantidades automáticamente)
+- [x] Toggle medidas caseras (puñado, filete, taza, cucharadas) en vez de gramos
+- [x] Selector de supermercado (Mercadona, Lidl, Aldi) para ajustar alimentos a productos reales
+- [x] Calorías y macros diferentes por día (días entreno vs descanso)
+- [x] Sección Mis Recetas: crear recetas propias y usarlas en la generación
+- [x] Generar guía nutricional personalizada en PDF
+- [x] Copiar comida de un día a otro (menú completo o comida individual)
+- [x] Mejorar peso de preferencias en el prompt (cumplimiento obligatorio y literal)
