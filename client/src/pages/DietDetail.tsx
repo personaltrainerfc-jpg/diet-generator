@@ -854,6 +854,8 @@ export default function DietDetail() {
   const [downloading, setDownloading] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [regeneratingMealId, setRegeneratingMealId] = useState<number | null>(null);
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
 
   const utils = trpc.useUtils();
 
@@ -1030,12 +1032,6 @@ export default function DietDetail() {
             {diet.name}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {new Date(diet.createdAt).toLocaleDateString("es-ES", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-            {" · "}
             {diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día
           </p>
         </div>
@@ -1045,7 +1041,10 @@ export default function DietDetail() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => duplicateMut.mutate({ id: dietId })}
+                onClick={() => {
+                  setDuplicateName(diet.name + " (copia)");
+                  setShowDuplicateDialog(true);
+                }}
                 disabled={duplicateMut.isPending}
               >
                 {duplicateMut.isPending ? (
@@ -1116,6 +1115,56 @@ export default function DietDetail() {
             </DialogTitle>
           </DialogHeader>
           <ShoppingListContent dietId={dietId} dietName={diet.name} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" />
+              Duplicar Dieta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre de la nueva dieta</label>
+              <Input
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="Ej: Dieta Juan Pérez"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && duplicateName.trim()) {
+                    duplicateMut.mutate({ id: dietId, name: duplicateName.trim() });
+                    setShowDuplicateDialog(false);
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (duplicateName.trim()) {
+                    duplicateMut.mutate({ id: dietId, name: duplicateName.trim() });
+                    setShowDuplicateDialog(false);
+                  }
+                }}
+                disabled={!duplicateName.trim() || duplicateMut.isPending}
+              >
+                {duplicateMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-2" />
+                )}
+                Duplicar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1399,7 +1448,7 @@ function generateGridPdfHtml(diet: any): string {
       ${diet.name}
     </h1>
     <p style="font-size:12px;color:#888;margin:0;">
-      ${diet.mealsPerDay} comidas/día · Generado el ${new Date(diet.createdAt).toLocaleDateString("es-ES")}
+      ${diet.mealsPerDay} comidas/día · ${diet.totalCalories} kcal
     </p>
   </div>
 

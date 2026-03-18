@@ -42,3 +42,5 @@
 - [x] Notas/instrucciones de preparación por comida
 - [x] Exportar lista de la compra a PDF
 - [x] Modo oscuro
+- [x] Al duplicar dieta, mostrar diálogo para cambiar el nombre (ej: nombre del cliente)
+- [x] Eliminar la fecha de creación de la vista de dietas

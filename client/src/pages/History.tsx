@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import {
-  Flame, UtensilsCrossed, Calendar, Trash2, Eye,
+  Flame, UtensilsCrossed, Trash2, Eye,
   History as HistoryIcon, Loader2, ChefHat, Copy
 } from "lucide-react";
 
@@ -93,14 +93,7 @@ export default function History() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg">{diet.name}</CardTitle>
                     <CardDescription className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {new Date(diet.createdAt).toLocaleDateString("es-ES", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día
                     </CardDescription>
                   </div>
                   <div className="flex gap-2 shrink-0">

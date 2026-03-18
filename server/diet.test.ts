@@ -557,6 +557,14 @@ describe("diet.duplicate", () => {
     expect(typeof result.dietId).toBe("number");
   });
 
+  it("duplicates a diet with a custom name", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.duplicate({ id: 1, name: "Dieta Juan P\u00e9rez" });
+    expect(result.dietId).toBeDefined();
+    expect(typeof result.dietId).toBe("number");
+  });
+
   it("throws UNAUTHORIZED when not authenticated", async () => {
     const ctx = createUnauthContext();
     const caller = appRouter.createCaller(ctx);

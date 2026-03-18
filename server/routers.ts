@@ -1018,7 +1018,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
 
     // ── Duplicate diet ──
     duplicate: protectedProcedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.number(), name: z.string().min(1).max(255).optional() }))
       .mutation(async ({ ctx, input }) => {
         const original = await getFullDiet(input.id);
         if (!original) throw new Error("Dieta no encontrada");
@@ -1027,7 +1027,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
         // Create a copy of the diet
         const newDietId = await createDiet({
           userId: ctx.user.id,
-          name: `${original.name} (copia)`,
+          name: input.name || `${original.name} (copia)`,
           totalCalories: original.totalCalories,
           proteinPercent: original.proteinPercent,
           carbsPercent: original.carbsPercent,
