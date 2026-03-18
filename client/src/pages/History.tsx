@@ -3,6 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { useState } from "react";
 import {
   Flame, UtensilsCrossed, Trash2, Eye,
   History as HistoryIcon, Loader2, ChefHat, Copy
@@ -25,6 +33,9 @@ export default function History() {
   const [, setLocation] = useLocation();
   const { data: diets, isLoading } = trpc.diet.list.useQuery();
   const utils = trpc.useUtils();
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateName, setDuplicateName] = useState("");
+  const [duplicatingDietId, setDuplicatingDietId] = useState<number | null>(null);
 
   const deleteMutation = trpc.diet.delete.useMutation({
     onSuccess: () => {
@@ -46,6 +57,19 @@ export default function History() {
       toast.error(error.message || "Error al duplicar la dieta");
     },
   });
+
+  const handleDuplicateClick = (dietId: number, dietName: string) => {
+    setDuplicatingDietId(dietId);
+    setDuplicateName(dietName + " (copia)");
+    setShowDuplicateDialog(true);
+  };
+
+  const handleDuplicateConfirm = () => {
+    if (duplicatingDietId && duplicateName.trim()) {
+      duplicateMutation.mutate({ id: duplicatingDietId, name: duplicateName.trim() });
+      setShowDuplicateDialog(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -108,7 +132,7 @@ export default function History() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => duplicateMutation.mutate({ id: diet.id })}
+                      onClick={() => handleDuplicateClick(diet.id, diet.name)}
                       disabled={duplicateMutation.isPending}
                     >
                       {duplicateMutation.isPending ? (
@@ -173,6 +197,48 @@ export default function History() {
           ))}
         </div>
       )}
+
+      {/* Duplicate Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" />
+              Duplicar Dieta
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre de la nueva dieta</label>
+              <Input
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="Ej: Dieta Juan Pérez"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleDuplicateConfirm();
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowDuplicateDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleDuplicateConfirm}
+                disabled={!duplicateName.trim() || duplicateMutation.isPending}
+              >
+                {duplicateMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Copy className="h-4 w-4 mr-2" />
+                )}
+                Duplicar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
