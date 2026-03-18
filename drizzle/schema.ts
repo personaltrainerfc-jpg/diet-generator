@@ -28,6 +28,7 @@ export const diets = mysqlTable("diets", {
   avoidFoods: json("avoidFoods").$type<string[]>(),
   dietType: varchar("dietType", { length: 50 }).default("equilibrada").notNull(),
   cookingLevel: varchar("cookingLevel", { length: 50 }).default("moderate").notNull(),
+  preferences: text("preferences"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -58,6 +59,7 @@ export const meals = mysqlTable("meals", {
   carbs: int("carbs").notNull(),
   fats: int("fats").notNull(),
   notes: text("notes"),
+  description: text("description"),
 });
 
 export type Meal = typeof meals.$inferSelect;

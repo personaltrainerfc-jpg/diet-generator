@@ -192,6 +192,12 @@ export async function updateMealNotes(mealId: number, notes: string | null) {
   await db.update(meals).set({ notes }).where(eq(meals.id, mealId));
 }
 
+export async function updateMealDescription(mealId: number, description: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(meals).set({ description }).where(eq(meals.id, mealId));
+}
+
 export async function updateFood(foodId: number, data: Partial<InsertFood>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -11,8 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
-  Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot
+  Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot, MessageSquare
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES } from "@shared/constants";
 import type { DietType, CookingLevel } from "@shared/constants";
 
@@ -29,6 +30,7 @@ export default function Home() {
   const [newAvoidFood, setNewAvoidFood] = useState("");
   const [dietType, setDietType] = useState<DietType>("equilibrada");
   const [cookingLevel, setCookingLevel] = useState<CookingLevel>("moderate");
+  const [preferences, setPreferences] = useState("");
 
   const macroSum = proteinPercent + carbsPercent + fatsPercent;
   const proteinGrams = Math.round((totalCalories * proteinPercent / 100) / 4);
@@ -86,6 +88,7 @@ export default function Home() {
       avoidFoods,
       dietType,
       cookingLevel,
+      ...(preferences.trim() ? { preferences: preferences.trim() } : {}),
     });
   };
 
@@ -454,6 +457,33 @@ export default function Home() {
                   </Badge>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Preferencias opcionales */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <MessageSquare className="h-5 w-5 text-purple-500" />
+              Preferencias para las Comidas
+              <Badge variant="outline" className="text-xs font-normal">Opcional</Badge>
+            </CardTitle>
+            <CardDescription>
+              Escribe ideas o preferencias para personalizar los menús. Si lo dejas vacío, la dieta se genera automáticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={preferences}
+              onChange={e => setPreferences(e.target.value)}
+              placeholder="Ej: Para comer me gustaría arroz con pollo. Prefiero que las cenas sean ligeras con ensalada. Me gusta desayunar tostadas con aguacate..."
+              rows={3}
+              className="resize-none"
+              maxLength={2000}
+            />
+            {preferences.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1 text-right">{preferences.length}/2000</p>
             )}
           </CardContent>
         </Card>

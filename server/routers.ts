@@ -28,9 +28,10 @@ const dietConfigSchema = z.object({
   avoidFoods: z.array(z.string()).default([]),
   dietType: z.string().default("equilibrada"),
   cookingLevel: z.string().default("moderate"),
+  preferences: z.string().max(2000).optional(),
 });
 
-function buildDietPrompt(config: z.infer<typeof dietConfigSchema>): string {
+function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietFoods?: string[]): string {
   const proteinGrams = Math.round((config.totalCalories * config.proteinPercent / 100) / 4);
   const carbsGrams = Math.round((config.totalCalories * config.carbsPercent / 100) / 4);
   const fatsGrams = Math.round((config.totalCalories * config.fatsPercent / 100) / 9);
@@ -146,9 +147,19 @@ ${foodRef}
 
 ${MEAL_PHILOSOPHY}
 
+COMBINACIONES DE ALIMENTOS COHERENTES E INTELIGENTES (OBLIGATORIO):
+- Cada comida debe representar un PLATO REAL de la gastronomía cotidiana (preferiblemente española/mediterránea).
+- Estructura de cada plato: proteína principal + vegetal o guarnición compatible + fuente de carbohidrato si corresponde.
+- Los métodos de cocción deben ser coherentes: plancha, horno, cocido, salteado, al vapor, guisado.
+- PROHIBIDO combinar alimentos que no tienen sentido juntos: atún con leche, arroz con yogur como plato principal, salmón con plátano, pollo con mermelada.
+- Ejemplos de combinaciones CORRECTAS: judías verdes salteadas con jamón serrano + pechuga de pollo a la plancha, lentejas estofadas con verduras + arroz, salmón al horno con patatas y espinacas, tortilla francesa con ensalada mixta, garbanzos con espinacas y huevo pochado.
+- Ejemplos de combinaciones INCORRECTAS: atún con leche y plátano, arroz con yogur y almendras como comida principal, pollo con fresas y avena en la cena.
+
+${config.preferences ? `PREFERENCIAS DEL USUARIO (RESPETAR EN LA MEDIDA DE LO POSIBLE):\n${config.preferences}\n` : ""}
+${previousDietFoods && previousDietFoods.length > 0 ? `VARIEDAD GARANTIZADA - PLATOS A EVITAR (ya usados en dietas anteriores, NO repetir):\n${previousDietFoods.join(", ")}\nDEBES usar combinaciones y platos COMPLETAMENTE DIFERENTES a los listados arriba. Rota las fuentes de proteína, carbohidratos y verduras.\n` : ""}
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
-2. Para CADA alimento, proporciona SIEMPRE UNA alternativa equivalente con macros similares Y coherente con el momento del día (la alternativa de un alimento de desayuno debe ser otro alimento de desayuno). NUNCA dejes un alimento sin alternativa.
+2. Para CADA alimento, proporciona SIEMPRE UNA alternativa equivalente con macros similares Y coherente con el momento del día. NUNCA dejes un alimento sin alternativa.
 3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades).
@@ -156,7 +167,8 @@ REGLAS IMPORTANTES:
 7. Asegúrate de que la suma de macros de todas las comidas se aproxime a los objetivos diarios.
 8. Todos los valores numéricos deben ser enteros (sin decimales).
 9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
-10. MENÚS DIFERENTES (MUY IMPORTANTE): Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. NO repitas los mismos platos, combinaciones ni alimentos principales entre menús. Varía las fuentes de proteína, carbohidratos y verduras en cada menú. Por ejemplo, si un menú tiene pollo con arroz, otro debe tener pescado con pasta o legumbres. Los desayunos también deben variar (tostadas en uno, avena en otro, yogur con fruta en otro). Cada menú debe parecer un día diferente de alimentación.
+10. MENÚS DIFERENTES: Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. Varía las fuentes de proteína, carbohidratos y verduras en cada menú.
+11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
 
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
@@ -184,6 +196,7 @@ const dietJsonSchema = {
                 properties: {
                   mealNumber: { type: "integer" },
                   mealName: { type: "string" },
+                  description: { type: "string" },
                   calories: { type: "integer" },
                   protein: { type: "integer" },
                   carbs: { type: "integer" },
@@ -211,7 +224,7 @@ const dietJsonSchema = {
                     },
                   },
                 },
-                required: ["mealNumber", "mealName", "calories", "protein", "carbs", "fats", "foods"],
+                required: ["mealNumber", "mealName", "description", "calories", "protein", "carbs", "fats", "foods"],
                 additionalProperties: false,
               },
             },
@@ -255,11 +268,34 @@ export const appRouter = router({
           throw new Error(`La suma de macronutrientes debe ser aproximadamente 100%. Actual: ${macroSum}%`);
         }
 
-        const prompt = buildDietPrompt(input);
+        // Get recent diets for variety guarantee
+        let previousDietFoods: string[] = [];
+        try {
+          const recentDiets = await getUserDiets(ctx.user.id);
+          const last3 = recentDiets.slice(0, 3);
+          for (const d of last3) {
+            const fullD = await getFullDiet(d.id);
+            if (fullD) {
+              for (const m of fullD.menus) {
+                for (const meal of m.meals) {
+                  for (const food of meal.foods) {
+                    if (!previousDietFoods.includes(food.name)) {
+                      previousDietFoods.push(food.name);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch previous diets for variety:", e);
+        }
+
+        const prompt = buildDietPrompt(input, previousDietFoods);
 
         const llmResponse = await invokeLLM({
           messages: [
-            { role: "system", content: "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
+            { role: "system", content: "Eres un nutricionista profesional experto en planificaci\u00f3n de dietas. Responde siempre en espa\u00f1ol. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente l\u00f3gicos que representen recetas reales de la gastronom\u00eda cotidiana espa\u00f1ola/mediterr\u00e1nea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos seg\u00fan las cantidades." },
             { role: "user", content: prompt },
           ],
           response_format: {
@@ -270,7 +306,7 @@ export const appRouter = router({
 
         const content = llmResponse.choices[0]?.message?.content;
         if (!content || typeof content !== "string") {
-          throw new Error("No se pudo generar la dieta. Inténtalo de nuevo.");
+          throw new Error("No se pudo generar la dieta. Int\u00e9ntalo de nuevo.");
         }
 
         let generatedDiet: GeneratedDiet;
@@ -292,6 +328,7 @@ export const appRouter = router({
           avoidFoods: input.avoidFoods,
           dietType: input.dietType,
           cookingLevel: input.cookingLevel,
+          preferences: input.preferences || null,
         });
 
         for (const menu of generatedDiet.menus) {
@@ -313,6 +350,7 @@ export const appRouter = router({
               protein: meal.protein,
               carbs: meal.carbs,
               fats: meal.fats,
+              description: meal.description || null,
             });
 
             for (const food of meal.foods) {
@@ -338,7 +376,7 @@ export const appRouter = router({
         try {
           await notifyOwner({
             title: "Nueva dieta generada",
-            content: `El usuario ${ctx.user.name || ctx.user.email || "Anónimo"} ha generado una nueva dieta "${input.name}" con ${input.totalCalories} kcal, ${input.totalMenus} menú(s) y ${input.mealsPerDay} comida(s)/día.`,
+            content: `El usuario ${ctx.user.name || ctx.user.email || "An\u00f3nimo"} ha generado una nueva dieta "${input.name}" con ${input.totalCalories} kcal, ${input.totalMenus} men\u00fa(s) y ${input.mealsPerDay} comida(s)/d\u00eda.`,
           });
         } catch (e) {
           console.warn("Failed to notify owner:", e);
@@ -1037,6 +1075,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           avoidFoods: (original.avoidFoods as string[]) || [],
           dietType: (original as any).dietType || 'equilibrada',
           cookingLevel: (original as any).cookingLevel || 'moderate',
+          preferences: (original as any).preferences || null,
         });
 
         // Copy all menus, meals and foods
@@ -1059,6 +1098,8 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
               protein: meal.protein,
               carbs: meal.carbs,
               fats: meal.fats,
+              description: (meal as any).description || null,
+              notes: (meal as any).notes || null,
             });
 
             for (const food of meal.foods) {
@@ -1082,6 +1123,152 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
         }
 
         return { dietId: newDietId };
+      }),
+
+    // ── Redo diet (regenerate with same params but different foods) ──
+    redoDiet: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const original = await getFullDiet(input.id);
+        if (!original) throw new Error("Dieta no encontrada");
+        if (original.userId !== ctx.user.id) throw new Error("No tienes acceso a esta dieta");
+
+        // Collect all food names from this diet to avoid them
+        const currentFoodNames: string[] = [];
+        for (const menu of original.menus) {
+          for (const meal of menu.meals) {
+            for (const food of meal.foods) {
+              if (!currentFoodNames.includes(food.name)) {
+                currentFoodNames.push(food.name);
+              }
+            }
+          }
+        }
+
+        // Also get foods from other recent diets
+        let allPreviousFoods = [...currentFoodNames];
+        try {
+          const recentDiets = await getUserDiets(ctx.user.id);
+          const others = recentDiets.filter(d => d.id !== input.id).slice(0, 2);
+          for (const d of others) {
+            const fullD = await getFullDiet(d.id);
+            if (fullD) {
+              for (const m of fullD.menus) {
+                for (const meal of m.meals) {
+                  for (const food of meal.foods) {
+                    if (!allPreviousFoods.includes(food.name)) {
+                      allPreviousFoods.push(food.name);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Could not fetch other diets for variety:", e);
+        }
+
+        const config = {
+          name: original.name,
+          totalCalories: original.totalCalories,
+          proteinPercent: original.proteinPercent,
+          carbsPercent: original.carbsPercent,
+          fatsPercent: original.fatsPercent,
+          mealsPerDay: original.mealsPerDay,
+          totalMenus: original.totalMenus,
+          avoidFoods: (original.avoidFoods as string[]) || [],
+          dietType: (original as any).dietType || 'equilibrada',
+          cookingLevel: (original as any).cookingLevel || 'moderate',
+          preferences: (original as any).preferences || undefined,
+        };
+
+        const prompt = buildDietPrompt(config, allPreviousFoods);
+
+        const llmResponse = await invokeLLM({
+          messages: [
+            { role: "system", content: "Eres un nutricionista profesional experto en planificaci\u00f3n de dietas. Responde siempre en espa\u00f1ol. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente l\u00f3gicos que representen recetas reales de la gastronom\u00eda cotidiana espa\u00f1ola/mediterr\u00e1nea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos seg\u00fan las cantidades." },
+            { role: "user", content: prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: dietJsonSchema,
+          },
+        });
+
+        const content = llmResponse.choices[0]?.message?.content;
+        if (!content || typeof content !== "string") {
+          throw new Error("No se pudo regenerar la dieta. Int\u00e9ntalo de nuevo.");
+        }
+
+        let generatedDiet: GeneratedDiet;
+        try {
+          generatedDiet = JSON.parse(content);
+        } catch {
+          throw new Error("Error al procesar la respuesta del generador de dietas.");
+        }
+
+        // Delete old menus, meals and foods
+        for (const menu of original.menus) {
+          for (const meal of menu.meals) {
+            for (const food of meal.foods) {
+              await deleteFood(food.id);
+            }
+            await deleteMeal(meal.id);
+          }
+          // Delete menu
+          const { getDb: getDbLocal } = await import("./db");
+          const dbLocal = await getDbLocal();
+          if (dbLocal) {
+            const { menus: menusTable } = await import("../drizzle/schema");
+            const { eq: eqLocal } = await import("drizzle-orm");
+            await dbLocal.delete(menusTable).where(eqLocal(menusTable.id, menu.id));
+          }
+        }
+
+        // Create new menus, meals and foods
+        for (const menu of generatedDiet.menus) {
+          const menuId = await createMenu({
+            dietId: input.id,
+            menuNumber: menu.menuNumber,
+            totalCalories: menu.totalCalories,
+            totalProtein: menu.totalProtein,
+            totalCarbs: menu.totalCarbs,
+            totalFats: menu.totalFats,
+          });
+
+          for (const meal of menu.meals) {
+            const mealId = await createMeal({
+              menuId,
+              mealNumber: meal.mealNumber,
+              mealName: meal.mealName,
+              calories: meal.calories,
+              protein: meal.protein,
+              carbs: meal.carbs,
+              fats: meal.fats,
+              description: meal.description || null,
+            });
+
+            for (const food of meal.foods) {
+              await createFood({
+                mealId,
+                name: food.name,
+                quantity: food.quantity,
+                calories: food.calories,
+                protein: food.protein,
+                carbs: food.carbs,
+                fats: food.fats,
+                alternativeName: food.alternativeName,
+                alternativeQuantity: food.alternativeQuantity,
+                alternativeCalories: food.alternativeCalories,
+                alternativeProtein: food.alternativeProtein,
+                alternativeCarbs: food.alternativeCarbs,
+                alternativeFats: food.alternativeFats,
+              });
+            }
+          }
+        }
+
+        return { success: true };
       }),
   }),
 });

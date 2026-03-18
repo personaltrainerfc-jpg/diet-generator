@@ -45,3 +45,8 @@
 - [x] Al duplicar dieta, mostrar diálogo para cambiar el nombre (ej: nombre del cliente)
 - [x] Eliminar la fecha de creación de la vista de dietas
 - [x] Bug: El diálogo de duplicar dieta no permite cambiar el nombre
+- [x] Descripción automática de cada comida (línea legible tipo nombre de plato cocinado)
+- [x] Variedad garantizada entre dietas generadas (evitar repetir combinaciones, rotar ingredientes)
+- [x] Campo opcional de preferencias por comida en el formulario de generación
+- [x] Botón "Rehacer dieta" que regenera con mismos parámetros pero menús diferentes
+- [x] Combinaciones de alimentos coherentes e inteligentes (platos reales, gastronomía mediterránea)

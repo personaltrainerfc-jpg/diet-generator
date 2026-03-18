@@ -633,6 +633,11 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             G: {meal.fats}g
           </span>
         </div>
+        {meal.description && (
+          <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-2">
+            {meal.description}
+          </p>
+        )}
       </CardHeader>
       <Separator />
       <CardContent className="pt-2 pb-3">
@@ -947,6 +952,17 @@ export default function DietDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const redoDietMut = trpc.diet.redoDiet.useMutation({
+    onMutate: () => {
+      toast.info("Rehaciendo dieta con menús completamente diferentes...");
+    },
+    onSuccess: () => {
+      utils.diet.getById.invalidate({ id: dietId });
+      toast.success("Dieta rehecha con nuevos menús");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const handleMealNameChange = useCallback((mealId: number, name: string) => {
     updateMealNameMut.mutate({ mealId, mealName: name });
   }, [updateMealNameMut]);
@@ -1036,6 +1052,24 @@ export default function DietDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={() => redoDietMut.mutate({ id: dietId })}
+                disabled={redoDietMut.isPending}
+                className="gap-1.5"
+              >
+                {redoDietMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Rehacer</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Regenerar la dieta con menús completamente diferentes</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1405,6 +1439,9 @@ function generateGridPdfHtml(diet: any): string {
         .join(", ");
 
       let cellContent = `<div style="margin-bottom:2px;"><strong style="font-size:12px;color:#1a1a1a;">${mealName}</strong></div>`;
+      if (meal.description) {
+        cellContent += `<div style="font-size:10px;color:#555;font-style:italic;margin-bottom:4px;">${meal.description}</div>`;
+      }
       cellContent += `<div style="font-size:11px;color:#333;line-height:1.5;">${foodLines}.</div>`;
       if (altFoods) {
         cellContent += `<div style="font-size:10px;color:#888;font-style:italic;margin-top:4px;border-top:1px dashed #ddd;padding-top:3px;">Alt: ${altFoods}.</div>`;

@@ -148,6 +148,9 @@ vi.mock("./db", () => ({
       select: vi.fn().mockImplementation(() => ({
         from: vi.fn().mockImplementation(() => makeFromChain()),
       })),
+      delete: vi.fn().mockImplementation(() => ({
+        where: vi.fn().mockResolvedValue(undefined),
+      })),
     };
     return db;
   }),
@@ -166,6 +169,7 @@ const dietResponse = JSON.stringify({
         {
           mealNumber: 1,
           mealName: "Desayuno",
+          description: "Porridge de avena con plátano y canela",
           calories: 500,
           protein: 38,
           carbs: 56,
@@ -682,6 +686,60 @@ describe("diet.updateMealNotes", () => {
     await expect(
       caller.diet.updateMealNotes({ mealId: 1, notes: "test" })
     ).rejects.toThrow();
+  });
+});
+
+describe("diet.generate with preferences", () => {
+  it("generates a diet with preferences parameter", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.generate({
+      name: "Dieta con Preferencias",
+      totalCalories: 2000,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      mealsPerDay: 4,
+      totalMenus: 1,
+      avoidFoods: [],
+      dietType: "equilibrada",
+      cookingLevel: "moderate",
+      preferences: "Para comer me gustaría arroz con pollo",
+    });
+    expect(result.dietId).toBe(1);
+  });
+
+  it("generates a diet without preferences (optional)", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.generate({
+      name: "Dieta sin Preferencias",
+      totalCalories: 2000,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      mealsPerDay: 4,
+      totalMenus: 1,
+      avoidFoods: [],
+      dietType: "equilibrada",
+      cookingLevel: "moderate",
+    });
+    expect(result.dietId).toBe(1);
+  });
+});
+
+describe("diet.redoDiet", () => {
+  it("rehacer dieta returns success", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.diet.redoDiet({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.redoDiet({ id: 1 })).rejects.toThrow();
   });
 });
 

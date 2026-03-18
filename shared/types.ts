@@ -26,6 +26,7 @@ export interface GeneratedFood {
 export interface GeneratedMeal {
   mealNumber: number;
   mealName: string;
+  description: string;
   calories: number;
   protein: number;
   carbs: number;
@@ -78,6 +79,7 @@ export interface FullMeal {
   menuId: number;
   mealNumber: number;
   mealName: string;
+  description: string | null;
   calories: number;
   protein: number;
   carbs: number;
@@ -109,6 +111,7 @@ export interface FullDiet {
   mealsPerDay: number;
   totalMenus: number;
   avoidFoods: string[] | null;
+  preferences: string | null;
   createdAt: Date;
   menus: FullMenu[];
 }
