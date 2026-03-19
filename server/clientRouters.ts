@@ -13,8 +13,19 @@ import {
   addMeasurement, getMeasurements, deleteMeasurement,
   createAssessment, getAssessment, updateAssessment,
   getTrainerDashboardStats,
+  // Bloque C: Entrenador
+  createDietTemplate, getDietTemplates, deleteDietTemplate,
+  addClientFavoriteFood, getClientFavoriteFoods, deleteClientFavoriteFood,
+  createClientTag, getClientTags, deleteClientTag,
+  assignTagToClient, removeTagFromClient, getClientTagAssignments,
+  // Bloque D: Cliente
+  logHydration, getHydrationLogs,
+  logSleep, getSleepLogs,
+  logWellness, getWellnessLogs,
+  setMealReminder, getMealReminders, deleteMealReminder,
 } from "./clientDb";
 import { storagePut } from "./storage";
+import { getFullDiet } from "./db";
 
 // ── Client Router (Trainer side) ──
 export const clientRouter = router({
@@ -484,6 +495,149 @@ ${assessment ? `Condiciones médicas: ${assessment.medicalConditions || "ninguna
 
       return (response.choices[0]?.message?.content as string) || "No se pudo procesar la consulta.";
     }),
+
+  // ── Diet Templates ──
+  createTemplate: protectedProcedure
+    .input(z.object({ dietId: z.number(), name: z.string().min(1).max(255), tags: z.array(z.string()).optional(), description: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return createDietTemplate({ userId: ctx.user.id, ...input });
+    }),
+
+  getTemplates: protectedProcedure.query(async ({ ctx }) => {
+    return getDietTemplates(ctx.user.id);
+  }),
+
+  deleteTemplate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteDietTemplate(input.id);
+      return { success: true };
+    }),
+
+  // ── Client Favorite Foods ──
+  addFavoriteFood: protectedProcedure
+    .input(z.object({ clientId: z.number(), foodName: z.string().min(1).max(255) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return addClientFavoriteFood({ clientId: input.clientId, trainerId: ctx.user.id, foodName: input.foodName });
+    }),
+
+  getFavoriteFoods: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getClientFavoriteFoods(input.clientId);
+    }),
+
+  deleteFavoriteFood: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteClientFavoriteFood(input.id);
+      return { success: true };
+    }),
+
+  // ── Client Tags ──
+  createTag: protectedProcedure
+    .input(z.object({ name: z.string().min(1).max(100), color: z.string().max(20).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return createClientTag({ trainerId: ctx.user.id, ...input });
+    }),
+
+  getTags: protectedProcedure.query(async ({ ctx }) => {
+    return getClientTags(ctx.user.id);
+  }),
+
+  deleteTag: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteClientTag(input.id);
+      return { success: true };
+    }),
+
+  assignTag: protectedProcedure
+    .input(z.object({ clientId: z.number(), tagId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return assignTagToClient(input.clientId, input.tagId);
+    }),
+
+  removeTag: protectedProcedure
+    .input(z.object({ clientId: z.number(), tagId: z.number() }))
+    .mutation(async ({ input }) => {
+      await removeTagFromClient(input.clientId, input.tagId);
+      return { success: true };
+    }),
+
+  getClientTags: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getClientTagAssignments(input.clientId);
+    }),
+
+  // ── Clone Diet to Another Client ──
+  cloneDietToClient: protectedProcedure
+    .input(z.object({ sourceDietId: z.number(), targetClientId: z.number(), newName: z.string().min(1).max(255).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.targetClientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      const original = await getFullDiet(input.sourceDietId);
+      if (!original) throw new Error("Dieta no encontrada");
+      const { createDiet, createMenu, createMeal, createFood } = await import("./db");
+      const newDietId = await createDiet({
+        userId: ctx.user.id,
+        name: input.newName || `Dieta ${client.name}`,
+        totalCalories: original.totalCalories,
+        proteinPercent: original.proteinPercent,
+        carbsPercent: original.carbsPercent,
+        fatsPercent: original.fatsPercent,
+        mealsPerDay: original.mealsPerDay,
+        totalMenus: original.totalMenus,
+        avoidFoods: (original.avoidFoods as string[]) || [],
+        dietType: (original as any).dietType || 'equilibrada',
+        cookingLevel: (original as any).cookingLevel || 'moderate',
+      });
+      for (const menu of original.menus) {
+        const newMenuId = await createMenu({ dietId: newDietId, menuNumber: menu.menuNumber, totalCalories: menu.totalCalories, totalProtein: menu.totalProtein, totalCarbs: menu.totalCarbs, totalFats: menu.totalFats });
+        for (const meal of menu.meals) {
+          const newMealId = await createMeal({ menuId: newMenuId, mealNumber: meal.mealNumber, mealName: meal.mealName, calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fats: meal.fats });
+          for (const food of meal.foods) {
+            await createFood({ mealId: newMealId, name: food.name, quantity: food.quantity, calories: food.calories, protein: food.protein, carbs: food.carbs, fats: food.fats, alternativeName: food.alternativeName, alternativeQuantity: food.alternativeQuantity, alternativeCalories: food.alternativeCalories, alternativeProtein: food.alternativeProtein, alternativeCarbs: food.alternativeCarbs, alternativeFats: food.alternativeFats });
+          }
+        }
+      }
+      await assignDietToClient(input.targetClientId, newDietId);
+      return { newDietId };
+    }),
+
+  // ── Client Hydration/Sleep/Wellness (trainer view) ──
+  getClientHydration: protectedProcedure
+    .input(z.object({ clientId: z.number(), startDate: z.string().optional(), endDate: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getHydrationLogs(input.clientId, input.startDate, input.endDate);
+    }),
+
+  getClientSleep: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getSleepLogs(input.clientId);
+    }),
+
+  getClientWellness: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getWellnessLogs(input.clientId);
+    }),
 });
 
 // ── Client Portal Router (Client-facing, public with code auth) ──
@@ -632,5 +786,175 @@ export const clientPortalRouter = router({
       const client = await getClientByAccessCode(input.accessCode);
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
       return getProgressPhotos(input.clientId);
+    }),
+
+  // ── Hydration ──
+  logHydration: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      glasses: z.number().int().min(0).max(30),
+      goalGlasses: z.number().int().min(1).max(30).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return logHydration({ clientId: input.clientId, date: input.date, glasses: input.glasses, goalGlasses: input.goalGlasses });
+    }),
+
+  getHydration: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string(), startDate: z.string().optional(), endDate: z.string().optional() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getHydrationLogs(input.clientId, input.startDate, input.endDate);
+    }),
+
+  // ── Sleep ──
+  logSleep: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      hoursSlept: z.number().int().min(0).max(1440),
+      quality: z.number().int().min(1).max(5),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return logSleep({ clientId: input.clientId, date: input.date, hoursSlept: input.hoursSlept, quality: input.quality, notes: input.notes });
+    }),
+
+  getSleep: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getSleepLogs(input.clientId);
+    }),
+
+  // ── Wellness ──
+  logWellness: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      energy: z.number().int().min(1).max(5),
+      mood: z.number().int().min(1).max(5),
+      digestion: z.number().int().min(1).max(5),
+      bloating: z.number().int().min(1).max(5),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return logWellness({ clientId: input.clientId, date: input.date, energy: input.energy, mood: input.mood, digestion: input.digestion, bloating: input.bloating, notes: input.notes });
+    }),
+
+  getWellness: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getWellnessLogs(input.clientId);
+    }),
+
+  // ── Meal Reminders ──
+  setReminder: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      mealName: z.string().min(1).max(100),
+      reminderTime: z.string().regex(/^\d{2}:\d{2}$/),
+      enabled: z.number().int().min(0).max(1).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return setMealReminder({ clientId: input.clientId, mealName: input.mealName, reminderTime: input.reminderTime, enabled: input.enabled });
+    }),
+
+  getReminders: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getMealReminders(input.clientId);
+    }),
+
+  deleteReminder: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string(), id: z.number() }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      await deleteMealReminder(input.id);
+      return { success: true };
+    }),
+
+  // ── Generate Recipe Steps (AI) ──
+  getRecipeSteps: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      mealName: z.string(), foods: z.array(z.object({ name: z.string(), quantity: z.string() })),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const foodList = input.foods.map(f => `${f.name} (${f.quantity})`).join(", ");
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "Eres un chef nutricionista. Genera instrucciones de preparación paso a paso, sencillas y claras, para la siguiente comida. Máximo 6 pasos. Responde en español. Formato: número) instrucción." },
+          { role: "user", content: `Comida: ${input.mealName}\nIngredientes: ${foodList}\n\nGenera los pasos de preparación:` },
+        ],
+      });
+      return (response.choices[0]?.message?.content as string) || "No se pudieron generar las instrucciones.";
+    }),
+
+  // ── Generate Shopping List ──
+  getShoppingList: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const activeDiet = await getClientActiveDiet(input.clientId);
+      if (!activeDiet) return { sections: [] };
+      // Collect all foods from all menus
+      const foodMap = new Map<string, { name: string; quantities: string[] }>();
+      for (const menu of (activeDiet as any).menus || []) {
+        for (const meal of menu.meals || []) {
+          for (const food of meal.foods || []) {
+            const key = food.name.toLowerCase().trim();
+            if (foodMap.has(key)) {
+              foodMap.get(key)!.quantities.push(food.quantity);
+            } else {
+              foodMap.set(key, { name: food.name, quantities: [food.quantity] });
+            }
+          }
+        }
+      }
+      // Categorize foods
+      const categories: Record<string, string[]> = {
+        "Proteínas": [], "Lácteos": [], "Frutas y Verduras": [],
+        "Cereales y Legumbres": [], "Grasas y Aceites": [], "Otros": [],
+      };
+      const proteinWords = ["pollo", "pavo", "ternera", "cerdo", "salmón", "atún", "merluza", "bacalao", "gambas", "huevo", "jamón", "lomo", "pechuga", "carne", "pescado", "marisco", "tofu", "seitan", "tempeh"];
+      const dairyWords = ["leche", "yogur", "queso", "requesón", "kefir", "nata", "mantequilla"];
+      const fruitVegWords = ["manzana", "plátano", "naranja", "fresa", "arándano", "tomate", "lechuga", "espinaca", "brócoli", "zanahoria", "pepino", "cebolla", "ajo", "pimiento", "calabacín", "berenjena", "aguacate", "fruta", "verdura", "ensalada", "champiñón", "seta"];
+      const grainWords = ["arroz", "pasta", "pan", "avena", "quinoa", "lenteja", "garbanzo", "judía", "cereal", "tortita", "patata", "boniato", "maíz"];
+      const fatWords = ["aceite", "oliva", "almendra", "nuez", "cacahuete", "crema", "mantequilla cacahuete", "semilla", "lino", "chía"];
+
+      for (const [, item] of Array.from(foodMap)) {
+        const lower = item.name.toLowerCase();
+        const qtyStr = item.quantities.length > 1 ? `(${item.quantities.length} menús)` : item.quantities[0];
+        const entry = `${item.name} — ${qtyStr}`;
+        if (proteinWords.some(w => lower.includes(w))) categories["Proteínas"].push(entry);
+        else if (dairyWords.some(w => lower.includes(w))) categories["Lácteos"].push(entry);
+        else if (fruitVegWords.some(w => lower.includes(w))) categories["Frutas y Verduras"].push(entry);
+        else if (grainWords.some(w => lower.includes(w))) categories["Cereales y Legumbres"].push(entry);
+        else if (fatWords.some(w => lower.includes(w))) categories["Grasas y Aceites"].push(entry);
+        else categories["Otros"].push(entry);
+      }
+      const sections = Object.entries(categories)
+        .filter(([, items]) => items.length > 0)
+        .map(([name, items]) => ({ name, items: items.map(i => ({ text: i, checked: false })) }));
+      return { sections };
     }),
 });

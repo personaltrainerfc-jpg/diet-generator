@@ -341,3 +341,113 @@ export const initialAssessments = mysqlTable("initial_assessments", {
 
 export type InitialAssessment = typeof initialAssessments.$inferSelect;
 export type InsertInitialAssessment = typeof initialAssessments.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE C: Mejoras App Entrenador
+// ═══════════════════════════════════════════════════════
+
+// ── Diet Templates (plantillas reutilizables) ──
+export const dietTemplates = mysqlTable("diet_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  dietId: int("dietId").notNull(), // dieta origen
+  name: varchar("name", { length: 255 }).notNull(),
+  tags: json("tags").$type<string[]>(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DietTemplate = typeof dietTemplates.$inferSelect;
+export type InsertDietTemplate = typeof dietTemplates.$inferInsert;
+
+// ── Client Favorite Foods (alimentos favoritos por cliente) ──
+export const clientFavoriteFoods = mysqlTable("client_favorite_foods", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  trainerId: int("trainerId").notNull(),
+  foodName: varchar("foodName", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ClientFavoriteFood = typeof clientFavoriteFoods.$inferSelect;
+export type InsertClientFavoriteFood = typeof clientFavoriteFoods.$inferInsert;
+
+// ── Client Tags (etiquetas para clientes) ──
+export const clientTags = mysqlTable("client_tags", {
+  id: int("id").autoincrement().primaryKey(),
+  trainerId: int("trainerId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 20 }).default("#6BCB77").notNull(),
+});
+
+export type ClientTag = typeof clientTags.$inferSelect;
+export type InsertClientTag = typeof clientTags.$inferInsert;
+
+// ── Client-Tag assignments ──
+export const clientTagAssignments = mysqlTable("client_tag_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  tagId: int("tagId").notNull(),
+});
+
+export type ClientTagAssignment = typeof clientTagAssignments.$inferSelect;
+export type InsertClientTagAssignment = typeof clientTagAssignments.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE D: Mejoras App Cliente
+// ═══════════════════════════════════════════════════════
+
+// ── Hydration Logs (registro de hidratación) ──
+export const hydrationLogs = mysqlTable("hydration_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  glasses: int("glasses").default(0).notNull(), // vasos de 250ml
+  goalGlasses: int("goalGlasses").default(8).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HydrationLog = typeof hydrationLogs.$inferSelect;
+export type InsertHydrationLog = typeof hydrationLogs.$inferInsert;
+
+// ── Sleep Logs (registro de sueño) ──
+export const sleepLogs = mysqlTable("sleep_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  hoursSlept: int("hoursSlept").notNull(), // minutos (ej: 480 = 8h)
+  quality: int("quality").notNull(), // 1-5
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SleepLog = typeof sleepLogs.$inferSelect;
+export type InsertSleepLog = typeof sleepLogs.$inferInsert;
+
+// ── Wellness Logs (diario de bienestar) ──
+export const wellnessLogs = mysqlTable("wellness_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  energy: int("energy").notNull(), // 1-5
+  mood: int("mood").notNull(), // 1-5
+  digestion: int("digestion").notNull(), // 1-5
+  bloating: int("bloating").notNull(), // 1-5 (1=mucha, 5=nada)
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WellnessLog = typeof wellnessLogs.$inferSelect;
+export type InsertWellnessLog = typeof wellnessLogs.$inferInsert;
+
+// ── Meal Reminders (recordatorios de comida) ──
+export const mealReminders = mysqlTable("meal_reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  mealName: varchar("mealName", { length: 100 }).notNull(),
+  reminderTime: varchar("reminderTime", { length: 5 }).notNull(), // HH:MM
+  enabled: int("enabled").default(1).notNull(),
+});
+
+export type MealReminder = typeof mealReminders.$inferSelect;
+export type InsertMealReminder = typeof mealReminders.$inferInsert;

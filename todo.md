@@ -136,3 +136,28 @@
 ## Bugs reportados
 
 - [x] Bug: La suma de calorías y macros por comida no se calcula correctamente
+
+## Bloque C: Mejoras App Entrenador (sesión 4)
+
+- [x] C1: Plantillas de dieta reutilizables (guardar dieta como plantilla con nombre y etiquetas)
+- [x] C2: Calendario de planificación (vista calendario con revisiones, alertas de inactividad, cambios de plan)
+- [x] C3: Comparativa antes/después por cliente (fotos lado a lado, gráfica peso superpuesta con cambios de dieta)
+- [x] C4: Informes automáticos semanales/mensuales (PDF resumen: adherencia, peso, métricas, recomendación)
+- [x] C5: Biblioteca de alimentos favoritos por cliente (marcar alimentos preferidos para priorizar en generación)
+- [x] C6: Etiquetas y filtros en lista de clientes (objetivo, estado, grupo)
+- [x] C7: Clonar plan de un cliente a otro (copiar dieta activa y ajustar calorías/macros)
+
+## Bloque D: Mejoras App Cliente (sesión 4)
+
+- [x] D1: Registro de hidratación (contador diario vasos/litros, objetivo personalizable)
+- [x] D2: Control de sueño (horas dormidas, calidad 1-5, gráfica semanal)
+- [x] D3: Diario de bienestar (energía, estado de ánimo, digestión, hinchazón)
+- [x] D4: Temporizador de ayuno intermitente (ventana alimentación, cuenta atrás visual)
+- [x] D5: Recetas paso a paso (instrucciones de preparación generadas por IA al tocar una comida)
+- [x] D6: Lista de la compra interactiva (marcar comprados, organizar por secciones supermercado)
+- [x] D7: Notificaciones/recordatorios de comida (horarios configurables por comida)
+- [x] D8: Exportar dieta a PDF desde portal del cliente
+
+## Otros (sesión 4)
+
+- [x] Logo NutriFlow aún más grande en ambas apps (sidebar entrenador + portal cliente)

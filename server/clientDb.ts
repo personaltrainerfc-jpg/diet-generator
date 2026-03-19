@@ -333,3 +333,199 @@ export async function getTrainerDashboardStats(trainerId: number) {
     todayAdherence: totalMeals > 0 ? Math.round((completedMeals / totalMeals) * 100) : null,
   };
 }
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE C: Funciones App Entrenador
+// ═══════════════════════════════════════════════════════
+
+import {
+  dietTemplates, clientFavoriteFoods, clientTags, clientTagAssignments,
+  hydrationLogs, sleepLogs, wellnessLogs, mealReminders
+} from "../drizzle/schema";
+
+// ── Diet Templates ──
+export async function createDietTemplate(data: {
+  userId: number; dietId: number; name: string; tags?: string[]; description?: string;
+}) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(dietTemplates).values(data);
+  return result.insertId;
+}
+
+export async function getDietTemplates(userId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(dietTemplates).where(eq(dietTemplates.userId, userId)).orderBy(desc(dietTemplates.createdAt));
+}
+
+export async function deleteDietTemplate(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(dietTemplates).where(eq(dietTemplates.id, id));
+}
+
+// ── Client Favorite Foods ──
+export async function addClientFavoriteFood(data: { clientId: number; trainerId: number; foodName: string }) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(clientFavoriteFoods).values(data);
+  return result.insertId;
+}
+
+export async function getClientFavoriteFoods(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(clientFavoriteFoods).where(eq(clientFavoriteFoods.clientId, clientId)).orderBy(desc(clientFavoriteFoods.createdAt));
+}
+
+export async function deleteClientFavoriteFood(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(clientFavoriteFoods).where(eq(clientFavoriteFoods.id, id));
+}
+
+// ── Client Tags ──
+export async function createClientTag(data: { trainerId: number; name: string; color?: string }) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(clientTags).values(data);
+  return result.insertId;
+}
+
+export async function getClientTags(trainerId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(clientTags).where(eq(clientTags.trainerId, trainerId));
+}
+
+export async function deleteClientTag(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(clientTagAssignments).where(eq(clientTagAssignments.tagId, id));
+  await db.delete(clientTags).where(eq(clientTags.id, id));
+}
+
+export async function assignTagToClient(clientId: number, tagId: number) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(clientTagAssignments)
+    .where(and(eq(clientTagAssignments.clientId, clientId), eq(clientTagAssignments.tagId, tagId)))
+    .limit(1);
+  if (existing.length > 0) return existing[0].id;
+  const [result] = await db.insert(clientTagAssignments).values({ clientId, tagId });
+  return result.insertId;
+}
+
+export async function removeTagFromClient(clientId: number, tagId: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(clientTagAssignments)
+    .where(and(eq(clientTagAssignments.clientId, clientId), eq(clientTagAssignments.tagId, tagId)));
+}
+
+export async function getClientTagAssignments(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select({
+    id: clientTagAssignments.id,
+    tagId: clientTagAssignments.tagId,
+    name: clientTags.name,
+    color: clientTags.color,
+  }).from(clientTagAssignments)
+    .innerJoin(clientTags, eq(clientTagAssignments.tagId, clientTags.id))
+    .where(eq(clientTagAssignments.clientId, clientId));
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE D: Funciones App Cliente
+// ═══════════════════════════════════════════════════════
+
+// ── Hydration Logs ──
+export async function logHydration(data: { clientId: number; date: string; glasses: number; goalGlasses?: number }) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(hydrationLogs)
+    .where(and(eq(hydrationLogs.clientId, data.clientId), eq(hydrationLogs.date, data.date)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(hydrationLogs).set({ glasses: data.glasses, goalGlasses: data.goalGlasses ?? existing[0].goalGlasses })
+      .where(eq(hydrationLogs.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(hydrationLogs).values(data);
+  return result.insertId;
+}
+
+export async function getHydrationLogs(clientId: number, startDate?: string, endDate?: string) {
+  const db = await getDb(); assertDb(db);
+  if (startDate && endDate) {
+    return db.select().from(hydrationLogs)
+      .where(and(eq(hydrationLogs.clientId, clientId), gte(hydrationLogs.date, startDate), lte(hydrationLogs.date, endDate)))
+      .orderBy(desc(hydrationLogs.date));
+  }
+  return db.select().from(hydrationLogs)
+    .where(eq(hydrationLogs.clientId, clientId))
+    .orderBy(desc(hydrationLogs.date))
+    .limit(30);
+}
+
+// ── Sleep Logs ──
+export async function logSleep(data: { clientId: number; date: string; hoursSlept: number; quality: number; notes?: string }) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(sleepLogs)
+    .where(and(eq(sleepLogs.clientId, data.clientId), eq(sleepLogs.date, data.date)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(sleepLogs).set({ hoursSlept: data.hoursSlept, quality: data.quality, notes: data.notes || null })
+      .where(eq(sleepLogs.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(sleepLogs).values(data);
+  return result.insertId;
+}
+
+export async function getSleepLogs(clientId: number, limit = 30) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(sleepLogs)
+    .where(eq(sleepLogs.clientId, clientId))
+    .orderBy(desc(sleepLogs.date))
+    .limit(limit);
+}
+
+// ── Wellness Logs ──
+export async function logWellness(data: {
+  clientId: number; date: string; energy: number; mood: number; digestion: number; bloating: number; notes?: string;
+}) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(wellnessLogs)
+    .where(and(eq(wellnessLogs.clientId, data.clientId), eq(wellnessLogs.date, data.date)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(wellnessLogs).set({ energy: data.energy, mood: data.mood, digestion: data.digestion, bloating: data.bloating, notes: data.notes || null })
+      .where(eq(wellnessLogs.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(wellnessLogs).values(data);
+  return result.insertId;
+}
+
+export async function getWellnessLogs(clientId: number, limit = 30) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(wellnessLogs)
+    .where(eq(wellnessLogs.clientId, clientId))
+    .orderBy(desc(wellnessLogs.date))
+    .limit(limit);
+}
+
+// ── Meal Reminders ──
+export async function setMealReminder(data: { clientId: number; mealName: string; reminderTime: string; enabled?: number }) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(mealReminders)
+    .where(and(eq(mealReminders.clientId, data.clientId), eq(mealReminders.mealName, data.mealName)))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(mealReminders).set({ reminderTime: data.reminderTime, enabled: data.enabled ?? 1 })
+      .where(eq(mealReminders.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(mealReminders).values(data);
+  return result.insertId;
+}
+
+export async function getMealReminders(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(mealReminders).where(eq(mealReminders.clientId, clientId));
+}
+
+export async function deleteMealReminder(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(mealReminders).where(eq(mealReminders.id, id));
+}

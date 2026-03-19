@@ -14,6 +14,8 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import TrainerDashboard from "./pages/TrainerDashboard";
 import ClientPortal from "./pages/ClientPortal";
+import Templates from "./pages/Templates";
+import CalendarView from "./pages/CalendarView";
 
 function DashboardRouter() {
   return (
@@ -27,6 +29,8 @@ function DashboardRouter() {
         <Route path="/clients" component={Clients} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/dashboard" component={TrainerDashboard} />
+        <Route path="/templates" component={Templates} />
+        <Route path="/calendar" component={CalendarView} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

@@ -17,7 +17,8 @@ import {
   ArrowLeft, User, Activity, Camera, ClipboardCheck, MessageCircle,
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
   Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
-  TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink
+  TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink,
+  Tag, Heart, Copy, Search
 } from "lucide-react";
 
 /* ─── Chart.js Evolution Chart ─── */
@@ -106,6 +107,15 @@ export default function ClientDetail() {
   const feedbackMut = trpc.clientMgmt.addCheckInFeedback.useMutation({ onSuccess: () => { toast.success("Feedback enviado"); checkInsQ.refetch(); } });
   const createAssessMut = trpc.clientMgmt.createAssessment.useMutation({ onSuccess: () => { toast.success("Valoración guardada"); assessmentQ.refetch(); setShowAssessment(false); } });
   const assignDietMut = trpc.clientMgmt.assignDiet.useMutation({ onSuccess: () => { toast.success("Dieta asignada correctamente"); activeDietQ.refetch(); dietHistoryQ.refetch(); setShowAssignDiet(false); } });
+  const favoritesQ = trpc.clientMgmt.getFavoriteFoods.useQuery({ clientId }, { enabled: clientId > 0 });
+  const addFavMut = trpc.clientMgmt.addFavoriteFood.useMutation({ onSuccess: () => { toast.success("Alimento favorito añadido"); favoritesQ.refetch(); } });
+  const removeFavMut = trpc.clientMgmt.deleteFavoriteFood.useMutation({ onSuccess: () => { toast.success("Favorito eliminado"); favoritesQ.refetch(); } });
+  const allTagsQ = trpc.clientMgmt.getTags.useQuery();
+  const clientTagsQ = trpc.clientMgmt.getClientTags.useQuery({ clientId }, { enabled: clientId > 0 });
+  const assignTagMut = trpc.clientMgmt.assignTag.useMutation({ onSuccess: () => { toast.success("Etiqueta asignada"); clientTagsQ.refetch(); } });
+  const removeTagMut = trpc.clientMgmt.removeTag.useMutation({ onSuccess: () => { toast.success("Etiqueta eliminada"); clientTagsQ.refetch(); } });
+  const createTagMut = trpc.clientMgmt.createTag.useMutation({ onSuccess: () => { toast.success("Etiqueta creada"); allTagsQ.refetch(); } });
+  const cloneDietMut = trpc.clientMgmt.cloneDietToClient.useMutation({ onSuccess: () => { toast.success("Dieta clonada y asignada"); activeDietQ.refetch(); dietHistoryQ.refetch(); } });
 
   // Local state
   const [newMsg, setNewMsg] = useState("");
@@ -118,6 +128,13 @@ export default function ClientDetail() {
   const [checkInForm, setCheckInForm] = useState({ weekStart: new Date().toISOString().split("T")[0], currentWeight: "", energyLevel: "3", hungerLevel: "3", sleepQuality: "3", adherenceRating: "3", notes: "" });
   const [measureForm, setMeasureForm] = useState({ date: new Date().toISOString().split("T")[0], weight: "", bodyFat: "", chest: "", waist: "", hips: "", arms: "", thighs: "", notes: "" });
   const [assessForm, setAssessForm] = useState({ currentDiet: "", exerciseFrequency: "", exerciseType: "", medicalConditions: "", medications: "", allergiesIntolerances: "", sleepHours: "", stressLevel: "3", waterIntake: "", alcoholFrequency: "", smokingStatus: "", goals: "", trainerNotes: "" });
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [showClone, setShowClone] = useState(false);
+  const [favSearch, setFavSearch] = useState("");
+  const [tagInput, setTagInput] = useState("");
+  const [cloneSourceId, setCloneSourceId] = useState<string>("");
+  const [cloneCalories, setCloneCalories] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const client = clientQ.data;
@@ -321,6 +338,43 @@ export default function ClientDetail() {
               <span className="text-[12px] text-muted-foreground">Código de acceso: </span>
               <code className="text-[12px] bg-secondary px-2 py-0.5 rounded-md font-mono">{client.accessCode}</code>
             </div>
+
+            {/* Client Tags */}
+            <div className="pt-3 border-t border-border/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Etiquetas</span>
+                <Button variant="ghost" size="sm" onClick={() => setShowTags(true)} className="h-6 text-[11px] gap-1 rounded-lg"><Tag className="h-3 w-3" />Gestionar</Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(clientTagsQ.data || []).map((ct: any) => (
+                  <span key={ct.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-medium">
+                    <Tag className="h-2.5 w-2.5" />{ct.tag?.name || ct.tagName || 'Tag'}
+                    <button onClick={() => removeTagMut.mutate({ clientId, tagId: ct.tagId })} className="ml-0.5 hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
+                  </span>
+                ))}
+                {(clientTagsQ.data || []).length === 0 && <span className="text-[11px] text-muted-foreground">Sin etiquetas</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* Favorite Foods */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-rose-400" />Alimentos Favoritos</h3>
+              <Button variant="outline" size="sm" onClick={() => setShowFavorites(true)} className="gap-1.5 rounded-xl h-8 text-[12px]"><Plus className="h-3.5 w-3.5" />Añadir</Button>
+            </div>
+            {(favoritesQ.data || []).length === 0 ? (
+              <p className="text-[13px] text-muted-foreground text-center py-4">Sin alimentos favoritos. Añade los que más le gusten al cliente para priorizarlos en la generación.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(favoritesQ.data || []).map((f: any) => (
+                  <span key={f.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[12px] font-medium">
+                    <Heart className="h-3 w-3" />{f.foodName}
+                    <button onClick={() => removeFavMut.mutate({ id: f.id })} className="ml-0.5 hover:text-destructive"><X className="h-3 w-3" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Plan Nutricional Activo */}
@@ -366,9 +420,14 @@ export default function ClientDetail() {
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-[15px] font-semibold">Plan Nutricional Activo</h3>
-              <Button onClick={() => setShowAssignDiet(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]">
-                <Plus className="h-3.5 w-3.5" />{activeDietQ.data ? "Cambiar dieta" : "Asignar dieta"}
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowClone(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]">
+                  <Copy className="h-3.5 w-3.5" />Clonar plan
+                </Button>
+                <Button onClick={() => setShowAssignDiet(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]">
+                  <Plus className="h-3.5 w-3.5" />{activeDietQ.data ? "Cambiar dieta" : "Asignar dieta"}
+                </Button>
+              </div>
             </div>
             {activeDietQ.isLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -667,28 +726,56 @@ export default function ClientDetail() {
                 </div>
               ))}
 
-              {/* Side-by-side comparison hint */}
-              {(photosQ.data || []).length >= 2 && (
-                <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
-                  <p className="text-[13px] font-medium text-primary">Comparaci\u00f3n de progreso</p>
-                  <div className="grid grid-cols-2 gap-4 mt-3">
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground">Primera foto</p>
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
-                        <img src={(photosQ.data as any[])[(photosQ.data as any[]).length - 1].photoUrl} alt="Primera" className="w-full h-full object-cover" />
+              {/* Enhanced Before/After Comparison */}
+              {(photosQ.data || []).length >= 2 && (() => {
+                const photos = photosQ.data as any[];
+                const types = Array.from(new Set(photos.map((p: any) => p.photoType)));
+                const typeLabels: Record<string, string> = { front: "Frente", side: "Perfil", back: "Espalda" };
+                return (
+                  <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-4">
+                    <h4 className="text-[15px] font-semibold flex items-center gap-2"><Camera className="h-4 w-4 text-primary" />Comparativa Antes / Después</h4>
+                    {types.map((type) => {
+                      const typePhotos = photos.filter((p: any) => p.photoType === type).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      if (typePhotos.length < 2) return null;
+                      const first = typePhotos[0];
+                      const last = typePhotos[typePhotos.length - 1];
+                      return (
+                        <div key={type} className="space-y-2">
+                          <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">{typeLabels[type] || type}</p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
+                                <img src={first.photoUrl} alt="Antes" className="w-full h-full object-cover" />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground text-center">{new Date(first.date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
+                                <img src={last.photoUrl} alt="Después" className="w-full h-full object-cover" />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground text-center">{new Date(last.date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Weight evolution overlay */}
+                    {weightData.length >= 2 && (
+                      <div className="pt-3 border-t border-border/30">
+                        <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Evolución de peso</p>
+                        <EvolutionChart data={weightData} labels={weightLabels} color="#6BCB77" unit="kg" height={120} />
+                        <div className="flex justify-between mt-2 text-[12px]">
+                          <span className="text-muted-foreground">Inicio: <strong>{weightData[0].toFixed(1)} kg</strong></span>
+                          <span className="text-muted-foreground">Actual: <strong>{weightData[weightData.length - 1].toFixed(1)} kg</strong></span>
+                          <span className={weightData[weightData.length - 1] < weightData[0] ? "text-emerald-500 font-semibold" : "text-amber-500 font-semibold"}>
+                            {(weightData[weightData.length - 1] - weightData[0]) > 0 ? "+" : ""}{(weightData[weightData.length - 1] - weightData[0]).toFixed(1)} kg
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{new Date((photosQ.data as any[])[(photosQ.data as any[]).length - 1].date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground">\u00daltima foto</p>
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
-                        <img src={(photosQ.data as any[])[0].photoUrl} alt="\u00daltima" className="w-full h-full object-cover" />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">{new Date((photosQ.data as any[])[0].date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</p>
-                    </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </TabsContent>
@@ -749,6 +836,52 @@ export default function ClientDetail() {
 
         {/* AI Tab */}
         <TabsContent value="ai" className="space-y-4 mt-4">
+          {/* Auto Report */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2"><FileText className="h-4.5 w-4.5 text-primary" /><h3 className="text-[15px] font-semibold">Informe Automático</h3></div>
+              <Button variant="outline" size="sm" onClick={() => {
+                const cis = checkInsQ.data || [];
+                const ms = measurementsQ.data || [];
+                const lastCi = cis[0];
+                const lastM = ms[0];
+                const avgAdherence = cis.length > 0 ? (cis.reduce((s: number, c: any) => s + (c.adherenceRating || 0), 0) / cis.length).toFixed(1) : '—';
+                const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { font-family: 'Plus Jakarta Sans', sans-serif; color: #1d1d1f; padding: 40px; max-width: 800px; margin: 0 auto; }
+                  h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+                  h2 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e5e5e7; }
+                  .subtitle { color: #86868b; font-size: 13px; margin-bottom: 20px; }
+                  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
+                  .stat { background: #f5f5f7; border-radius: 12px; padding: 14px; }
+                  .stat-label { font-size: 10px; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; }
+                  .stat-value { font-size: 18px; font-weight: 600; margin-top: 2px; }
+                  .note { background: #f5f5f7; border-radius: 8px; padding: 10px; font-size: 13px; color: #424245; margin: 8px 0; }
+                  @media print { body { padding: 20px; } }
+                </style></head><body>
+                  <h1>Informe de Seguimiento — ${client.name}</h1>
+                  <p class="subtitle">Generado el ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <div class="grid">
+                    <div class="stat"><div class="stat-label">Peso actual</div><div class="stat-value">${lastWeight ? lastWeight.toFixed(1) + ' kg' : '—'}</div></div>
+                    <div class="stat"><div class="stat-label">Adherencia media</div><div class="stat-value">${avgAdherence}/5</div></div>
+                    <div class="stat"><div class="stat-label">Check-ins</div><div class="stat-value">${cis.length}</div></div>
+                  </div>
+                  ${lastCi ? '<h2>\u00daltimo Check-in</h2><div class="note">Energ\u00eda: ' + (lastCi.energyLevel || '—') + '/5 · Sue\u00f1o: ' + (lastCi.sleepQuality || '—') + '/5 · Adherencia: ' + (lastCi.adherenceRating || '—') + '/5' + (lastCi.notes ? '<br/>' + lastCi.notes : '') + '</div>' : ''}
+                  ${lastM ? '<h2>\u00daltimas Medidas</h2><div class="note">Peso: ' + (lastM.weight ? (lastM.weight/1000).toFixed(1) + ' kg' : '—') + ' · Cintura: ' + (lastM.waist ? (lastM.waist/10).toFixed(1) + ' cm' : '—') + ' · Pecho: ' + (lastM.chest ? (lastM.chest/10).toFixed(1) + ' cm' : '—') + '</div>' : ''}
+                  ${activeDietQ.data ? '<h2>Plan Activo</h2><div class="note">' + activeDietQ.data.name + ' — ' + activeDietQ.data.totalCalories + ' kcal</div>' : ''}
+                </body></html>`;
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const w = window.open(url, '_blank');
+                if (w) { setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 500); }
+              }} className="gap-1.5 rounded-xl h-8 text-[12px]">
+                <Download className="h-3.5 w-3.5" />Generar PDF
+              </Button>
+            </div>
+            <p className="text-[13px] text-muted-foreground">Genera un informe resumen con peso, adherencia, medidas y plan activo del cliente. Ideal para revisiones periódicas.</p>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-1"><Brain className="h-4.5 w-4.5 text-primary" /><h3 className="text-[15px] font-semibold">Recomendaciones IA</h3></div>
@@ -843,6 +976,85 @@ export default function ClientDetail() {
             <div className="space-y-1.5"><Label className="text-[13px]">Notas del entrenador</Label><Textarea value={assessForm.trainerNotes} onChange={(e) => setAssessForm(f => ({ ...f, trainerNotes: e.target.value }))} rows={2} placeholder="Tus observaciones..." className="rounded-xl" /></div>
             <Button onClick={() => createAssessMut.mutate({ clientId, currentDiet: assessForm.currentDiet || undefined, exerciseFrequency: assessForm.exerciseFrequency || undefined, exerciseType: assessForm.exerciseType || undefined, medicalConditions: assessForm.medicalConditions || undefined, medications: assessForm.medications || undefined, allergiesIntolerances: assessForm.allergiesIntolerances || undefined, sleepHours: assessForm.sleepHours ? parseInt(assessForm.sleepHours) : undefined, stressLevel: parseInt(assessForm.stressLevel), waterIntake: assessForm.waterIntake ? parseInt(assessForm.waterIntake) : undefined, alcoholFrequency: assessForm.alcoholFrequency || undefined, smokingStatus: assessForm.smokingStatus || undefined, goals: assessForm.goals || undefined, trainerNotes: assessForm.trainerNotes || undefined })} disabled={createAssessMut.isPending} className="w-full rounded-xl h-11">
               {createAssessMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Valoración
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Favorite Food Dialog */}
+      <Dialog open={showFavorites} onOpenChange={setShowFavorites}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Añadir Alimento Favorito</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-[13px] text-muted-foreground">Añade alimentos que le gusten al cliente para priorizarlos en futuras dietas.</p>
+            <div className="flex gap-2">
+              <Input value={favSearch} onChange={(e) => setFavSearch(e.target.value)} placeholder="Ej: Pollo a la plancha, Arroz integral..." className="rounded-xl text-[14px]" onKeyDown={(e) => { if (e.key === 'Enter' && favSearch.trim()) { addFavMut.mutate({ clientId, foodName: favSearch.trim() }); setFavSearch(''); } }} />
+              <Button onClick={() => { if (favSearch.trim()) { addFavMut.mutate({ clientId, foodName: favSearch.trim() }); setFavSearch(''); } }} disabled={!favSearch.trim() || addFavMut.isPending} className="rounded-xl shrink-0">
+                {addFavMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-[200px] overflow-y-auto">
+              {(favoritesQ.data || []).map((f: any) => (
+                <span key={f.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[12px] font-medium">
+                  <Heart className="h-3 w-3" />{f.foodName}
+                  <button onClick={() => removeFavMut.mutate({ id: f.id })} className="ml-0.5 hover:text-destructive"><X className="h-3 w-3" /></button>
+                </span>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tags Dialog */}
+      <Dialog open={showTags} onOpenChange={setShowTags}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Gestionar Etiquetas</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="Nueva etiqueta..." className="rounded-xl text-[14px]" onKeyDown={(e) => { if (e.key === 'Enter' && tagInput.trim()) { createTagMut.mutate({ name: tagInput.trim(), color: '#6BCB77' }); setTagInput(''); } }} />
+              <Button onClick={() => { if (tagInput.trim()) { createTagMut.mutate({ name: tagInput.trim(), color: '#6BCB77' }); setTagInput(''); } }} disabled={!tagInput.trim() || createTagMut.isPending} className="rounded-xl shrink-0">
+                {createTagMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Etiquetas disponibles</p>
+              <div className="flex flex-wrap gap-1.5 max-h-[200px] overflow-y-auto">
+                {(allTagsQ.data || []).map((tag: any) => {
+                  const isAssigned = (clientTagsQ.data || []).some((ct: any) => ct.tagId === tag.id);
+                  return (
+                    <button key={tag.id} onClick={() => isAssigned ? removeTagMut.mutate({ clientId, tagId: tag.id }) : assignTagMut.mutate({ clientId, tagId: tag.id })} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all ${isAssigned ? 'bg-primary/15 text-primary ring-1 ring-primary/30' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'}`}>
+                      <Tag className="h-3 w-3" />{tag.name}
+                      {isAssigned && <CheckCircle2 className="h-3 w-3" />}
+                    </button>
+                  );
+                })}
+                {(allTagsQ.data || []).length === 0 && <p className="text-[12px] text-muted-foreground">Crea tu primera etiqueta arriba</p>}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Diet Dialog */}
+      <Dialog open={showClone} onOpenChange={setShowClone}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Clonar y Adaptar Dieta</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-[13px] text-muted-foreground">Selecciona una dieta de tu biblioteca. Se creará una copia adaptada a las calorías que indiques y se asignará al cliente.</p>
+            <div className="space-y-2 max-h-[250px] overflow-y-auto">
+              {(trainerDietsQ.data || []).map((d: any) => (
+                <button key={d.id} onClick={() => setCloneSourceId(String(d.id))} className={`w-full text-left p-3 rounded-xl border transition-all ${cloneSourceId === String(d.id) ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border/50 hover:bg-accent/50'}`}>
+                  <p className="text-[14px] font-medium">{d.name}</p>
+                  <div className="flex gap-3 mt-1 text-[12px] text-muted-foreground"><span>{d.totalCalories} kcal</span><span>{d.mealsPerDay} comidas</span></div>
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Calorías objetivo (opcional)</Label>
+              <Input type="number" value={cloneCalories} onChange={(e) => setCloneCalories(e.target.value)} placeholder="Dejar vacío para mantener las originales" className="rounded-xl" />
+            </div>
+            <Button onClick={() => { if (!cloneSourceId) { toast.error('Selecciona una dieta'); return; } cloneDietMut.mutate({ sourceDietId: parseInt(cloneSourceId), targetClientId: clientId }); setShowClone(false); }} disabled={!cloneSourceId || cloneDietMut.isPending} className="w-full rounded-xl h-11">
+              {cloneDietMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Clonar y Asignar
             </Button>
           </div>
         </DialogContent>
