@@ -14,7 +14,7 @@ import {
   ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES } from "@shared/constants";
+import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
 import type { DietType, CookingLevel } from "@shared/constants";
 
 type DailyTarget = {
@@ -48,7 +48,7 @@ function Section({ children, className = "" }: { children: React.ReactNode; clas
 
 function SectionTitle({ icon: Icon, color, children }: { icon: any; color: string; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground mb-1">
+    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground mb-1 uppercase tracking-wide">
       <Icon className={`h-[18px] w-[18px] ${color}`} strokeWidth={1.5} />
       {children}
     </h2>
@@ -125,6 +125,18 @@ export default function Home() {
       });
     }
   }, [totalMenus, useDailyTargets]);
+
+  // Auto-adjust macros when diet type changes
+  const handleDietTypeChange = (newType: DietType) => {
+    setDietType(newType);
+    const macros = DIET_TYPE_MACROS[newType];
+    if (macros) {
+      setProteinPercent(macros.proteinPercent);
+      setCarbsPercent(macros.carbsPercent);
+      setFatsPercent(macros.fatsPercent);
+      toast.success(`Macros ajustados para dieta ${DIET_TYPES.find(d => d.value === newType)?.label || newType}`);
+    }
+  };
 
   const generateMutation = trpc.diet.generate.useMutation({
     onSuccess: (data) => {
@@ -210,8 +222,8 @@ export default function Home() {
     <div className="max-w-3xl mx-auto space-y-5 pb-8">
       {/* Header */}
       <div className="pt-2">
-        <h1 className="text-[28px] font-bold tracking-tight text-foreground">Nueva Dieta</h1>
-        <p className="text-[15px] text-muted-foreground mt-1">Configura los parametros y genera menus personalizados con IA.</p>
+        <h1 className="text-[28px] font-bold tracking-tight text-foreground uppercase">NUEVA DIETA</h1>
+        <p className="text-[13px] text-muted-foreground mt-1 uppercase tracking-wide">CONFIGURA LOS PARÁMETROS PARA CREAR EL PLAN NUTRICIONAL</p>
       </div>
 
       {/* Quick templates */}
@@ -224,10 +236,10 @@ export default function Home() {
               key={template.name}
               type="button"
               onClick={() => applyTemplate(template)}
-              className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-accent/50 transition-all duration-200 cursor-pointer group"
+              className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer group"
             >
               <span className="text-xl">{template.icon}</span>
-              <span className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight text-center">{template.name}</span>
+              <span className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight text-center uppercase">{template.name}</span>
               <span className="text-[10px] text-muted-foreground">{template.totalCalories}</span>
             </button>
           ))}
@@ -251,21 +263,21 @@ export default function Home() {
 
         {/* Diet type */}
         <Section>
-          <SectionTitle icon={Salad} color="text-emerald-500">Tipo de Dieta</SectionTitle>
-          <SectionDesc>Selecciona el estilo de alimentacion.</SectionDesc>
+          <SectionTitle icon={Salad} color="text-primary">Tipo de Dieta</SectionTitle>
+          <SectionDesc>Selecciona el estilo de alimentacion. Los macros se ajustan automaticamente.</SectionDesc>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {DIET_TYPES.map(dt => (
               <button
                 key={dt.value}
                 type="button"
-                onClick={() => setDietType(dt.value)}
+                onClick={() => handleDietTypeChange(dt.value)}
                 className={`flex flex-col items-start gap-0.5 p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
                   dietType === dt.value
                     ? "border-primary bg-primary/5 shadow-sm"
                     : "border-border/50 hover:border-border hover:bg-accent/30"
                 }`}
               >
-                <span className={`text-[13px] font-semibold ${dietType === dt.value ? "text-primary" : "text-foreground"}`}>
+                <span className={`text-[13px] font-semibold uppercase tracking-wide ${dietType === dt.value ? "text-primary" : "text-foreground"}`}>
                   {dt.label}
                 </span>
                 <span className="text-[12px] text-muted-foreground leading-relaxed">{dt.description}</span>
@@ -290,7 +302,7 @@ export default function Home() {
                     : "border-border/50 hover:border-border hover:bg-accent/30"
                 }`}
               >
-                <span className={`text-[13px] font-semibold ${cookingLevel === cl.value ? "text-primary" : "text-foreground"}`}>
+                <span className={`text-[13px] font-semibold uppercase tracking-wide ${cookingLevel === cl.value ? "text-primary" : "text-foreground"}`}>
                   {cl.label}
                 </span>
                 <span className="text-[12px] text-muted-foreground leading-relaxed">{cl.description}</span>
@@ -332,7 +344,7 @@ export default function Home() {
         {/* Macros */}
         <Section>
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-[15px] font-semibold text-foreground">Macronutrientes</h2>
+            <h2 className="text-[15px] font-semibold text-foreground uppercase tracking-wide">Macronutrientes</h2>
             {(macroSum < 95 || macroSum > 105) && (
               <span className="flex items-center gap-1 text-[12px] text-destructive font-medium">
                 <AlertCircle className="h-3.5 w-3.5" />
@@ -539,7 +551,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 w-full justify-center py-2"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 w-full justify-center py-2 uppercase tracking-wide"
         >
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           {showAdvanced ? "Ocultar opciones avanzadas" : "Opciones avanzadas"}
@@ -697,7 +709,7 @@ export default function Home() {
         <Button
           type="submit"
           size="lg"
-          className="w-full rounded-2xl h-12 text-[15px] font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+          className="w-full rounded-2xl h-12 text-[15px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 uppercase tracking-wide"
           disabled={generateMutation.isPending || macroSum < 95 || macroSum > 105}
         >
           {generateMutation.isPending ? (

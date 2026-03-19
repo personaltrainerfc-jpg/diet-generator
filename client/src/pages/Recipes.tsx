@@ -53,7 +53,7 @@ export default function Recipes() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Mis Recetas</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">Mis Recetas</h1>
           <p className="text-[14px] text-muted-foreground mt-1">Crea y gestiona tus recetas para incluirlas en las dietas.</p>
         </div>
         <Button onClick={() => setShowCreate(true)} className="gap-2 rounded-xl h-10">

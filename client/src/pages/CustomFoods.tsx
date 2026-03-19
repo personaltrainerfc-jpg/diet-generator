@@ -41,7 +41,7 @@ export default function CustomFoods() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Alimentos Personalizados</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">Alimentos Personalizados</h1>
           <p className="text-[14px] text-muted-foreground mt-1">Crea alimentos con macros personalizados para usar en tus dietas.</p>
         </div>
         <Button onClick={() => { resetForm(); setShowAdd(true); }} className="gap-1.5 rounded-xl h-10">

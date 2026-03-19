@@ -106,3 +106,19 @@
 - [x] Portal de acceso para clientes (login con código de acceso)
 - [x] Gráficas de evolución en ClientDetail (Chart.js: peso, medidas, adherencia)
 - [x] Exportar ficha completa del cliente a PDF (valoración, medidas, evolución, dieta)
+
+## NutriFlow Branding + Nuevas funcionalidades
+
+- [x] Cambiar título "Diet Generator" por logo NutriFlow (imagen)
+- [x] Texto "Nueva Dieta" en mayúsculas: NUEVA DIETA
+- [x] Subtítulo: "CONFIGURA LOS PARÁMETROS PARA CREAR EL PLAN NUTRICIONAL"
+- [x] Ajuste automático de macros según tipo de dieta (Keto, Low Carb, Equilibrada, Alta proteína, Volumen, Déficit)
+- [ ] Invitación por email al añadir un cliente (código único, caducidad 72h)
+- [ ] Métricas de progreso y fotos en portal del cliente ("Mi Progreso")
+- [ ] Apartado de control del sueño en portal del cliente (gráfica semanal/mensual)
+- [x] Estética unificada NutriFlow: colores verde (#6BCB77) + oscuro, ambas apps coherentes
+- [x] Diseño responsive móvil: barra inferior, touch targets 44px, desde 320px ancho
+- [ ] Asignar dieta a cliente: crear nueva, asignar existente, asignar plantilla
+- [ ] Vista plan activo en perfil del cliente (nombre, fecha inicio, días activo)
+- [ ] Notificación al cliente cuando se le asigna un nuevo plan
+- [ ] Historial de planes anteriores accesible para entrenador y cliente

@@ -1,5 +1,6 @@
-// Logo URL for PDF and branding
+// Logo URLs for PDF and branding
 export const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/LOGO1_ab57b4c5.png";
+export const NUTRIFLOW_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp";
 
 // Diet types
 export const DIET_TYPES = [
@@ -13,6 +14,22 @@ export const DIET_TYPES = [
 ] as const;
 
 export type DietType = typeof DIET_TYPES[number]["value"];
+
+// Recommended macros per diet type (auto-adjust on selection)
+export const DIET_TYPE_MACROS: Record<string, { proteinPercent: number; carbsPercent: number; fatsPercent: number }> = {
+  keto: { proteinPercent: 22, carbsPercent: 8, fatsPercent: 70 },
+  equilibrada: { proteinPercent: 22, carbsPercent: 50, fatsPercent: 28 },
+  mediterranea: { proteinPercent: 22, carbsPercent: 50, fatsPercent: 28 },
+  paleo: { proteinPercent: 30, carbsPercent: 30, fatsPercent: 40 },
+  realfood: { proteinPercent: 28, carbsPercent: 42, fatsPercent: 30 },
+  vegetariana: { proteinPercent: 22, carbsPercent: 50, fatsPercent: 28 },
+  vegana: { proteinPercent: 20, carbsPercent: 55, fatsPercent: 25 },
+  // Extended types from user requirements
+  lowcarb: { proteinPercent: 30, carbsPercent: 20, fatsPercent: 50 },
+  altaproteina: { proteinPercent: 40, carbsPercent: 35, fatsPercent: 25 },
+  volumen: { proteinPercent: 28, carbsPercent: 55, fatsPercent: 17 },
+  deficit: { proteinPercent: 32, carbsPercent: 45, fatsPercent: 23 },
+};
 
 // Cooking levels
 export const COOKING_LEVELS = [

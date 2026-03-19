@@ -249,7 +249,7 @@ export default function ClientDetail() {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 mb-1">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate">{client.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate uppercase">{client.name}</h1>
             <Badge variant="outline" className={`text-[11px] rounded-full px-2.5 py-0.5 shrink-0 ${statusColors[client.status] || ""}`}>
               {statusLabels[client.status] || client.status}
             </Badge>

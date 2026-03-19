@@ -42,10 +42,8 @@ export default function ClientPortal() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <User className="h-8 w-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">Portal del Cliente</h1>
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-10 object-contain mx-auto mb-4" />
+            <h1 className="text-2xl font-bold tracking-tight uppercase">Portal del Cliente</h1>
             <p className="text-muted-foreground text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
           </div>
           <div className="space-y-3">
@@ -95,9 +93,12 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-[17px] font-semibold tracking-tight">{session.name}</h1>
-            {profileQ.data?.goal && <p className="text-[12px] text-muted-foreground">{profileQ.data.goal}</p>}
+          <div className="flex items-center gap-3">
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-6 object-contain" />
+            <div>
+              <h1 className="text-[17px] font-semibold tracking-tight uppercase">{session.name}</h1>
+              {profileQ.data?.goal && <p className="text-[12px] text-muted-foreground">{profileQ.data.goal}</p>}
+            </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-muted-foreground">
             Cerrar sesión

@@ -43,7 +43,7 @@ export default function Clients() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Mis Clientes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">Mis Clientes</h1>
           <p className="text-[14px] text-muted-foreground mt-1">Gestiona tus clientes y sus planes nutricionales.</p>
         </div>
         <Button onClick={() => setShowCreate(true)} className="gap-2 rounded-xl h-10"><Plus className="h-4 w-4" />Nuevo Cliente</Button>

@@ -617,7 +617,7 @@ export default function DietDetail() {
           <button onClick={() => setLocation("/history")} className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-2">
             <ArrowLeft className="h-4 w-4" /> Volver
           </button>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">{diet.name}</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground uppercase">{diet.name}</h1>
           <p className="text-[13px] text-muted-foreground">{diet.totalCalories} kcal · {diet.mealsPerDay} comidas/día</p>
         </div>
         <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">

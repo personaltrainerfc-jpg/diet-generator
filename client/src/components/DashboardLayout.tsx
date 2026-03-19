@@ -28,6 +28,8 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
+const NUTRIFLOW_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp";
+
 const menuItems = [
   { icon: PlusCircle, label: "Nueva Dieta", path: "/" },
   { icon: History, label: "Historial", path: "/history" },
@@ -63,17 +65,16 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
         <div className="flex flex-col items-center gap-8 p-10 max-w-sm w-full">
-          <div className="flex flex-col items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center">
-              <UtensilsCrossed className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <h1 className="text-[28px] font-bold tracking-tight text-center text-foreground">
-              Diet Generator
-            </h1>
-            <p className="text-[15px] text-muted-foreground text-center leading-relaxed">
-              Crea dietas personalizadas con inteligencia artificial.
+          <div className="flex flex-col items-center gap-6">
+            <img
+              src={NUTRIFLOW_LOGO}
+              alt="NutriFlow"
+              className="h-12 object-contain"
+            />
+            <p className="text-[15px] text-gray-400 text-center leading-relaxed">
+              Crea planes nutricionales personalizados con inteligencia artificial.
             </p>
           </div>
           <Button
@@ -81,7 +82,7 @@ export default function DashboardLayout({
               window.location.href = getLoginUrl();
             }}
             size="lg"
-            className="w-full rounded-full h-12 text-[15px] font-semibold"
+            className="w-full rounded-full h-12 text-[15px] font-semibold bg-[#6BCB77] hover:bg-[#5ab868] text-white"
           >
             Iniciar sesion
           </Button>
@@ -111,18 +112,18 @@ function ThemeToggleButton({ isCollapsed }: { isCollapsed: boolean }) {
   return (
     <button
       onClick={toggleTheme}
-      className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-accent transition-colors duration-200 w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-sidebar-accent transition-colors duration-200 w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
     >
       <div className="h-5 w-5 flex items-center justify-center shrink-0">
         {theme === 'dark' ? (
-          <Sun className="h-[18px] w-[18px] text-muted-foreground" />
+          <Sun className="h-[18px] w-[18px] text-sidebar-foreground/60" />
         ) : (
-          <Moon className="h-[18px] w-[18px] text-muted-foreground" />
+          <Moon className="h-[18px] w-[18px] text-sidebar-foreground/60" />
         )}
       </div>
       {!isCollapsed && (
-        <span className="text-[13px] text-muted-foreground">
+        <span className="text-[13px] text-sidebar-foreground/60">
           {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
         </span>
       )}
@@ -183,22 +184,24 @@ function DashboardLayoutContent({
       <div className="relative" ref={sidebarRef}>
         <Sidebar
           collapsible="icon"
-          className="border-r border-border/50"
+          className="border-r border-sidebar-border"
           disableTransition={isResizing}
         >
           <SidebarHeader className="h-16 justify-center">
             <div className="flex items-center gap-3 px-2 transition-all duration-200 w-full">
               <button
                 onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors duration-200 focus:outline-none shrink-0"
+                className="h-8 w-8 flex items-center justify-center hover:bg-sidebar-accent rounded-lg transition-colors duration-200 focus:outline-none shrink-0"
                 aria-label="Toggle navigation"
               >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
+                <PanelLeft className="h-4 w-4 text-sidebar-foreground/60" />
               </button>
               {!isCollapsed ? (
-                <span className="text-[15px] font-semibold tracking-tight text-foreground truncate">
-                  Diet Generator
-                </span>
+                <img
+                  src={NUTRIFLOW_LOGO}
+                  alt="NutriFlow"
+                  className="h-7 object-contain"
+                />
               ) : null}
             </div>
           </SidebarHeader>
@@ -213,13 +216,17 @@ function DashboardLayoutContent({
                       isActive={isActive}
                       onClick={() => setLocation(item.path)}
                       tooltip={item.label}
-                      className="h-9 rounded-lg transition-all duration-200 text-[13px]"
+                      className={`h-9 rounded-lg transition-all duration-200 text-[13px] ${
+                        isActive
+                          ? "bg-[#6BCB77]/15 text-[#6BCB77]"
+                          : "hover:bg-sidebar-accent"
+                      }`}
                     >
                       <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                        className={`h-4 w-4 ${isActive ? "text-[#6BCB77]" : "text-sidebar-foreground/60"}`}
                         strokeWidth={isActive ? 2 : 1.5}
                       />
-                      <span className={isActive ? "font-medium text-foreground" : "text-muted-foreground"}>
+                      <span className={isActive ? "font-medium text-[#6BCB77]" : "text-sidebar-foreground/80"}>
                         {item.label}
                       </span>
                     </SidebarMenuButton>
@@ -233,17 +240,17 @@ function DashboardLayoutContent({
             <ThemeToggleButton isCollapsed={isCollapsed} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-accent transition-colors duration-200 w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none">
+                <button className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-sidebar-accent transition-colors duration-200 w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none">
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                    <AvatarFallback className="text-xs font-medium bg-[#6BCB77]/20 text-[#6BCB77]">
                       {user?.name?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-[13px] font-medium truncate leading-none text-foreground">
+                    <p className="text-[13px] font-medium truncate leading-none text-sidebar-foreground">
                       {user?.name || "-"}
                     </p>
-                    <p className="text-[11px] text-muted-foreground truncate mt-1">
+                    <p className="text-[11px] text-sidebar-foreground/50 truncate mt-1">
                       {user?.email || "-"}
                     </p>
                   </div>
@@ -262,7 +269,7 @@ function DashboardLayoutContent({
           </SidebarFooter>
         </Sidebar>
         <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors duration-200 ${isCollapsed ? "hidden" : ""}`}
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[#6BCB77]/20 transition-colors duration-200 ${isCollapsed ? "hidden" : ""}`}
           onMouseDown={() => {
             if (isCollapsed) return;
             setIsResizing(true);
@@ -276,32 +283,34 @@ function DashboardLayoutContent({
           <div className="flex border-b border-border/50 h-12 items-center justify-between bg-background/80 px-3 backdrop-blur-xl sticky top-0 z-40">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-8 w-8 rounded-lg" />
-              <span className="text-[15px] font-medium text-foreground">
-                {activeMenuItem?.label ?? "Menu"}
-              </span>
+              <img
+                src={NUTRIFLOW_LOGO}
+                alt="NutriFlow"
+                className="h-6 object-contain"
+              />
             </div>
           </div>
         )}
-        <main className="flex-1 p-4 md:p-8">{children}</main>
+        <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8">{children}</main>
       </SidebarInset>
 
       {/* Mobile bottom navigation */}
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 pb-[env(safe-area-inset-bottom)]">
-          <div className="flex items-center justify-around h-14 px-2">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-t border-border/50 pb-[env(safe-area-inset-bottom)]">
+          <div className="flex items-center justify-around h-16 px-2">
             {menuItems.slice(0, 5).map(item => {
               const isActive = location === item.path;
               return (
                 <button
                   key={item.path}
                   onClick={() => setLocation(item.path)}
-                  className="flex flex-col items-center gap-0.5 py-1 px-3 transition-colors duration-200"
+                  className="flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-[48px] min-h-[48px] justify-center transition-colors duration-200"
                 >
                   <item.icon
-                    className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                    className={`h-5 w-5 ${isActive ? "text-[#6BCB77]" : "text-muted-foreground"}`}
                     strokeWidth={isActive ? 2 : 1.5}
                   />
-                  <span className={`text-[10px] ${isActive ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                  <span className={`text-[10px] ${isActive ? "text-[#6BCB77] font-medium" : "text-muted-foreground"}`}>
                     {item.label}
                   </span>
                 </button>

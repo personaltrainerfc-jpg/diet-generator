@@ -80,7 +80,7 @@ export default function History() {
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-8">
       <div className="pt-2">
-        <h1 className="text-[28px] font-bold tracking-tight text-foreground">Historial</h1>
+        <h1 className="text-[28px] font-bold tracking-tight text-foreground uppercase">Historial</h1>
         <p className="text-[15px] text-muted-foreground mt-1">
           {diets && diets.length > 0 ? `${diets.length} dieta${diets.length > 1 ? "s" : ""} generada${diets.length > 1 ? "s" : ""}` : "Consulta y gestiona tus dietas."}
         </p>
