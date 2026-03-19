@@ -405,14 +405,25 @@ export const appRouter = router({
           });
 
           for (const meal of menu.meals) {
+            // Calculate real totals from foods instead of trusting LLM meal-level values
+            const realMealTotals = meal.foods.reduce(
+              (acc, f) => ({
+                calories: acc.calories + (f.calories || 0),
+                protein: acc.protein + (f.protein || 0),
+                carbs: acc.carbs + (f.carbs || 0),
+                fats: acc.fats + (f.fats || 0),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fats: 0 }
+            );
+
             const mealId = await createMeal({
               menuId,
               mealNumber: meal.mealNumber,
               mealName: meal.mealName,
-              calories: meal.calories,
-              protein: meal.protein,
-              carbs: meal.carbs,
-              fats: meal.fats,
+              calories: realMealTotals.calories,
+              protein: realMealTotals.protein,
+              carbs: realMealTotals.carbs,
+              fats: realMealTotals.fats,
               description: meal.description || null,
             });
 
@@ -434,6 +445,9 @@ export const appRouter = router({
               });
             }
           }
+
+          // Recalculate menu totals from actual meal values
+          await updateMenuMacros(menuId);
         }
 
         try {
@@ -1334,14 +1348,25 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           });
 
           for (const meal of menu.meals) {
+            // Calculate real totals from foods instead of trusting LLM meal-level values
+            const realMealTotals = meal.foods.reduce(
+              (acc, f) => ({
+                calories: acc.calories + (f.calories || 0),
+                protein: acc.protein + (f.protein || 0),
+                carbs: acc.carbs + (f.carbs || 0),
+                fats: acc.fats + (f.fats || 0),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fats: 0 }
+            );
+
             const mealId = await createMeal({
               menuId,
               mealNumber: meal.mealNumber,
               mealName: meal.mealName,
-              calories: meal.calories,
-              protein: meal.protein,
-              carbs: meal.carbs,
-              fats: meal.fats,
+              calories: realMealTotals.calories,
+              protein: realMealTotals.protein,
+              carbs: realMealTotals.carbs,
+              fats: realMealTotals.fats,
               description: meal.description || null,
             });
 
@@ -1363,6 +1388,9 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
               });
             }
           }
+
+          // Recalculate menu totals from actual meal values
+          await updateMenuMacros(menuId);
         }
 
         return { success: true };

@@ -183,30 +183,42 @@ function DietTab({ dietQ }: { dietQ: any }) {
       {diet.menus?.map((menu: any, mi: number) => (
         <div key={mi} className="space-y-3">
           <h3 className="text-[15px] font-semibold text-muted-foreground">Día {mi + 1}</h3>
-          {menu.meals?.map((meal: any, mealIdx: number) => (
-            <div key={mealIdx} className="bg-card rounded-xl border border-border/50 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[14px] font-semibold">{meal.mealName}</h4>
-                <span className="text-[12px] text-muted-foreground">{meal.totalCalories} kcal</span>
+          {menu.meals?.map((meal: any, mealIdx: number) => {
+            // Calculate real totals from foods
+            const mealTotals = (meal.foods || []).reduce(
+              (acc: any, f: any) => ({
+                calories: acc.calories + (f.calories || 0),
+                protein: acc.protein + (f.protein || 0),
+                carbs: acc.carbs + (f.carbs || 0),
+                fats: acc.fats + (f.fats || 0),
+              }),
+              { calories: 0, protein: 0, carbs: 0, fats: 0 }
+            );
+            return (
+              <div key={mealIdx} className="bg-card rounded-xl border border-border/50 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[14px] font-semibold">{meal.mealName}</h4>
+                  <span className="text-[12px] text-muted-foreground">{mealTotals.calories} kcal</span>
+                </div>
+                {meal.description && (
+                  <p className="text-[12px] text-primary/80 italic mb-2">{meal.description}</p>
+                )}
+                <div className="space-y-1.5">
+                  {meal.foods?.map((food: any, fi: number) => (
+                    <div key={fi} className="flex items-center justify-between text-[13px]">
+                      <span>{food.name}</span>
+                      <span className="text-muted-foreground">{food.quantity}{food.unit}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
+                  <span>P: {mealTotals.protein}g</span>
+                  <span>C: {mealTotals.carbs}g</span>
+                  <span>G: {mealTotals.fats}g</span>
+                </div>
               </div>
-              {meal.description && (
-                <p className="text-[12px] text-primary/80 italic mb-2">{meal.description}</p>
-              )}
-              <div className="space-y-1.5">
-                {meal.foods?.map((food: any, fi: number) => (
-                  <div key={fi} className="flex items-center justify-between text-[13px]">
-                    <span>{food.name}</span>
-                    <span className="text-muted-foreground">{food.quantity}{food.unit}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
-                <span>P: {meal.totalProtein}g</span>
-                <span>C: {meal.totalCarbs}g</span>
-                <span>G: {meal.totalFat}g</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>

@@ -132,3 +132,7 @@
 - [x] Apartado "Mi Progreso" en app del cliente: subida de fotos de seguimiento (frente, perfil, espalda) con galería cronológica
 - [x] Entrenador puede ver métricas y fotos del cliente desde su panel (comparación lado a lado)
 - [x] Notificación al entrenador cuando el cliente sube métricas o fotos
+
+## Bugs reportados
+
+- [x] Bug: La suma de calorías y macros por comida no se calcula correctamente

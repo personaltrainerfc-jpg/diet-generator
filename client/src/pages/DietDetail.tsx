@@ -328,6 +328,20 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   const [editingDesc, setEditingDesc] = useState(false);
   const [descValue, setDescValue] = useState(meal.description || "");
 
+  // Calculate real totals from foods instead of trusting stored meal-level values
+  const realTotals = useMemo(() => {
+    if (!meal.foods || meal.foods.length === 0) return { calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fats: meal.fats };
+    return meal.foods.reduce(
+      (acc, f) => ({
+        calories: acc.calories + (f.calories || 0),
+        protein: acc.protein + (f.protein || 0),
+        carbs: acc.carbs + (f.carbs || 0),
+        fats: acc.fats + (f.fats || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+  }, [meal.foods, meal.calories, meal.protein, meal.carbs, meal.fats]);
+
   return (
     <div className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow group/meal overflow-hidden">
       {/* Header */}
@@ -336,7 +350,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
           <EditableMealName meal={meal} onSave={(name) => onMealNameChange(meal.id, name)} />
           <div className="flex items-center gap-1.5">
             <div className="px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[12px] font-semibold tabular-nums">
-              {meal.calories} kcal
+              {realTotals.calories} kcal
             </div>
             {onSaveAsRecipe && (
               <Tooltip><TooltipTrigger asChild>
@@ -381,9 +395,9 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
         </div>
         {/* Macro pills */}
         <div className="flex gap-3 mt-2 text-[12px]">
-          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-red-400" />P: {meal.protein}g</span>
-          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />C: {meal.carbs}g</span>
-          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />G: {meal.fats}g</span>
+          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-red-400" />P: {realTotals.protein}g</span>
+          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-amber-400" />C: {realTotals.carbs}g</span>
+          <span className="flex items-center gap-1 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />G: {realTotals.fats}g</span>
         </div>
         {/* Description */}
         {editingDesc ? (
@@ -484,15 +498,39 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   const sortedMeals = [...menu.meals].sort((a, b) => a.mealNumber - b.mealNumber);
   const canDeleteMeal = sortedMeals.length > 1;
 
+  // Calculate real menu totals from all foods across all meals
+  const menuTotals = useMemo(() => {
+    return menu.meals.reduce(
+      (acc, meal) => {
+        const mealSum = (meal.foods || []).reduce(
+          (mAcc, f) => ({
+            calories: mAcc.calories + (f.calories || 0),
+            protein: mAcc.protein + (f.protein || 0),
+            carbs: mAcc.carbs + (f.carbs || 0),
+            fats: mAcc.fats + (f.fats || 0),
+          }),
+          { calories: 0, protein: 0, carbs: 0, fats: 0 }
+        );
+        return {
+          calories: acc.calories + mealSum.calories,
+          protein: acc.protein + mealSum.protein,
+          carbs: acc.carbs + mealSum.carbs,
+          fats: acc.fats + mealSum.fats,
+        };
+      },
+      { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    );
+  }, [menu.meals]);
+
   return (
     <div className="space-y-5">
       {/* Macro summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: Flame, label: "Calorías", value: menu.totalCalories, unit: "", color: "orange" },
-          { icon: Beef, label: "Proteínas", value: `${menu.totalProtein}g`, unit: "", color: "red" },
-          { icon: Wheat, label: "Carbohidratos", value: `${menu.totalCarbs}g`, unit: "", color: "amber" },
-          { icon: Droplets, label: "Grasas", value: `${menu.totalFats}g`, unit: "", color: "blue" },
+          { icon: Flame, label: "Calorías", value: menuTotals.calories, unit: "", color: "orange" },
+          { icon: Beef, label: "Proteínas", value: `${menuTotals.protein}g`, unit: "", color: "red" },
+          { icon: Wheat, label: "Carbohidratos", value: `${menuTotals.carbs}g`, unit: "", color: "amber" },
+          { icon: Droplets, label: "Grasas", value: `${menuTotals.fats}g`, unit: "", color: "blue" },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-${color}-500/8 border border-${color}-500/10`}>
             <Icon className={`h-5 w-5 text-${color}-500`} />
