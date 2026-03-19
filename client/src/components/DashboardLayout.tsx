@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Leaf, Sun, Moon, BookOpen } from "lucide-react";
+import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Leaf, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -32,6 +32,9 @@ const menuItems = [
   { icon: PlusCircle, label: "Nueva Dieta", path: "/" },
   { icon: History, label: "Historial", path: "/history" },
   { icon: BookOpen, label: "Mis Recetas", path: "/recipes" },
+  { icon: Apple, label: "Alimentos Custom", path: "/custom-foods" },
+  { icon: Users, label: "Mis Clientes", path: "/clients" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

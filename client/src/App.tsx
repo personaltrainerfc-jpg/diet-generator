@@ -9,6 +9,10 @@ import Home from "./pages/Home";
 import History from "./pages/History";
 import DietDetail from "./pages/DietDetail";
 import Recipes from "./pages/Recipes";
+import CustomFoods from "./pages/CustomFoods";
+import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
+import TrainerDashboard from "./pages/TrainerDashboard";
 
 function Router() {
   return (
@@ -18,6 +22,10 @@ function Router() {
         <Route path="/history" component={History} />
         <Route path="/diet/:id" component={DietDetail} />
         <Route path="/recipes" component={Recipes} />
+        <Route path="/custom-foods" component={CustomFoods} />
+        <Route path="/clients" component={Clients} />
+        <Route path="/clients/:id" component={ClientDetail} />
+        <Route path="/dashboard" component={TrainerDashboard} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

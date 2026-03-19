@@ -423,3 +423,175 @@ export async function copyMealToMenu(mealId: number, targetMenuId: number, mealN
 
   return newMealId;
 }
+
+// ── Supplement helpers ──
+
+import { supplements, InsertSupplement, folders, InsertFolder, customFoods, InsertCustomFood, dietInstructions, InsertDietInstruction } from "../drizzle/schema";
+
+export async function getSupplementsByDietId(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(supplements).where(eq(supplements.dietId, dietId));
+}
+
+export async function createSupplement(supp: InsertSupplement) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(supplements).values(supp);
+  return result[0].insertId;
+}
+
+export async function updateSupplement(id: number, data: Partial<InsertSupplement>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(supplements).set(data).where(eq(supplements.id, id));
+}
+
+export async function deleteSupplement(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(supplements).where(eq(supplements.id, id));
+}
+
+// ── Folder helpers ──
+
+export async function getUserFolders(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(folders).where(eq(folders.userId, userId)).orderBy(desc(folders.createdAt));
+}
+
+export async function createFolder(folder: InsertFolder) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(folders).values(folder);
+  return result[0].insertId;
+}
+
+export async function deleteFolder(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Unassign diets from this folder
+  await db.update(diets).set({ folderId: null }).where(eq(diets.folderId, id));
+  await db.delete(folders).where(eq(folders.id, id));
+}
+
+export async function renameFolder(id: number, name: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(folders).set({ name }).where(eq(folders.id, id));
+}
+
+export async function moveDietToFolder(dietId: number, folderId: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(diets).set({ folderId }).where(eq(diets.id, dietId));
+}
+
+// ── Custom Food helpers ──
+
+export async function getUserCustomFoods(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.select().from(customFoods).where(eq(customFoods.userId, userId)).orderBy(desc(customFoods.createdAt));
+}
+
+export async function createCustomFood(food: InsertCustomFood) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(customFoods).values(food);
+  return result[0].insertId;
+}
+
+export async function deleteCustomFood(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(customFoods).where(eq(customFoods.id, id));
+}
+
+// ── Diet Instructions helpers ──
+
+export async function getDietInstructions(dietId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(dietInstructions).where(eq(dietInstructions.dietId, dietId)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function upsertDietInstructions(dietId: number, data: Partial<InsertDietInstruction>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await getDietInstructions(dietId);
+  if (existing) {
+    await db.update(dietInstructions).set(data).where(eq(dietInstructions.dietId, dietId));
+  } else {
+    await db.insert(dietInstructions).values({ dietId, ...data });
+  }
+}
+
+// ── Reorder foods within a meal ──
+
+export async function reorderFoods(mealId: number, foodIds: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  for (let i = 0; i < foodIds.length; i++) {
+    await db.update(foods).set({ sortOrder: i }).where(eq(foods.id, foodIds[i]));
+  }
+}
+
+// ── Toggle meal enabled/disabled ──
+
+export async function toggleMealEnabled(mealId: number, enabled: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(meals).set({ enabled: enabled ? 1 : 0 }).where(eq(meals.id, mealId));
+}
+
+// ── Save meal as recipe ──
+
+export async function saveMealAsRecipe(mealId: number, userId: number) {
+  const meal = await getMealById(mealId);
+  if (!meal) throw new Error("Comida no encontrada");
+  const mealFoods = await getFoodsByMealId(mealId);
+
+  const recipeId = await createRecipe({
+    userId,
+    name: meal.description || meal.mealName,
+    totalCalories: meal.calories,
+    totalProtein: meal.protein,
+    totalCarbs: meal.carbs,
+    totalFats: meal.fats,
+  });
+
+  for (const food of mealFoods) {
+    await addRecipeIngredient({
+      recipeId,
+      name: food.name,
+      quantity: food.quantity,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fats: food.fats,
+    });
+  }
+
+  return recipeId;
+}
+
+// ── Get folder by ID ──
+
+export async function getFolderById(folderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(folders).where(eq(folders.id, folderId)).limit(1);
+  return result[0] ?? null;
+}
+
+// ── Get supplement by ID ──
+
+export async function getSupplementById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(supplements).where(eq(supplements.id, id)).limit(1);
+  return result[0] ?? null;
+}

@@ -29,11 +29,12 @@ import {
   ArrowLeft, Download, Flame, Beef, Wheat, Droplets,
   Loader2, ArrowLeftRight, UtensilsCrossed, Pencil, Check, X,
   Search, Plus, Trash2, Copy, ShoppingCart, RefreshCw, StickyNote, FileDown,
-  Settings2, ClipboardCopy, BookOpen, AlertCircle
+  Settings2, ClipboardCopy, BookOpen, AlertCircle, Pill, Save
 } from "lucide-react";
+import SupplementsPanel from "./Supplements";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { FullMenu, FullMeal, FullFood } from "@shared/types";
 import { toast } from "sonner";
 import { LOGO_URL } from "@shared/constants";
@@ -548,7 +549,7 @@ function MealNotes({ meal, onSave }: { meal: FullMeal; onSave: (notes: string | 
 }
 
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, isDeletable, isRegenerating }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, isDeletable, isRegenerating }: {
   meal: FullMeal;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -559,6 +560,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
   onCopyMeal?: (mealId: number) => void;
+  onSaveAsRecipe?: (mealId: number) => void;
   isDeletable: boolean;
   isRegenerating: boolean;
 }) {
@@ -581,6 +583,20 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
               <Flame className="h-3 w-3 text-orange-500 dark:text-orange-400" />
               {meal.calories} kcal
             </Badge>
+            {/* Save as recipe button */}
+            {onSaveAsRecipe && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onSaveAsRecipe(meal.id)}
+                    className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors opacity-0 group-hover/meal:opacity-100"
+                  >
+                    <Save className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Guardar como receta</TooltipContent>
+              </Tooltip>
+            )}
             {/* Copy meal button */}
             {onCopyMeal && (
               <Tooltip>
@@ -592,7 +608,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
                     <ClipboardCopy className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Copiar comida a otro men\u00fa</TooltipContent>
+                <TooltipContent>Copiar comida a otro menú</TooltipContent>
               </Tooltip>
             )}
             {/* Regenerate meal button */}
@@ -808,7 +824,7 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, addingMeal, regeneratingMealId }: {
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, addingMeal, regeneratingMealId }: {
   menu: FullMenu;
   onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
@@ -820,6 +836,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
   onCopyMeal?: (mealId: number) => void;
+  onSaveAsRecipe?: (mealId: number) => void;
   addingMeal: boolean;
   regeneratingMealId: number | null;
 }) {
@@ -876,6 +893,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             onUpdateNotes={onUpdateNotes}
             onUpdateDescription={onUpdateDescription}
             onCopyMeal={onCopyMeal}
+            onSaveAsRecipe={onSaveAsRecipe}
             isDeletable={canDeleteMeal}
             isRegenerating={regeneratingMealId === meal.id}
           />
@@ -936,6 +954,10 @@ export default function DietDetail() {
   const [adjustProtein, setAdjustProtein] = useState(30);
   const [adjustCarbs, setAdjustCarbs] = useState(45);
   const [adjustFats, setAdjustFats] = useState(25);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [instructionsText, setInstructionsText] = useState("");
+  const [showSupplements, setShowSupplements] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -1081,6 +1103,17 @@ export default function DietDetail() {
     updateDescriptionMut.mutate({ mealId, description });
   }, [updateDescriptionMut]);
 
+  const saveAsRecipeMut = trpc.mealAction.saveAsRecipe.useMutation({
+    onSuccess: () => {
+      toast.success("Comida guardada como receta en 'Mis Recetas'");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSaveAsRecipe = useCallback((mealId: number) => {
+    saveAsRecipeMut.mutate({ mealId });
+  }, [saveAsRecipeMut]);
+
   const adjustMacrosMut = trpc.dietAdjust.adjustMacros.useMutation({
     onMutate: () => toast.info("Ajustando macros y cantidades..."),
     onSuccess: () => {
@@ -1219,6 +1252,33 @@ export default function DietDetail() {
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
+                size="icon"
+                onClick={() => {
+                  setInstructionsText("");
+                  setShowInstructions(true);
+                }}
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Instrucciones del PDF</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowSupplements(true)}
+              >
+                <Pill className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Suplementos</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
                 onClick={() => redoDietMut.mutate({ id: dietId })}
                 disabled={redoDietMut.isPending}
                 className="gap-1.5"
@@ -1301,6 +1361,64 @@ export default function DietDetail() {
           </Badge>
         )}
       </div>
+
+      {/* Weekly Summary */}
+      {diet.menus.length > 1 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3 cursor-pointer" onClick={() => setShowSummary(!showSummary)}>
+            <CardTitle className="flex items-center justify-between text-base">
+              <span className="flex items-center gap-2">
+                <Flame className="h-4 w-4 text-orange-500" />
+                Resumen Semanal
+              </span>
+              <span className="text-xs text-muted-foreground">{showSummary ? "Ocultar" : "Ver resumen"}</span>
+            </CardTitle>
+          </CardHeader>
+          {showSummary && (
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Menú</th>
+                      <th className="text-right py-2 px-2 font-medium text-orange-600">Kcal</th>
+                      <th className="text-right py-2 px-2 font-medium text-red-600">Prot</th>
+                      <th className="text-right py-2 px-2 font-medium text-amber-600">Carbs</th>
+                      <th className="text-right py-2 px-2 font-medium text-blue-600">Grasas</th>
+                      <th className="text-right py-2 pl-2 font-medium text-muted-foreground">Comidas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diet.menus
+                      .sort((a: any, b: any) => a.menuNumber - b.menuNumber)
+                      .map((menu: any) => {
+                        const totals = menu.meals.reduce((acc: any, meal: any) => {
+                          meal.foods.forEach((f: any) => {
+                            acc.cal += f.calories || 0;
+                            acc.prot += f.protein || 0;
+                            acc.carbs += f.carbs || 0;
+                            acc.fats += f.fats || 0;
+                          });
+                          return acc;
+                        }, { cal: 0, prot: 0, carbs: 0, fats: 0 });
+                        return (
+                          <tr key={menu.id} className="border-b last:border-0">
+                            <td className="py-2 pr-4 font-medium">Menú {menu.menuNumber}</td>
+                            <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.cal)}</td>
+                            <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.prot)}g</td>
+                            <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.carbs)}g</td>
+                            <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.fats)}g</td>
+                            <td className="py-2 pl-2 text-right text-muted-foreground">{menu.meals.length}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Shopping List Dialog */}
       <Dialog open={showShoppingList} onOpenChange={setShowShoppingList}>
@@ -1542,6 +1660,62 @@ export default function DietDetail() {
         </DialogContent>
       </Dialog>
 
+      {/* Instructions Dialog */}
+      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-primary" />
+              Instrucciones para el PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              Añade instrucciones personalizadas que aparecerán al final del PDF de la dieta (ej: horarios de comidas, consejos de preparación, notas para el cliente).
+            </p>
+            <Textarea
+              value={instructionsText}
+              onChange={(e) => setInstructionsText(e.target.value)}
+              placeholder="Ej: Beber mínimo 2L de agua al día. Cocinar las verduras al vapor para mantener nutrientes..."
+              rows={5}
+              className="resize-none"
+              maxLength={3000}
+            />
+            {instructionsText.length > 0 && (
+              <p className="text-xs text-muted-foreground text-right">{instructionsText.length}/3000</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowInstructions(false)}>Cancelar</Button>
+              <Button onClick={() => {
+                const printWindow = window.open("", "_blank");
+                if (!printWindow) { toast.error("No se pudo abrir la ventana"); return; }
+                const html = generateGridPdfHtml(diet, instructionsText || undefined);
+                printWindow.document.write(html);
+                printWindow.document.close();
+                printWindow.onload = () => printWindow.print();
+                setShowInstructions(false);
+              }}>
+                <Download className="h-4 w-4 mr-2" />
+                Generar PDF con instrucciones
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Supplements Dialog */}
+      <Dialog open={showSupplements} onOpenChange={setShowSupplements}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pill className="h-5 w-5 text-primary" />
+              Suplementos
+            </DialogTitle>
+          </DialogHeader>
+          <SupplementsPanel dietId={dietId} />
+        </DialogContent>
+      </Dialog>
+
       {/* Menus */}
       {diet.menus.length === 1 ? (
         <MenuView
@@ -1555,6 +1729,7 @@ export default function DietDetail() {
           onRegenerateMeal={handleRegenerateMeal}
           onUpdateNotes={handleUpdateNotes}
           onUpdateDescription={handleUpdateDescription}
+          onSaveAsRecipe={handleSaveAsRecipe}
           addingMeal={addMealMut.isPending}
           regeneratingMealId={regeneratingMealId}
         />
@@ -1589,6 +1764,7 @@ export default function DietDetail() {
                   onUpdateNotes={handleUpdateNotes}
                   onUpdateDescription={handleUpdateDescription}
                   onCopyMeal={handleCopyMeal}
+                  onSaveAsRecipe={handleSaveAsRecipe}
                   addingMeal={addMealMut.isPending}
                   regeneratingMealId={regeneratingMealId}
                 />
@@ -1732,7 +1908,7 @@ function generateShoppingListPdfHtml(dietName: string, items: { name: string; to
  * Shows only food names, quantities and alternatives (NO calories/macros).
  * Includes NoLimitPerformance logo and notes.
  */
-function generateGridPdfHtml(diet: any): string {
+function generateGridPdfHtml(diet: any, instructions?: string): string {
   const sortedMenus = [...diet.menus].sort((a: any, b: any) => a.menuNumber - b.menuNumber);
 
   // Collect all unique meal names across all menus (by mealNumber)
@@ -1837,6 +2013,12 @@ function generateGridPdfHtml(diet: any): string {
       ${bodyRows}
     </tbody>
   </table>
+
+  ${instructions ? `
+  <div style="margin-top:24px;padding:16px;border:1px solid #e8e8e8;border-radius:8px;background:#fafafa;">
+    <h3 style="font-size:14px;font-weight:700;margin:0 0 8px;color:#1a1a1a;text-transform:uppercase;letter-spacing:0.5px;">Instrucciones</h3>
+    <p style="font-size:12px;color:#333;line-height:1.6;margin:0;white-space:pre-wrap;">${instructions}</p>
+  </div>` : ''}
 
   <div style="text-align:center;margin-top:16px;">
     <p style="font-size:9px;color:#ccc;">NoLimitPerformance #MetabolicHacking</p>

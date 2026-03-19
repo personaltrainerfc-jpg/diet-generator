@@ -62,6 +62,13 @@ export default function Home() {
   const [selectedRecipeIds, setSelectedRecipeIds] = useState<number[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // New Bloque A fields
+  const [preferredFoods, setPreferredFoods] = useState<string[]>([]);
+  const [newPreferredFood, setNewPreferredFood] = useState("");
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [newAllergy, setNewAllergy] = useState("");
+  const [fastingProtocol, setFastingProtocol] = useState("");
+
   // Fetch user recipes
   const recipesQuery = trpc.recipe.list.useQuery();
 
@@ -128,6 +135,22 @@ export default function Home() {
     setAvoidFoods(avoidFoods.filter(f => f !== food));
   };
 
+  const handleAddPreferredFood = () => {
+    const trimmed = newPreferredFood.trim();
+    if (trimmed && !preferredFoods.includes(trimmed)) {
+      setPreferredFoods([...preferredFoods, trimmed]);
+      setNewPreferredFood("");
+    }
+  };
+
+  const handleAddAllergy = () => {
+    const trimmed = newAllergy.trim();
+    if (trimmed && !allergies.includes(trimmed)) {
+      setAllergies([...allergies, trimmed]);
+      setNewAllergy("");
+    }
+  };
+
   const applyTemplate = (template: typeof QUICK_TEMPLATES[number]) => {
     setTotalCalories(template.totalCalories);
     setProteinPercent(template.proteinPercent);
@@ -170,6 +193,9 @@ export default function Home() {
       ...(useDailyTargets && dailyTargets.length > 0 ? { dailyTargets } : {}),
       ...(selectedRecipeIds.length > 0 ? { selectedRecipeIds } : {}),
       ...(preferences.trim() ? { preferences: preferences.trim() } : {}),
+      preferredFoods,
+      allergies,
+      ...(fastingProtocol ? { fastingProtocol } : {}),
     });
   };
 
@@ -542,6 +568,122 @@ export default function Home() {
           </CardContent>
         </Card>
 
+        {/* Alimentos preferidos */}
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5 text-amber-500" />
+              Alimentos Preferidos
+              <Badge variant="outline" className="text-xs font-normal">Opcional</Badge>
+            </CardTitle>
+            <CardDescription>
+              Alimentos que quieres que aparezcan con mayor frecuencia en los menús.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newPreferredFood}
+                onChange={e => setNewPreferredFood(e.target.value)}
+                placeholder="Ej: Pollo, Arroz, Aguacate..."
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddPreferredFood();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleAddPreferredFood}
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {preferredFoods.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {preferredFoods.map(food => (
+                  <Badge
+                    key={food}
+                    variant="default"
+                    className="pl-3 pr-1 py-1.5 text-sm gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  >
+                    {food}
+                    <button
+                      type="button"
+                      onClick={() => setPreferredFoods(preferredFoods.filter(f => f !== food))}
+                      className="ml-1 h-4 w-4 rounded-full hover:bg-amber-300/50 flex items-center justify-center"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Alergias e intolerancias */}
+        <Card className="shadow-sm border-red-200/50 dark:border-red-900/30">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Alergias e Intolerancias
+              <Badge variant="outline" className="text-xs font-normal">Importante</Badge>
+            </CardTitle>
+            <CardDescription>
+              Estos alimentos se excluirán completamente de todos los menús por motivos de salud.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                value={newAllergy}
+                onChange={e => setNewAllergy(e.target.value)}
+                placeholder="Ej: Gluten, Lactosa, Frutos secos, Marisco..."
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddAllergy();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleAddAllergy}
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {allergies.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {allergies.map(allergy => (
+                  <Badge
+                    key={allergy}
+                    variant="destructive"
+                    className="pl-3 pr-1 py-1.5 text-sm gap-1"
+                  >
+                    {allergy}
+                    <button
+                      type="button"
+                      onClick={() => setAllergies(allergies.filter(a => a !== allergy))}
+                      className="ml-1 h-4 w-4 rounded-full hover:bg-red-300/50 flex items-center justify-center"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Preferencias opcionales */}
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
@@ -633,6 +775,45 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Ayuno intermitente */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <UtensilsCrossed className="h-5 w-5 text-orange-600" />
+                  Ayuno Intermitente
+                  <Badge variant="outline" className="text-xs font-normal">Opcional</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Si sigues un protocolo de ayuno, las comidas se distribuirán dentro de la ventana de alimentación.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "", label: "Sin ayuno" },
+                    { value: "16/8", label: "16/8" },
+                    { value: "18/6", label: "18/6" },
+                    { value: "20/4", label: "20/4" },
+                    { value: "OMAD", label: "OMAD (1 comida)" },
+                    { value: "5:2", label: "5:2" },
+                  ].map(f => (
+                    <button
+                      key={f.value}
+                      type="button"
+                      onClick={() => setFastingProtocol(f.value)}
+                      className={`px-3 py-1.5 rounded-lg border text-sm transition-all cursor-pointer ${
+                        fastingProtocol === f.value
+                          ? "border-primary bg-primary/5 ring-1 ring-primary text-primary font-medium"
+                          : "border-border hover:border-primary/50 text-foreground"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
               </CardContent>
             </Card>

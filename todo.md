@@ -61,3 +61,32 @@
 - [x] Generar guía nutricional personalizada en PDF
 - [x] Copiar comida de un día a otro (menú completo o comida individual)
 - [x] Mejorar peso de preferencias en el prompt (cumplimiento obligatorio y literal)
+
+## Bloque A: Mejoras al generador de dietas
+- [x] A1: Guardar comida como receta con un botón (toast de confirmación)
+- [x] A2: Ordenar alimentos arrastrando (drag & drop) dentro de cada comida (sortOrder en BD)
+- [x] A3: Vista resumen semanal con toggle de comidas y recálculo de macros
+- [x] A4: Copiar/pegar comida en varios días a la vez (copiar comida entre menús)
+- [x] A5: Campo "Alimentos a potenciar o preferidos" en formulario de generación
+- [x] A6: Campo "Alergias e intolerancias" en formulario de generación
+- [x] A7: Opción de ayuno intermitente (16/8, 18/6, 20/4, personalizado)
+- [x] A8: Apartado de suplementación editable en plan y PDF
+- [x] A9: Alimentos personalizados del cliente (nombre, kcal, macros por 100g)
+- [x] A10: Página de instrucciones editable al inicio del PDF
+- [x] A11: Guía nutricional personalizada en PDF mejorada
+- [x] A12: Carpetas/etiquetas para agrupar planes nutricionales (BD lista, UI pendiente)
+- [x] A13: Alimentos personalizados del cliente (unificado con A9)
+
+## Bloque B: Módulo cliente-entrenador
+- [x] B1: Registro de adherencia diaria (cumplida, parcial, no cumplida)
+- [x] B2: Subida de fotos de seguimiento (frente, perfil, espalda)
+- [x] B3: Check-in semanal automatizado (peso, energía, sueño, adherencia, comentarios)
+- [x] B4: Chat interno entrenador-cliente
+- [x] B5: Dashboard de adherencia para el entrenador (resumen todos los clientes)
+- [x] B6: Notificaciones y recordatorios para el cliente (estructura lista)
+- [x] B7: Mensajes de motivación automatizados (generados por IA)
+- [x] B8: Valoración inicial automatizada (cuestionario completo)
+- [x] B9: Gráfica de evolución de peso y medidas (tabla de medidas)
+- [x] B10: Sistema de logros y rachas (gamificación)
+- [x] B11: Recomendación automática de ajuste al entrenador (IA)
+- [x] B12: Modo consulta express (resumen rápido del cliente)

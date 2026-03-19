@@ -15,10 +15,16 @@ import {
   createRecipe, getUserRecipes, getFullRecipe, deleteRecipe,
   addRecipeIngredient, deleteRecipeIngredient, updateRecipeMacros, getRecipeById,
   updateDietCalories, copyMealToMenu, getFoodsByMealId,
+  getSupplementsByDietId, createSupplement, updateSupplement, deleteSupplement, getSupplementById,
+  getUserFolders, createFolder, deleteFolder, renameFolder, moveDietToFolder, getFolderById,
+  getUserCustomFoods, createCustomFood, deleteCustomFood,
+  getDietInstructions, upsertDietInstructions,
+  reorderFoods, toggleMealEnabled, saveMealAsRecipe,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
 import { MEAL_PHILOSOPHY } from "@shared/mealPhilosophy";
+import { clientRouter } from "./clientRouters";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -43,6 +49,9 @@ const dietConfigSchema = z.object({
   })).optional(),
   selectedRecipeIds: z.array(z.number()).optional(),
   recipesText: z.string().optional(),
+  preferredFoods: z.array(z.string()).default([]),
+  allergies: z.array(z.string()).default([]),
+  fastingProtocol: z.string().max(20).optional(),
 });
 
 function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietFoods?: string[]): string {
@@ -178,6 +187,9 @@ ${config.dailyTargets && config.dailyTargets.length > 0 ? `CALORÍAS Y MACROS DI
   return `- Día/Menú ${dt.day}: ${dt.calories} kcal, Proteínas ${pG}g (${dt.proteinPercent}%), Carbohidratos ${cG}g (${dt.carbsPercent}%), Grasas ${fG}g (${dt.fatsPercent}%)`;
 }).join("\n")}\nRespeta estos objetivos individuales para cada menú en lugar de los objetivos globales.\n` : ""}
 ${config.recipesText ? `RECETAS PROPIAS DEL USUARIO (INCORPORAR OBLIGATORIAMENTE):\nEl usuario quiere que las siguientes recetas aparezcan en el menú. Incorpóralas en los días/comidas que mejor encajen respetando los macros del plan:\n${config.recipesText}\n` : ""}
+${config.preferredFoods && config.preferredFoods.length > 0 ? `ALIMENTOS A POTENCIAR/PREFERIDOS (OBLIGATORIO):\nEl usuario quiere que los siguientes alimentos aparezcan con MAYOR FRECUENCIA en los menús. Priorízalos siempre que encajen con los macros y la coherencia culinaria del plan:\n${config.preferredFoods.join(", ")}\nInclúyelos en tantas comidas como sea posible sin forzar combinaciones ilógicas.\n` : ""}
+${config.allergies && config.allergies.length > 0 ? `ALERGIAS E INTOLERANCIAS (EXCLUSIÓN TOTAL OBLIGATORIA):\nEl usuario tiene las siguientes alergias o intolerancias. NUNCA incluyas estos alimentos ni derivados en ninguna comida del plan:\n${config.allergies.join(", ")}\nEsto es una restricción absoluta de salud. Verifica cada alimento propuesto.\n` : ""}
+${config.fastingProtocol ? `PROTOCOLO DE AYUNO INTERMITENTE (OBLIGATORIO):\nEl usuario sigue un protocolo de ayuno intermitente ${config.fastingProtocol}. Distribuye TODAS las comidas del día dentro de la ventana de alimentación correspondiente. Por ejemplo, si es 16/8, las comidas deben concentrarse en 8 horas (ej: 12:00 a 20:00). Ajusta los nombres de las comidas para reflejar los horarios reales (ej: "Primera comida (12:00)", "Segunda comida (15:00)", "Tercera comida (19:30)"). El desayuno tradicional NO existe en ayuno intermitente.\n` : ""}
 ${config.preferences ? `PREFERENCIAS DEL USUARIO (CUMPLIMIENTO OBLIGATORIO Y PRIORITARIO):\nLas siguientes preferencias escritas por el usuario son de cumplimiento obligatorio y tienen prioridad sobre cualquier criterio de variedad o distribución automática. Sigue cada instrucción del usuario de forma literal:\n${config.preferences}\n` : ""}
 ${previousDietFoods && previousDietFoods.length > 0 ? `VARIEDAD GARANTIZADA - PLATOS A EVITAR (ya usados en dietas anteriores, NO repetir):\n${previousDietFoods.join(", ")}\nDEBES usar combinaciones y platos COMPLETAMENTE DIFERENTES a los listados arriba. Rota las fuentes de proteína, carbohidratos y verduras.\n` : ""}
 REGLAS IMPORTANTES:
@@ -283,6 +295,8 @@ export const appRouter = router({
       }),
   }),
 
+  clientMgmt: clientRouter,
+
   diet: router({
     generate: protectedProcedure
       .input(dietConfigSchema)
@@ -374,6 +388,9 @@ export const appRouter = router({
           supermarket: input.supermarket || null,
           dailyTargets: input.dailyTargets || null,
           selectedRecipeIds: input.selectedRecipeIds || null,
+          preferredFoods: input.preferredFoods.length > 0 ? input.preferredFoods : null,
+          allergies: input.allergies.length > 0 ? input.allergies : null,
+          fastingProtocol: input.fastingProtocol || null,
         });
 
         for (const menu of generatedDiet.menus) {
@@ -1256,6 +1273,9 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           supermarket: (original as any).supermarket || undefined,
           dailyTargets: (original as any).dailyTargets || undefined,
           selectedRecipeIds: (original as any).selectedRecipeIds || undefined,
+          preferredFoods: (original as any).preferredFoods || [],
+          allergies: (original as any).allergies || [],
+          fastingProtocol: (original as any).fastingProtocol || undefined,
         };
 
         const prompt = buildDietPrompt(config, allPreviousFoods);
@@ -1612,6 +1632,216 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         }
 
         return { content: guideContent, dietName: diet.name };
+      }),
+  }),
+
+  // ── Supplement router ──
+  supplement: router({
+    list: protectedProcedure
+      .input(z.object({ dietId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        return getSupplementsByDietId(input.dietId);
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        dietId: z.number(),
+        name: z.string().min(1).max(255),
+        dose: z.string().max(100).optional(),
+        timing: z.string().max(100).optional(),
+        notes: z.string().max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const id = await createSupplement({
+          dietId: input.dietId,
+          name: input.name,
+          dose: input.dose || null,
+          timing: input.timing || null,
+          notes: input.notes || null,
+        });
+        return { id };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        dose: z.string().max(100).optional().nullable(),
+        timing: z.string().max(100).optional().nullable(),
+        notes: z.string().max(500).optional().nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const supp = await getSupplementById(input.id);
+        if (!supp) throw new Error("Suplemento no encontrado");
+        const diet = await getDietById(supp.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const { id, ...data } = input;
+        await updateSupplement(id, data);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const supp = await getSupplementById(input.id);
+        if (!supp) throw new Error("Suplemento no encontrado");
+        const diet = await getDietById(supp.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await deleteSupplement(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ── Folder router ──
+  folder: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getUserFolders(ctx.user.id);
+    }),
+
+    create: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(255) }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createFolder({ userId: ctx.user.id, name: input.name });
+        return { id };
+      }),
+
+    rename: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).max(255) }))
+      .mutation(async ({ ctx, input }) => {
+        const folder = await getFolderById(input.id);
+        if (!folder || folder.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await renameFolder(input.id, input.name);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const folder = await getFolderById(input.id);
+        if (!folder || folder.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await deleteFolder(input.id);
+        return { success: true };
+      }),
+
+    moveDiet: protectedProcedure
+      .input(z.object({ dietId: z.number(), folderId: z.number().nullable() }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        if (input.folderId) {
+          const folder = await getFolderById(input.folderId);
+          if (!folder || folder.userId !== ctx.user.id) throw new Error("No tienes acceso a esta carpeta");
+        }
+        await moveDietToFolder(input.dietId, input.folderId);
+        return { success: true };
+      }),
+  }),
+
+  // ── Custom Food router ──
+  customFood: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return getUserCustomFoods(ctx.user.id);
+    }),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        caloriesPer100g: z.number().int().min(0),
+        proteinPer100g: z.number().int().min(0),
+        carbsPer100g: z.number().int().min(0),
+        fatsPer100g: z.number().int().min(0),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await createCustomFood({ userId: ctx.user.id, ...input });
+        return { id };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await deleteCustomFood(input.id);
+        return { success: true };
+      }),
+  }),
+
+  // ── Diet Instructions router ──
+  dietInstruction: router({
+    get: protectedProcedure
+      .input(z.object({ dietId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        return getDietInstructions(input.dietId);
+      }),
+
+    upsert: protectedProcedure
+      .input(z.object({
+        dietId: z.number(),
+        hungerManagement: z.string().max(2000).optional().nullable(),
+        portionControl: z.string().max(2000).optional().nullable(),
+        weighingFood: z.string().max(2000).optional().nullable(),
+        weekendGuidelines: z.string().max(2000).optional().nullable(),
+        healthIndications: z.string().max(2000).optional().nullable(),
+        professionalNotes: z.string().max(2000).optional().nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getDietById(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const { dietId, ...data } = input;
+        await upsertDietInstructions(dietId, data);
+        return { success: true };
+      }),
+  }),
+
+  // ── Meal actions (save as recipe, reorder foods, toggle enabled) ──
+  mealAction: router({
+    saveAsRecipe: protectedProcedure
+      .input(z.object({ mealId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        const menu = await getMenuById(meal.menuId);
+        if (!menu) throw new Error("Menú no encontrado");
+        const diet = await getDietById(menu.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const recipeId = await saveMealAsRecipe(input.mealId, ctx.user.id);
+        return { recipeId };
+      }),
+
+    reorderFoods: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        foodIds: z.array(z.number()),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        const menu = await getMenuById(meal.menuId);
+        if (!menu) throw new Error("Menú no encontrado");
+        const diet = await getDietById(menu.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await reorderFoods(input.mealId, input.foodIds);
+        return { success: true };
+      }),
+
+    toggleEnabled: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        enabled: z.boolean(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        const menu = await getMenuById(meal.menuId);
+        if (!menu) throw new Error("Menú no encontrado");
+        const diet = await getDietById(menu.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await toggleMealEnabled(input.mealId, input.enabled);
+        return { success: true };
       }),
   }),
 });
