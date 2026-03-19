@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils } from "lucide-react";
+import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ── Client Portal: Login + Dashboard ──
 export default function ClientPortal() {
@@ -42,7 +45,7 @@ export default function ClientPortal() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-10 object-contain mx-auto mb-4" />
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-14 object-contain mx-auto mb-4" />
             <h1 className="text-2xl font-bold tracking-tight uppercase">Portal del Cliente</h1>
             <p className="text-muted-foreground text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
           </div>
@@ -76,7 +79,7 @@ export default function ClientPortal() {
 
 // ── Client Dashboard (after login) ──
 function ClientDashboard({ session, onLogout }: { session: { clientId: number; name: string; accessCode: string }; onLogout: () => void }) {
-  const [tab, setTab] = useState<"diet" | "adherence" | "chat" | "achievements">("diet");
+  const [tab, setTab] = useState<"diet" | "adherence" | "chat" | "achievements" | "progress">("diet");
 
   const profileQ = trpc.clientPortal.getProfile.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
   const dietQ = trpc.clientPortal.getActiveDiet.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
@@ -85,6 +88,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
     { id: "diet" as const, label: "Mi Dieta", icon: Utensils },
     { id: "adherence" as const, label: "Adherencia", icon: Calendar },
     { id: "chat" as const, label: "Chat", icon: MessageSquare },
+    { id: "progress" as const, label: "Progreso", icon: TrendingUp },
     { id: "achievements" as const, label: "Logros", icon: Award },
   ];
 
@@ -94,7 +98,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-6 object-contain" />
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-8 object-contain" />
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight uppercase">{session.name}</h1>
               {profileQ.data?.goal && <p className="text-[12px] text-muted-foreground">{profileQ.data.goal}</p>}
@@ -129,6 +133,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
         {tab === "diet" && <DietTab dietQ={dietQ} />}
         {tab === "adherence" && <AdherenceTab session={session} dietId={dietQ.data?.id} />}
         {tab === "chat" && <ChatTab session={session} />}
+        {tab === "progress" && <ProgressTab session={session} />}
         {tab === "achievements" && <AchievementsTab session={session} />}
       </div>
 
@@ -347,6 +352,264 @@ function ChatTab({ session }: { session: { clientId: number; name: string; acces
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Progress Tab (Metrics + Photos) ──
+function ProgressTab({ session }: { session: { clientId: number; name: string; accessCode: string } }) {
+  const [subTab, setSubTab] = useState<"metrics" | "photos">("metrics");
+  const [showAddMetric, setShowAddMetric] = useState(false);
+  const [showAddPhoto, setShowAddPhoto] = useState(false);
+  const [metricForm, setMetricForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    weight: "", waist: "", hips: "", chest: "", arms: "",
+  });
+  const [photoForm, setPhotoForm] = useState<{ photoType: string; date: string; notes: string; file: File | null }>({
+    photoType: "front", date: new Date().toISOString().split("T")[0], notes: "", file: null,
+  });
+
+  const measurementsQ = trpc.clientPortal.getMeasurements.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const photosQ = trpc.clientPortal.getPhotos.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const addMetricMut = trpc.clientPortal.addMeasurement.useMutation({
+    onSuccess: () => { toast.success("M\u00e9tricas registradas"); measurementsQ.refetch(); setShowAddMetric(false); setMetricForm({ date: new Date().toISOString().split("T")[0], weight: "", waist: "", hips: "", chest: "", arms: "" }); },
+    onError: (e) => toast.error(e.message),
+  });
+  const uploadPhotoMut = trpc.clientPortal.uploadPhoto.useMutation({
+    onSuccess: () => { toast.success("Foto subida"); photosQ.refetch(); setShowAddPhoto(false); setPhotoForm({ photoType: "front", date: new Date().toISOString().split("T")[0], notes: "", file: null }); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const measurements = measurementsQ.data || [];
+  const photos = photosQ.data || [];
+
+  // Simple chart for metrics
+  const renderMiniChart = (values: number[], label: string, unit: string, color: string) => {
+    if (values.length < 2) return null;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    return (
+      <div className="bg-card rounded-xl border border-border/50 p-3">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
+          <span className="text-[14px] font-semibold">{values[values.length - 1]}{unit}</span>
+        </div>
+        <div className="flex items-end gap-[2px] h-10">
+          {values.slice(-12).map((v, i) => (
+            <div key={i} className="flex-1 rounded-t" style={{ height: `${Math.max(10, ((v - min) / range) * 100)}%`, backgroundColor: color, opacity: i === values.slice(-12).length - 1 ? 1 : 0.5 }} />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const weightVals = measurements.filter((m: any) => m.weight).map((m: any) => m.weight / 1000);
+  const waistVals = measurements.filter((m: any) => m.waist).map((m: any) => m.waist / 10);
+  const hipsVals = measurements.filter((m: any) => m.hips).map((m: any) => m.hips / 10);
+  const chestVals = measurements.filter((m: any) => m.chest).map((m: any) => m.chest / 10);
+  const armsVals = measurements.filter((m: any) => m.arms).map((m: any) => m.arms / 10);
+
+  const photoTypeLabels: Record<string, string> = { front: "Frente", side: "Perfil", back: "Espalda", other: "Otra" };
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-2">
+        <button onClick={() => setSubTab("metrics")} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${subTab === "metrics" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+          <TrendingUp className="h-3.5 w-3.5" />M\u00e9tricas
+        </button>
+        <button onClick={() => setSubTab("photos")} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${subTab === "photos" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
+          <Camera className="h-3.5 w-3.5" />Fotos
+        </button>
+      </div>
+
+      {subTab === "metrics" && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-[15px] font-semibold">MI PROGRESO</h3>
+            <Button size="sm" onClick={() => setShowAddMetric(true)} className="gap-1.5 rounded-xl h-8 text-[12px]">
+              <Plus className="h-3.5 w-3.5" />Registrar
+            </Button>
+          </div>
+
+          {/* Charts */}
+          {measurements.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {renderMiniChart(weightVals, "Peso", "kg", "#6BCB77")}
+              {renderMiniChart(waistVals, "Cintura", "cm", "#4D96FF")}
+              {renderMiniChart(hipsVals, "Cadera", "cm", "#FF6B6B")}
+              {renderMiniChart(chestVals, "Pecho", "cm", "#FFD93D")}
+              {renderMiniChart(armsVals, "Brazos", "cm", "#C084FC")}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <TrendingUp className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-[15px] font-medium">Sin registros a\u00fan</p>
+              <p className="text-[13px] text-muted-foreground mt-1">Registra tus medidas para ver tu evoluci\u00f3n</p>
+            </div>
+          )}
+
+          {/* History */}
+          {measurements.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
+              <h4 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">Historial</h4>
+              <div className="space-y-2">
+                {measurements.slice(0, 10).map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30">
+                    <span className="text-[12px] text-muted-foreground">{new Date(m.date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span>
+                    <div className="flex gap-3 text-[12px]">
+                      {m.weight && <span className="font-medium">{(m.weight / 1000).toFixed(1)}kg</span>}
+                      {m.waist && <span>{(m.waist / 10).toFixed(1)}cm cin</span>}
+                      {m.hips && <span>{(m.hips / 10).toFixed(1)}cm cad</span>}
+                      {m.chest && <span>{(m.chest / 10).toFixed(1)}cm pec</span>}
+                      {m.arms && <span>{(m.arms / 10).toFixed(1)}cm bra</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === "photos" && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-[15px] font-semibold">FOTOS DE SEGUIMIENTO</h3>
+            <Button size="sm" onClick={() => setShowAddPhoto(true)} className="gap-1.5 rounded-xl h-8 text-[12px]">
+              <Camera className="h-3.5 w-3.5" />Subir foto
+            </Button>
+          </div>
+
+          {photos.length > 0 ? (
+            <div className="space-y-4">
+              {/* Group by date */}
+              {Object.entries(
+                photos.reduce((acc: Record<string, any[]>, p: any) => {
+                  const d = new Date(p.date).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+                  if (!acc[d]) acc[d] = [];
+                  acc[d].push(p);
+                  return acc;
+                }, {})
+              ).map(([date, datePhotos]) => (
+                <div key={date}>
+                  <p className="text-[12px] font-medium text-muted-foreground mb-2">{date}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(datePhotos as any[]).map((p: any) => (
+                      <div key={p.id} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
+                        <img src={p.photoUrl} alt={photoTypeLabels[p.photoType] || p.photoType} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <span className="text-[10px] text-white font-medium">{photoTypeLabels[p.photoType] || p.photoType}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <ImageIcon className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-[15px] font-medium">Sin fotos a\u00fan</p>
+              <p className="text-[13px] text-muted-foreground mt-1">Sube fotos de seguimiento para ver tu transformaci\u00f3n</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Metric Dialog */}
+      <Dialog open={showAddMetric} onOpenChange={setShowAddMetric}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Registrar M\u00e9tricas</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label className="text-[13px]">Fecha</Label><Input type="date" value={metricForm.date} onChange={(e) => setMetricForm(f => ({ ...f, date: e.target.value }))} className="rounded-xl" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label className="text-[13px]">Peso (kg)</Label><Input type="number" step="0.1" value={metricForm.weight} onChange={(e) => setMetricForm(f => ({ ...f, weight: e.target.value }))} placeholder="75.5" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Cintura (cm)</Label><Input type="number" step="0.1" value={metricForm.waist} onChange={(e) => setMetricForm(f => ({ ...f, waist: e.target.value }))} placeholder="80" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Cadera (cm)</Label><Input type="number" step="0.1" value={metricForm.hips} onChange={(e) => setMetricForm(f => ({ ...f, hips: e.target.value }))} placeholder="95" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Pecho (cm)</Label><Input type="number" step="0.1" value={metricForm.chest} onChange={(e) => setMetricForm(f => ({ ...f, chest: e.target.value }))} placeholder="100" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Brazos (cm)</Label><Input type="number" step="0.1" value={metricForm.arms} onChange={(e) => setMetricForm(f => ({ ...f, arms: e.target.value }))} placeholder="35" className="rounded-xl" /></div>
+            </div>
+            <Button
+              onClick={() => {
+                addMetricMut.mutate({
+                  clientId: session.clientId, accessCode: session.accessCode,
+                  date: metricForm.date,
+                  weight: metricForm.weight ? Math.round(parseFloat(metricForm.weight) * 1000) : undefined,
+                  waist: metricForm.waist ? Math.round(parseFloat(metricForm.waist) * 10) : undefined,
+                  hips: metricForm.hips ? Math.round(parseFloat(metricForm.hips) * 10) : undefined,
+                  chest: metricForm.chest ? Math.round(parseFloat(metricForm.chest) * 10) : undefined,
+                  arms: metricForm.arms ? Math.round(parseFloat(metricForm.arms) * 10) : undefined,
+                });
+              }}
+              disabled={addMetricMut.isPending}
+              className="w-full rounded-xl h-11"
+            >
+              {addMetricMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Guardar M\u00e9tricas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Photo Dialog */}
+      <Dialog open={showAddPhoto} onOpenChange={setShowAddPhoto}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Subir Foto de Seguimiento</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Tipo de foto</Label>
+              <Select value={photoForm.photoType} onValueChange={(v) => setPhotoForm(f => ({ ...f, photoType: v }))}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="front">Frente</SelectItem>
+                  <SelectItem value="side">Perfil</SelectItem>
+                  <SelectItem value="back">Espalda</SelectItem>
+                  <SelectItem value="other">Otra</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Fecha</Label><Input type="date" value={photoForm.date} onChange={(e) => setPhotoForm(f => ({ ...f, date: e.target.value }))} className="rounded-xl" /></div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Foto</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (file && file.size > 5 * 1024 * 1024) { toast.error("M\u00e1ximo 5MB"); return; }
+                  setPhotoForm(f => ({ ...f, file }));
+                }}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Notas (opcional)</Label><Input value={photoForm.notes} onChange={(e) => setPhotoForm(f => ({ ...f, notes: e.target.value }))} placeholder="Ej: Semana 4" className="rounded-xl" /></div>
+            <Button
+              onClick={async () => {
+                if (!photoForm.file) { toast.error("Selecciona una foto"); return; }
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(",")[1];
+                  uploadPhotoMut.mutate({
+                    clientId: session.clientId, accessCode: session.accessCode,
+                    photoBase64: base64,
+                    photoType: photoForm.photoType as any,
+                    date: photoForm.date,
+                    notes: photoForm.notes || undefined,
+                  });
+                };
+                reader.readAsDataURL(photoForm.file);
+              }}
+              disabled={!photoForm.file || uploadPhotoMut.isPending}
+              className="w-full rounded-xl h-11"
+            >
+              {uploadPhotoMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Subir Foto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

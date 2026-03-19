@@ -560,4 +560,77 @@ export const clientPortalRouter = router({
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
       return getCheckIns(input.clientId);
     }),
+
+  // ── Client Progress: Measurements ──
+  addMeasurement: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      weight: z.number().int().optional(),
+      bodyFat: z.number().int().optional(),
+      chest: z.number().int().optional(),
+      waist: z.number().int().optional(),
+      hips: z.number().int().optional(),
+      arms: z.number().int().optional(),
+      thighs: z.number().int().optional(),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const { accessCode, ...data } = input;
+      const id = await addMeasurement(data);
+      // Notify trainer
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `${client.name} registr\u00f3 nuevas m\u00e9tricas`, content: `Peso: ${input.weight ? (input.weight / 1000).toFixed(1) + "kg" : "--"}, Cintura: ${input.waist ? (input.waist / 10).toFixed(1) + "cm" : "--"}` });
+      } catch {}
+      return { id };
+    }),
+
+  getMeasurements: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getMeasurements(input.clientId);
+    }),
+
+  // ── Client Progress: Photos ──
+  uploadPhoto: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      photoBase64: z.string(),
+      photoType: z.enum(["front", "side", "back", "other"]),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const buffer = Buffer.from(input.photoBase64, "base64");
+      const key = `progress-photos/${input.clientId}/${Date.now()}-${input.photoType}.jpg`;
+      const { url } = await storagePut(key, buffer, "image/jpeg");
+      const id = await addProgressPhoto({
+        clientId: input.clientId,
+        photoUrl: url,
+        photoType: input.photoType,
+        date: input.date,
+        notes: input.notes,
+      });
+      // Notify trainer
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `${client.name} subi\u00f3 una foto de progreso`, content: `Tipo: ${input.photoType}, Fecha: ${input.date}` });
+      } catch {}
+      return { id, url };
+    }),
+
+  getPhotos: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getProgressPhotos(input.clientId);
+    }),
 });

@@ -71,7 +71,7 @@ export default function DashboardLayout({
             <img
               src={NUTRIFLOW_LOGO}
               alt="NutriFlow"
-              className="h-12 object-contain"
+              className="h-16 object-contain"
             />
             <p className="text-[15px] text-gray-400 text-center leading-relaxed">
               Crea planes nutricionales personalizados con inteligencia artificial.
@@ -200,7 +200,7 @@ function DashboardLayoutContent({
                 <img
                   src={NUTRIFLOW_LOGO}
                   alt="NutriFlow"
-                  className="h-7 object-contain"
+                  className="h-10 object-contain"
                 />
               ) : null}
             </div>
@@ -286,7 +286,7 @@ function DashboardLayoutContent({
               <img
                 src={NUTRIFLOW_LOGO}
                 alt="NutriFlow"
-                className="h-6 object-contain"
+                className="h-8 object-contain"
               />
             </div>
           </div>

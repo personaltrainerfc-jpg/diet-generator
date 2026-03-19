@@ -3,8 +3,9 @@ import { getDb } from "./db";
 import {
   clients, clientDiets, adherenceLogs, progressPhotos,
   weeklyCheckIns, chatMessages, achievements, clientAchievements,
-  bodyMeasurements, initialAssessments
+  bodyMeasurements, initialAssessments, diets
 } from "../drizzle/schema";
+import { getFullDiet } from "./db";
 
 function assertDb<T>(db: T | null | undefined): asserts db is NonNullable<T> {
   if (!db) throw new Error("Database not available");
@@ -64,14 +65,30 @@ export async function getClientActiveDiet(clientId: number) {
   const rows = await db.select().from(clientDiets)
     .where(and(eq(clientDiets.clientId, clientId), eq(clientDiets.active, 1)))
     .limit(1);
-  return rows[0] || null;
+  if (!rows[0]) return null;
+  // Return the full diet data (with menus, meals, foods) along with assignment info
+  const fullDiet = await getFullDiet(rows[0].dietId);
+  if (!fullDiet) return null;
+  return { ...fullDiet, assignedAt: rows[0].assignedAt, clientDietId: rows[0].id };
 }
 
 export async function getClientDietHistory(clientId: number) {
   const db = await getDb(); assertDb(db);
-  return db.select().from(clientDiets)
+  const assignments = await db.select({
+    id: clientDiets.id,
+    clientId: clientDiets.clientId,
+    dietId: clientDiets.dietId,
+    assignedAt: clientDiets.assignedAt,
+    active: clientDiets.active,
+    dietName: diets.name,
+    totalCalories: diets.totalCalories,
+    mealsPerDay: diets.mealsPerDay,
+    dietType: diets.dietType,
+  }).from(clientDiets)
+    .innerJoin(diets, eq(clientDiets.dietId, diets.id))
     .where(eq(clientDiets.clientId, clientId))
     .orderBy(desc(clientDiets.assignedAt));
+  return assignments;
 }
 
 // ── Adherence Logs ──

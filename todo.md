@@ -122,3 +122,13 @@
 - [ ] Vista plan activo en perfil del cliente (nombre, fecha inicio, días activo)
 - [ ] Notificación al cliente cuando se le asigna un nuevo plan
 - [ ] Historial de planes anteriores accesible para entrenador y cliente
+
+## Mejoras solicitadas (sesión 3)
+
+- [x] Logo NutriFlow más grande en sidebar entrenador y portal cliente (presencia visual clara)
+- [x] Cambiar tipografía a Plus Jakarta Sans en toda la app (títulos 28-32px Bold, subtítulos 17-20px SemiBold, cuerpo 15-17px Regular, etiquetas 13px Regular gris)
+- [x] Corregir asignación de dietas a clientes desde panel entrenador (crear nueva, asignar existente, asignar plantilla)
+- [x] Apartado "Mi Progreso" en app del cliente: registro de métricas (peso, cintura, cadera, pecho, brazos) con gráficas de evolución
+- [x] Apartado "Mi Progreso" en app del cliente: subida de fotos de seguimiento (frente, perfil, espalda) con galería cronológica
+- [x] Entrenador puede ver métricas y fotos del cliente desde su panel (comparación lado a lado)
+- [x] Notificación al entrenador cuando el cliente sube métricas o fotos

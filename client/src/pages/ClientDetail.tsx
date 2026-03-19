@@ -17,7 +17,7 @@ import {
   ArrowLeft, User, Activity, Camera, ClipboardCheck, MessageCircle,
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
   Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
-  TrendingDown, TrendingUp, Minus, BarChart3, Download
+  TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink
 } from "lucide-react";
 
 /* ─── Chart.js Evolution Chart ─── */
@@ -91,6 +91,9 @@ export default function ClientDetail() {
   const measurementsQ = trpc.clientMgmt.getMeasurements.useQuery({ clientId }, { enabled: clientId > 0 });
   const achievementsQ = trpc.clientMgmt.getClientAchievements.useQuery({ clientId }, { enabled: clientId > 0 });
   const messagesQ = trpc.clientMgmt.getMessages.useQuery({ clientId, limit: 50 }, { enabled: clientId > 0 });
+  const activeDietQ = trpc.clientMgmt.getActiveDiet.useQuery({ clientId }, { enabled: clientId > 0 });
+  const dietHistoryQ = trpc.clientMgmt.getDietHistory.useQuery({ clientId }, { enabled: clientId > 0 });
+  const trainerDietsQ = trpc.diet.list.useQuery(undefined, { enabled: clientId > 0 });
 
   // Mutations
   const updateMut = trpc.clientMgmt.update.useMutation({ onSuccess: () => { toast.success("Cliente actualizado"); clientQ.refetch(); } });
@@ -102,6 +105,7 @@ export default function ClientDetail() {
   const addMeasureMut = trpc.clientMgmt.addMeasurement.useMutation({ onSuccess: () => { toast.success("Medida registrada"); measurementsQ.refetch(); setShowMeasure(false); } });
   const feedbackMut = trpc.clientMgmt.addCheckInFeedback.useMutation({ onSuccess: () => { toast.success("Feedback enviado"); checkInsQ.refetch(); } });
   const createAssessMut = trpc.clientMgmt.createAssessment.useMutation({ onSuccess: () => { toast.success("Valoración guardada"); assessmentQ.refetch(); setShowAssessment(false); } });
+  const assignDietMut = trpc.clientMgmt.assignDiet.useMutation({ onSuccess: () => { toast.success("Dieta asignada correctamente"); activeDietQ.refetch(); dietHistoryQ.refetch(); setShowAssignDiet(false); } });
 
   // Local state
   const [newMsg, setNewMsg] = useState("");
@@ -109,6 +113,8 @@ export default function ClientDetail() {
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
+  const [showAssignDiet, setShowAssignDiet] = useState(false);
+  const [selectedDietId, setSelectedDietId] = useState<string>("");
   const [checkInForm, setCheckInForm] = useState({ weekStart: new Date().toISOString().split("T")[0], currentWeight: "", energyLevel: "3", hungerLevel: "3", sleepQuality: "3", adherenceRating: "3", notes: "" });
   const [measureForm, setMeasureForm] = useState({ date: new Date().toISOString().split("T")[0], weight: "", bodyFat: "", chest: "", waist: "", hips: "", arms: "", thighs: "", notes: "" });
   const [assessForm, setAssessForm] = useState({ currentDiet: "", exerciseFrequency: "", exerciseType: "", medicalConditions: "", medications: "", allergiesIntolerances: "", sleepHours: "", stressLevel: "3", waterIntake: "", alcoholFrequency: "", smokingStatus: "", goals: "", trainerNotes: "" });
@@ -288,6 +294,7 @@ export default function ClientDetail() {
         <div className="overflow-x-auto -mx-4 px-4 pb-1">
           <TabsList className="inline-flex h-10 gap-0.5 bg-secondary/60 rounded-xl p-1">
             <TabsTrigger value="overview" className="rounded-lg text-[13px] gap-1.5 px-3"><User className="h-3.5 w-3.5" />General</TabsTrigger>
+            <TabsTrigger value="diet" className="rounded-lg text-[13px] gap-1.5 px-3"><UtensilsCrossed className="h-3.5 w-3.5" />Dieta</TabsTrigger>
             <TabsTrigger value="evolution" className="rounded-lg text-[13px] gap-1.5 px-3"><BarChart3 className="h-3.5 w-3.5" />Evolución</TabsTrigger>
             <TabsTrigger value="chat" className="rounded-lg text-[13px] gap-1.5 px-3"><MessageCircle className="h-3.5 w-3.5" />Chat</TabsTrigger>
             <TabsTrigger value="checkins" className="rounded-lg text-[13px] gap-1.5 px-3"><ClipboardCheck className="h-3.5 w-3.5" />Check-ins</TabsTrigger>
@@ -315,6 +322,133 @@ export default function ClientDetail() {
               <code className="text-[12px] bg-secondary px-2 py-0.5 rounded-md font-mono">{client.accessCode}</code>
             </div>
           </div>
+
+          {/* Plan Nutricional Activo */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold flex items-center gap-2"><UtensilsCrossed className="h-4 w-4 text-primary" />Plan Nutricional Activo</h3>
+              <Button variant="outline" size="sm" onClick={() => setShowAssignDiet(true)} className="gap-1.5 rounded-xl h-8 text-[12px]">
+                <Link2 className="h-3.5 w-3.5" />{activeDietQ.data ? "Cambiar" : "Asignar"}
+              </Button>
+            </div>
+            {activeDietQ.isLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : activeDietQ.data ? (
+              <div className="bg-primary/5 rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[15px] font-semibold">{activeDietQ.data.name}</p>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation(`/diet/${activeDietQ.data!.id}`)} className="gap-1 rounded-lg h-7 text-[11px] text-primary">
+                    <ExternalLink className="h-3 w-3" />Ver dieta
+                  </Button>
+                </div>
+                <div className="flex gap-4 text-[13px] text-muted-foreground">
+                  <span>{activeDietQ.data.totalCalories} kcal</span>
+                  <span>{activeDietQ.data.mealsPerDay} comidas/d\u00eda</span>
+                  <span className="capitalize">{activeDietQ.data.dietType}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Asignada el {new Date(activeDietQ.data.assignedAt).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</p>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <UtensilsCrossed className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">No hay dieta asignada</p>
+                <Button variant="outline" size="sm" onClick={() => setShowAssignDiet(true)} className="mt-3 gap-1.5 rounded-xl text-[12px]">
+                  <Plus className="h-3.5 w-3.5" />Asignar dieta
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Diet Tab - Full diet assignment management */}
+        <TabsContent value="diet" className="space-y-4 mt-4">
+          {/* Active Diet */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold">Plan Nutricional Activo</h3>
+              <Button onClick={() => setShowAssignDiet(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]">
+                <Plus className="h-3.5 w-3.5" />{activeDietQ.data ? "Cambiar dieta" : "Asignar dieta"}
+              </Button>
+            </div>
+            {activeDietQ.isLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : activeDietQ.data ? (
+              <div className="bg-primary/5 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[16px] font-semibold">{activeDietQ.data.name}</p>
+                    <div className="flex gap-4 mt-1 text-[13px] text-muted-foreground">
+                      <span>{activeDietQ.data.totalCalories} kcal</span>
+                      <span>{activeDietQ.data.mealsPerDay} comidas/d\u00eda</span>
+                      <span className="capitalize">{activeDietQ.data.dietType}</span>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setLocation(`/diet/${activeDietQ.data!.id}`)} className="gap-1.5 rounded-xl h-8 text-[12px]">
+                    <ExternalLink className="h-3.5 w-3.5" />Ver completa
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Asignada el {new Date(activeDietQ.data.assignedAt).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</p>
+                {/* Show menus summary */}
+                {activeDietQ.data.menus && activeDietQ.data.menus.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-border/30">
+                    <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">{activeDietQ.data.menus.length} men\u00fa{activeDietQ.data.menus.length > 1 ? "s" : ""}</p>
+                    {activeDietQ.data.menus.slice(0, 3).map((menu: any, i: number) => (
+                      <div key={i} className="bg-background/50 rounded-lg p-3">
+                        <div className="flex justify-between text-[13px]">
+                          <span className="font-medium">D\u00eda {menu.menuNumber}</span>
+                          <span className="text-muted-foreground">{menu.totalCalories} kcal</span>
+                        </div>
+                        <div className="mt-1 space-y-0.5">
+                          {menu.meals?.slice(0, 4).map((meal: any, mi: number) => (
+                            <p key={mi} className="text-[12px] text-muted-foreground">{meal.mealName} \u2022 {meal.totalCalories} kcal</p>
+                          ))}
+                          {menu.meals && menu.meals.length > 4 && <p className="text-[11px] text-muted-foreground">+{menu.meals.length - 4} m\u00e1s...</p>}
+                        </div>
+                      </div>
+                    ))}
+                    {activeDietQ.data.menus.length > 3 && <p className="text-[11px] text-muted-foreground text-center">+{activeDietQ.data.menus.length - 3} men\u00fas m\u00e1s</p>}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <UtensilsCrossed className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-[15px] font-medium">Sin dieta asignada</p>
+                <p className="text-[13px] text-muted-foreground mt-1">Asigna una dieta de tu biblioteca para que el cliente la vea en su portal</p>
+                <Button onClick={() => setShowAssignDiet(true)} className="mt-4 gap-1.5 rounded-xl">
+                  <Plus className="h-4 w-4" />Asignar dieta
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Diet History */}
+          {(dietHistoryQ.data || []).length > 0 && (
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+              <h3 className="text-[15px] font-semibold">Historial de Dietas</h3>
+              <div className="space-y-2">
+                {(dietHistoryQ.data || []).map((h: any) => (
+                  <div key={h.id} className={`flex items-center justify-between p-3 rounded-xl border ${h.active ? "border-primary/30 bg-primary/5" : "border-border/50"}`}>
+                    <div>
+                      <p className="text-[14px] font-medium">{h.dietName}</p>
+                      <div className="flex gap-3 text-[12px] text-muted-foreground mt-0.5">
+                        <span>{h.totalCalories} kcal</span>
+                        <span>{h.mealsPerDay} comidas</span>
+                        <span className="capitalize">{h.dietType}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {h.active ? (
+                        <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Activa</Badge>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">{new Date(h.assignedAt).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* Evolution Tab - Charts */}
@@ -499,24 +633,62 @@ export default function ClientDetail() {
         </TabsContent>
 
         {/* Photos Tab */}
-        <TabsContent value="photos" className="space-y-3 mt-4">
-          <h3 className="text-[15px] font-semibold">Fotos de Progreso</h3>
+        <TabsContent value="photos" className="space-y-4 mt-4">
+          <h3 className="text-[15px] font-semibold uppercase">Fotos de Progreso</h3>
           {(photosQ.data || []).length === 0 ? (
             <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
               <Camera className="h-8 w-8 text-muted-foreground/30 mb-3" />
-              <p className="text-[13px] text-muted-foreground">No hay fotos de progreso</p>
+              <p className="text-[13px] text-muted-foreground">El cliente a\u00fan no ha subido fotos de progreso</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {(photosQ.data || []).map((p: any) => (
-                <div key={p.id} className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                  <img src={p.photoUrl} alt={p.photoType} className="w-full h-48 object-cover" />
-                  <div className="p-3 text-[12px] text-muted-foreground flex justify-between items-center">
-                    <span>{p.date}</span>
-                    <Badge variant="outline" className="text-[10px] rounded-full">{p.photoType}</Badge>
+            <div className="space-y-6">
+              {/* Group photos by date */}
+              {Object.entries(
+                (photosQ.data || []).reduce((acc: Record<string, any[]>, p: any) => {
+                  const d = new Date(p.date).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+                  if (!acc[d]) acc[d] = [];
+                  acc[d].push(p);
+                  return acc;
+                }, {})
+              ).map(([date, datePhotos]) => (
+                <div key={date} className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 space-y-3">
+                  <p className="text-[13px] font-semibold text-muted-foreground">{date}</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(datePhotos as any[]).map((p: any) => (
+                      <div key={p.id} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-border/50 group">
+                        <img src={p.photoUrl} alt={p.photoType} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <span className="text-[10px] text-white font-medium capitalize">{p.photoType === "front" ? "Frente" : p.photoType === "side" ? "Perfil" : p.photoType === "back" ? "Espalda" : p.photoType}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  {(datePhotos as any[])[0]?.notes && <p className="text-[12px] text-muted-foreground italic">{(datePhotos as any[])[0].notes}</p>}
                 </div>
               ))}
+
+              {/* Side-by-side comparison hint */}
+              {(photosQ.data || []).length >= 2 && (
+                <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
+                  <p className="text-[13px] font-medium text-primary">Comparaci\u00f3n de progreso</p>
+                  <div className="grid grid-cols-2 gap-4 mt-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground">Primera foto</p>
+                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
+                        <img src={(photosQ.data as any[])[(photosQ.data as any[]).length - 1].photoUrl} alt="Primera" className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{new Date((photosQ.data as any[])[(photosQ.data as any[]).length - 1].date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] text-muted-foreground">\u00daltima foto</p>
+                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-border/50">
+                        <img src={(photosQ.data as any[])[0].photoUrl} alt="\u00daltima" className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{new Date((photosQ.data as any[])[0].date).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
@@ -672,6 +844,62 @@ export default function ClientDetail() {
             <Button onClick={() => createAssessMut.mutate({ clientId, currentDiet: assessForm.currentDiet || undefined, exerciseFrequency: assessForm.exerciseFrequency || undefined, exerciseType: assessForm.exerciseType || undefined, medicalConditions: assessForm.medicalConditions || undefined, medications: assessForm.medications || undefined, allergiesIntolerances: assessForm.allergiesIntolerances || undefined, sleepHours: assessForm.sleepHours ? parseInt(assessForm.sleepHours) : undefined, stressLevel: parseInt(assessForm.stressLevel), waterIntake: assessForm.waterIntake ? parseInt(assessForm.waterIntake) : undefined, alcoholFrequency: assessForm.alcoholFrequency || undefined, smokingStatus: assessForm.smokingStatus || undefined, goals: assessForm.goals || undefined, trainerNotes: assessForm.trainerNotes || undefined })} disabled={createAssessMut.isPending} className="w-full rounded-xl h-11">
               {createAssessMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Valoración
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Diet Dialog */}
+      <Dialog open={showAssignDiet} onOpenChange={setShowAssignDiet}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Asignar Dieta al Cliente</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-[13px] text-muted-foreground">Selecciona una dieta de tu biblioteca para asignarla a {client.name}. La dieta activa anterior se desactivar\u00e1 autom\u00e1ticamente.</p>
+            {trainerDietsQ.isLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : (trainerDietsQ.data || []).length === 0 ? (
+              <div className="text-center py-6">
+                <UtensilsCrossed className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">No tienes dietas creadas</p>
+                <Button variant="outline" size="sm" onClick={() => { setShowAssignDiet(false); setLocation("/"); }} className="mt-3 gap-1.5 rounded-xl text-[12px]">
+                  <Plus className="h-3.5 w-3.5" />Crear nueva dieta
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {(trainerDietsQ.data || []).map((d: any) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setSelectedDietId(String(d.id))}
+                      className={`w-full text-left p-3 rounded-xl border transition-all ${
+                        selectedDietId === String(d.id)
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                          : "border-border/50 hover:bg-accent/50"
+                      }`}
+                    >
+                      <p className="text-[14px] font-medium">{d.name}</p>
+                      <div className="flex gap-3 mt-1 text-[12px] text-muted-foreground">
+                        <span>{d.totalCalories} kcal</span>
+                        <span>{d.mealsPerDay} comidas</span>
+                        <span className="capitalize">{d.dietType}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">{new Date(d.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!selectedDietId) { toast.error("Selecciona una dieta"); return; }
+                    assignDietMut.mutate({ clientId, dietId: parseInt(selectedDietId) });
+                  }}
+                  disabled={!selectedDietId || assignDietMut.isPending}
+                  className="w-full rounded-xl h-11"
+                >
+                  {assignDietMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Asignar Dieta
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
