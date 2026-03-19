@@ -1,6 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, MessageCircle, Activity, TrendingUp, Loader2 } from "lucide-react";
+import { Users, MessageCircle, Activity, TrendingUp, Loader2, ChevronRight, Utensils, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function TrainerDashboard() {
@@ -8,80 +7,62 @@ export default function TrainerDashboard() {
   const dashQ = trpc.clientMgmt.dashboard.useQuery();
 
   if (dashQ.isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
   const stats = dashQ.data;
 
+  const statCards = [
+    { label: "Clientes Totales", value: stats?.totalClients || 0, icon: Users, color: "text-primary", bg: "bg-primary/10", onClick: () => setLocation("/clients") },
+    { label: "Clientes Activos", value: stats?.activeClients || 0, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Mensajes Sin Leer", value: stats?.unreadMessages || 0, icon: MessageCircle, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Adherencia Hoy", value: stats?.todayAdherence != null ? `${stats.todayAdherence}%` : "—", icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+  ];
+
+  const quickActions = [
+    { label: "Ver Clientes", desc: "Gestionar clientes activos", icon: Users, color: "text-primary", bg: "bg-primary/10", path: "/clients" },
+    { label: "Nueva Dieta", desc: "Crear plan nutricional", icon: Utensils, color: "text-emerald-500", bg: "bg-emerald-500/10", path: "/" },
+    { label: "Historial", desc: "Dietas generadas", icon: Clock, color: "text-blue-500", bg: "bg-blue-500/10", path: "/history" },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Resumen de tu actividad como entrenador</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-[14px] text-muted-foreground mt-1">Resumen de tu actividad como entrenador.</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setLocation("/clients")}>
-          <CardContent className="py-5 text-center">
-            <Users className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <p className="text-3xl font-bold text-foreground">{stats?.totalClients || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">Clientes Totales</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-5 text-center">
-            <Activity className="h-8 w-8 mx-auto mb-2 text-emerald-500" />
-            <p className="text-3xl font-bold text-foreground">{stats?.activeClients || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">Clientes Activos</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-5 text-center">
-            <MessageCircle className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-            <p className="text-3xl font-bold text-foreground">{stats?.unreadMessages || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">Mensajes Sin Leer</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-5 text-center">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-amber-500" />
-            <p className="text-3xl font-bold text-foreground">
-              {stats?.todayAdherence != null ? `${stats.todayAdherence}%` : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Adherencia Hoy</p>
-          </CardContent>
-        </Card>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {statCards.map(({ label, value, icon: Icon, color, bg, onClick }) => (
+          <div key={label} onClick={onClick} className={`bg-card rounded-2xl border border-border/50 shadow-sm p-4 ${onClick ? "cursor-pointer hover:shadow-md" : ""} transition-all`}>
+            <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center mb-3`}>
+              <Icon className={`h-5 w-5 ${color}`} />
+            </div>
+            <p className="text-[26px] font-bold tracking-tight">{value}</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">{label}</p>
+          </div>
+        ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation("/clients")}>
-            <CardContent className="py-4 text-center text-sm">
-              <Users className="h-5 w-5 mx-auto mb-1.5 text-primary" />
-              Ver Clientes
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation("/")}>
-            <CardContent className="py-4 text-center text-sm">
-              <TrendingUp className="h-5 w-5 mx-auto mb-1.5 text-emerald-500" />
-              Nueva Dieta
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation("/history")}>
-            <CardContent className="py-4 text-center text-sm">
-              <Activity className="h-5 w-5 mx-auto mb-1.5 text-blue-500" />
-              Historial
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-[15px] font-semibold mb-3">Acciones Rápidas</h2>
+        <div className="space-y-2">
+          {quickActions.map(({ label, desc, icon: Icon, color, bg, path }) => (
+            <div key={label} onClick={() => setLocation(path)} className="bg-card rounded-2xl border border-border/50 shadow-sm flex items-center gap-4 p-4 cursor-pointer hover:shadow-md transition-all group">
+              <div className={`h-11 w-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                <Icon className={`h-5 w-5 ${color}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-[14px]">{label}</p>
+                <p className="text-[12px] text-muted-foreground">{desc}</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -24,7 +24,7 @@ import {
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
 import { MEAL_PHILOSOPHY } from "@shared/mealPhilosophy";
-import { clientRouter } from "./clientRouters";
+import { clientRouter, clientPortalRouter } from "./clientRouters";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -296,6 +296,7 @@ export const appRouter = router({
   }),
 
   clientMgmt: clientRouter,
+  clientPortal: clientPortalRouter,
 
   diet: router({
     generate: protectedProcedure

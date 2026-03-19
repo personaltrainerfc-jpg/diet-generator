@@ -13,8 +13,9 @@ import CustomFoods from "./pages/CustomFoods";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import TrainerDashboard from "./pages/TrainerDashboard";
+import ClientPortal from "./pages/ClientPortal";
 
-function Router() {
+function DashboardRouter() {
   return (
     <DashboardLayout>
       <Switch>
@@ -39,7 +40,10 @@ function App() {
       <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Switch>
+            <Route path="/portal" component={ClientPortal} />
+            <Route>{() => <DashboardRouter />}</Route>
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

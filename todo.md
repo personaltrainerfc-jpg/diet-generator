@@ -90,3 +90,19 @@
 - [x] B10: Sistema de logros y rachas (gamificación)
 - [x] B11: Recomendación automática de ajuste al entrenador (IA)
 - [x] B12: Modo consulta express (resumen rápido del cliente)
+
+## Rediseño Apple + Nuevas funcionalidades
+- [x] Rediseño global: colores Apple (#F5F5F7, #1D1D1F, #0071E3), tipografía SF Pro/Inter, variables CSS
+- [x] Fuente Inter/SF Pro en index.html vía Google Fonts CDN
+- [x] Componentes: tarjetas border-radius 12-16px, sombra sutil, botones pill shape, inputs Apple-style
+- [x] Layout: espaciado múltiplos de 8px, máximo 2 columnas desktop
+- [x] DashboardLayout: sidebar minimalista Apple-style, barra inferior móvil
+- [x] Microinteracciones: transiciones 200-300ms, skeleton screens, toasts discretos
+- [x] Eliminar degradados agresivos, sombras pronunciadas, bordes gruesos, colores llamativos
+- [x] Rediseño Home.tsx (formulario limpio Apple-style)
+- [x] Rediseño History.tsx (listado minimalista)
+- [x] Rediseño DietDetail.tsx (vista de dieta premium)
+- [x] Rediseño Recipes.tsx, CustomFoods.tsx, Clients.tsx, ClientDetail.tsx, TrainerDashboard.tsx
+- [x] Portal de acceso para clientes (login con código de acceso)
+- [x] Gráficas de evolución en ClientDetail (Chart.js: peso, medidas, adherencia)
+- [x] Exportar ficha completa del cliente a PDF (valoración, medidas, evolución, dieta)

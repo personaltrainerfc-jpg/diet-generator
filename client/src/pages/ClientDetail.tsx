@@ -1,8 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from "chart.js";
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,17 +16,72 @@ import { toast } from "sonner";
 import {
   ArrowLeft, User, Activity, Camera, ClipboardCheck, MessageCircle,
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
-  Sparkles, Brain, Zap, CheckCircle2, XCircle, ChevronDown, Edit2,
-  Save, X
+  Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
+  TrendingDown, TrendingUp, Minus, BarChart3, Download
 } from "lucide-react";
+
+/* ─── Chart.js Evolution Chart ─── */
+function EvolutionChart({ data, labels, color = "#007AFF", unit = "", height = 160 }: { data: number[]; labels: string[]; color?: string; unit?: string; height?: number }) {
+  if (data.length < 2) return <p className="text-[13px] text-muted-foreground text-center py-6">Se necesitan al menos 2 registros</p>;
+  const chartData = {
+    labels,
+    datasets: [{
+      data,
+      borderColor: color,
+      backgroundColor: color + "18",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      pointBackgroundColor: color,
+      pointBorderColor: "#fff",
+      pointBorderWidth: 2,
+      borderWidth: 2.5,
+    }],
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(0,0,0,0.8)",
+        titleFont: { size: 12, family: "Inter" },
+        bodyFont: { size: 13, family: "Inter", weight: "bold" as const },
+        padding: 10,
+        cornerRadius: 10,
+        callbacks: { label: (ctx: any) => `${ctx.parsed.y.toFixed(1)} ${unit}` },
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10, family: "Inter" }, color: "#999", maxTicksLimit: 8 }, border: { display: false } },
+      y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10, family: "Inter" }, color: "#999", callback: (v: any) => `${v}${unit ? " " + unit : ""}` }, border: { display: false } },
+    },
+    interaction: { intersect: false, mode: "index" as const },
+  };
+  return <div style={{ height }}><Line data={chartData} options={options} /></div>;
+}
+
+/* ─── Stat Card ─── */
+function StatCard({ label, value, trend, icon: Icon }: { label: string; value: string; trend?: "up" | "down" | "neutral"; icon?: any }) {
+  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
+  const trendColor = trend === "down" ? "text-emerald-500" : trend === "up" ? "text-red-400" : "text-muted-foreground";
+  return (
+    <div className="bg-card rounded-2xl border border-border/50 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+        {trend && <TrendIcon className={`h-3.5 w-3.5 ${trendColor}`} />}
+      </div>
+      <p className="text-[22px] font-bold tracking-tight">{value}</p>
+    </div>
+  );
+}
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0");
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
-  const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState<any>(null);
 
   // Queries
   const clientQ = trpc.clientMgmt.getById.useQuery({ id: clientId }, { enabled: clientId > 0 });
@@ -36,95 +93,179 @@ export default function ClientDetail() {
   const messagesQ = trpc.clientMgmt.getMessages.useQuery({ clientId, limit: 50 }, { enabled: clientId > 0 });
 
   // Mutations
-  const updateMut = trpc.clientMgmt.update.useMutation({
-    onSuccess: () => { toast.success("Cliente actualizado"); clientQ.refetch(); setEditMode(false); },
-  });
-  const sendMsgMut = trpc.clientMgmt.sendMessage.useMutation({
-    onSuccess: () => { messagesQ.refetch(); setNewMsg(""); },
-  });
-  const motivationMut = trpc.clientMgmt.sendMotivation.useMutation({
-    onSuccess: (data) => { toast.success("Mensaje enviado"); messagesQ.refetch(); },
-  });
+  const updateMut = trpc.clientMgmt.update.useMutation({ onSuccess: () => { toast.success("Cliente actualizado"); clientQ.refetch(); } });
+  const sendMsgMut = trpc.clientMgmt.sendMessage.useMutation({ onSuccess: () => { messagesQ.refetch(); setNewMsg(""); } });
+  const motivationMut = trpc.clientMgmt.sendMotivation.useMutation({ onSuccess: () => { toast.success("Mensaje motivacional enviado"); messagesQ.refetch(); } });
   const recommendMut = trpc.clientMgmt.getRecommendations.useMutation();
   const quickConsultMut = trpc.clientMgmt.quickConsult.useMutation();
-  const createCheckInMut = trpc.clientMgmt.createCheckIn.useMutation({
-    onSuccess: () => { toast.success("Check-in registrado"); checkInsQ.refetch(); setShowCheckIn(false); },
-  });
-  const addMeasureMut = trpc.clientMgmt.addMeasurement.useMutation({
-    onSuccess: () => { toast.success("Medida registrada"); measurementsQ.refetch(); setShowMeasure(false); },
-  });
-  const feedbackMut = trpc.clientMgmt.addCheckInFeedback.useMutation({
-    onSuccess: () => { toast.success("Feedback enviado"); checkInsQ.refetch(); },
-  });
-  const createAssessMut = trpc.clientMgmt.createAssessment.useMutation({
-    onSuccess: () => { toast.success("Valoración guardada"); assessmentQ.refetch(); setShowAssessment(false); },
-  });
+  const createCheckInMut = trpc.clientMgmt.createCheckIn.useMutation({ onSuccess: () => { toast.success("Check-in registrado"); checkInsQ.refetch(); setShowCheckIn(false); } });
+  const addMeasureMut = trpc.clientMgmt.addMeasurement.useMutation({ onSuccess: () => { toast.success("Medida registrada"); measurementsQ.refetch(); setShowMeasure(false); } });
+  const feedbackMut = trpc.clientMgmt.addCheckInFeedback.useMutation({ onSuccess: () => { toast.success("Feedback enviado"); checkInsQ.refetch(); } });
+  const createAssessMut = trpc.clientMgmt.createAssessment.useMutation({ onSuccess: () => { toast.success("Valoración guardada"); assessmentQ.refetch(); setShowAssessment(false); } });
 
   // Local state
   const [newMsg, setNewMsg] = useState("");
-  const [consultQ, setConsultQ] = useState("");
+  const [consultQ_text, setConsultQ_text] = useState("");
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showMeasure, setShowMeasure] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
-  const [checkInForm, setCheckInForm] = useState({
-    weekStart: new Date().toISOString().split("T")[0],
-    currentWeight: "", energyLevel: "3", hungerLevel: "3", sleepQuality: "3", adherenceRating: "3", notes: "",
-  });
-  const [measureForm, setMeasureForm] = useState({
-    date: new Date().toISOString().split("T")[0],
-    weight: "", bodyFat: "", chest: "", waist: "", hips: "", arms: "", thighs: "", notes: "",
-  });
-  const [assessForm, setAssessForm] = useState({
-    currentDiet: "", exerciseFrequency: "", exerciseType: "", medicalConditions: "",
-    medications: "", allergiesIntolerances: "", sleepHours: "", stressLevel: "3",
-    waterIntake: "", alcoholFrequency: "", smokingStatus: "", goals: "", trainerNotes: "",
-  });
+  const [checkInForm, setCheckInForm] = useState({ weekStart: new Date().toISOString().split("T")[0], currentWeight: "", energyLevel: "3", hungerLevel: "3", sleepQuality: "3", adherenceRating: "3", notes: "" });
+  const [measureForm, setMeasureForm] = useState({ date: new Date().toISOString().split("T")[0], weight: "", bodyFat: "", chest: "", waist: "", hips: "", arms: "", thighs: "", notes: "" });
+  const [assessForm, setAssessForm] = useState({ currentDiet: "", exerciseFrequency: "", exerciseType: "", medicalConditions: "", medications: "", allergiesIntolerances: "", sleepHours: "", stressLevel: "3", waterIntake: "", alcoholFrequency: "", smokingStatus: "", goals: "", trainerNotes: "" });
 
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const client = clientQ.data;
+
+  // Scroll chat to bottom
+  const messages = useMemo(() => (messagesQ.data || []).slice().reverse(), [messagesQ.data]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  // Weight evolution data
+  const weightEntries = useMemo(() => {
+    const measurements = measurementsQ.data || [];
+    return measurements.filter((m: any) => m.weight).map((m: any) => ({ value: m.weight / 1000, date: new Date(m.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) })).reverse();
+  }, [measurementsQ.data]);
+  const weightData = useMemo(() => weightEntries.map(e => e.value), [weightEntries]);
+  const weightLabels = useMemo(() => weightEntries.map(e => e.date), [weightEntries]);
+
+  // Adherence data from check-ins
+  const adherenceEntries = useMemo(() => {
+    const cis = checkInsQ.data || [];
+    return cis.filter((c: any) => c.adherenceRating).map((c: any) => ({ value: c.adherenceRating, date: new Date(c.weekStart).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) })).reverse();
+  }, [checkInsQ.data]);
+  const adherenceData = useMemo(() => adherenceEntries.map(e => e.value), [adherenceEntries]);
+  const adherenceLabels = useMemo(() => adherenceEntries.map(e => e.date), [adherenceEntries]);
+
   if (!client) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
   const statusColors: Record<string, string> = {
-    active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    inactive: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-    paused: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    active: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    inactive: "bg-secondary text-muted-foreground border-border/50",
+    paused: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
   };
+  const statusLabels: Record<string, string> = { active: "Activo", inactive: "Inactivo", paused: "Pausado" };
 
-  const messages = (messagesQ.data || []).slice().reverse();
+  const lastWeight = weightData.length > 0 ? weightData[weightData.length - 1] : null;
+  const weightTrend = weightData.length >= 2 ? (weightData[weightData.length - 1] < weightData[weightData.length - 2] ? "down" : weightData[weightData.length - 1] > weightData[weightData.length - 2] ? "up" : "neutral") : undefined;
+
+  const handleExportClientPdf = () => {
+    const assessment = assessmentQ.data;
+    const measurements = measurementsQ.data || [];
+    const checkIns = checkInsQ.data || [];
+    const lastMeasure = measurements[0];
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Inter', sans-serif; color: #1d1d1f; padding: 40px; max-width: 800px; margin: 0 auto; }
+      h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+      h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e5e5e7; }
+      h3 { font-size: 14px; font-weight: 600; margin: 16px 0 8px; }
+      .subtitle { color: #86868b; font-size: 14px; margin-bottom: 24px; }
+      .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+      .badge-active { background: #e8f5e9; color: #2e7d32; }
+      .badge-paused { background: #fff3e0; color: #e65100; }
+      .badge-inactive { background: #f5f5f5; color: #757575; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+      .stat { background: #f5f5f7; border-radius: 12px; padding: 14px; }
+      .stat-label { font-size: 11px; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; }
+      .stat-value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+      table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+      th, td { text-align: left; padding: 8px 12px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+      th { font-weight: 600; color: #86868b; font-size: 11px; text-transform: uppercase; }
+      .section { margin-bottom: 20px; }
+      .note { background: #f5f5f7; border-radius: 8px; padding: 12px; font-size: 13px; color: #424245; margin: 8px 0; }
+      @media print { body { padding: 20px; } }
+    </style></head><body>
+      <h1>${client.name}</h1>
+      <p class="subtitle">${client.email || ""} ${client.phone ? " · " + client.phone : ""} ${client.goal ? " · " + client.goal : ""}
+        <span class="badge badge-${client.status}">${statusLabels[client.status]}</span>
+      </p>
+
+      <div class="grid">
+        <div class="stat"><div class="stat-label">Peso</div><div class="stat-value">${lastWeight ? lastWeight.toFixed(1) + " kg" : client.weight ? (client.weight / 1000).toFixed(1) + " kg" : "—"}</div></div>
+        <div class="stat"><div class="stat-label">Altura</div><div class="stat-value">${client.height ? client.height + " cm" : "—"}</div></div>
+        <div class="stat"><div class="stat-label">Edad</div><div class="stat-value">${client.age ? client.age + " años" : "—"}</div></div>
+        <div class="stat"><div class="stat-label">IMC</div><div class="stat-value">${lastWeight && client.height ? (lastWeight / ((client.height / 100) ** 2)).toFixed(1) : "—"}</div></div>
+      </div>
+
+      ${assessment ? `
+      <h2>Valoración Inicial</h2>
+      <div class="section">
+        ${assessment.currentDiet ? `<h3>Dieta actual</h3><div class="note">${assessment.currentDiet}</div>` : ""}
+        ${assessment.exerciseFrequency ? `<h3>Ejercicio</h3><div class="note">${assessment.exerciseFrequency} veces/semana${assessment.exerciseType ? " — " + assessment.exerciseType : ""}</div>` : ""}
+        ${assessment.medicalConditions ? `<h3>Condiciones médicas</h3><div class="note">${assessment.medicalConditions}</div>` : ""}
+        ${assessment.medications ? `<h3>Medicación</h3><div class="note">${assessment.medications}</div>` : ""}
+        ${assessment.allergiesIntolerances ? `<h3>Alergias/Intolerancias</h3><div class="note">${assessment.allergiesIntolerances}</div>` : ""}
+        ${assessment.goals ? `<h3>Objetivos</h3><div class="note">${assessment.goals}</div>` : ""}
+        ${assessment.trainerNotes ? `<h3>Notas del entrenador</h3><div class="note">${assessment.trainerNotes}</div>` : ""}
+      </div>` : ""}
+
+      ${measurements.length > 0 ? `
+      <h2>Medidas Corporales</h2>
+      <table>
+        <tr><th>Fecha</th><th>Peso</th><th>Grasa</th><th>Cintura</th><th>Pecho</th><th>Cadera</th></tr>
+        ${measurements.slice(0, 10).map((m: any) => `<tr>
+          <td>${new Date(m.date).toLocaleDateString("es-ES")}</td>
+          <td>${m.weight ? (m.weight / 1000).toFixed(1) + " kg" : "—"}</td>
+          <td>${m.bodyFat ? (m.bodyFat / 10).toFixed(1) + "%" : "—"}</td>
+          <td>${m.waist ? (m.waist / 10).toFixed(1) + " cm" : "—"}</td>
+          <td>${m.chest ? (m.chest / 10).toFixed(1) + " cm" : "—"}</td>
+          <td>${m.hips ? (m.hips / 10).toFixed(1) + " cm" : "—"}</td>
+        </tr>`).join("")}
+      </table>` : ""}
+
+      ${checkIns.length > 0 ? `
+      <h2>Check-ins Semanales</h2>
+      <table>
+        <tr><th>Semana</th><th>Peso</th><th>Energía</th><th>Sueño</th><th>Adherencia</th></tr>
+        ${checkIns.slice(0, 10).map((c: any) => `<tr>
+          <td>${new Date(c.weekStart).toLocaleDateString("es-ES")}</td>
+          <td>${c.currentWeight ? (c.currentWeight / 1000).toFixed(1) + " kg" : "—"}</td>
+          <td>${c.energyLevel || "—"}/5</td>
+          <td>${c.sleepQuality || "—"}/5</td>
+          <td>${c.adherenceRating || "—"}/5</td>
+        </tr>`).join("")}
+      </table>` : ""}
+
+      <p style="margin-top:40px;font-size:11px;color:#86868b;text-align:center;">Ficha generada el ${new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</p>
+    </body></html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (w) { setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 500); }
+    else { URL.revokeObjectURL(url); toast.error("No se pudo abrir la ventana de impresión"); }
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/clients")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
-            <Badge className={statusColors[client.status] || ""}>
-              {client.status === "active" ? "Activo" : client.status === "paused" ? "Pausado" : "Inactivo"}
+      <div className="flex items-start gap-3">
+        <button onClick={() => setLocation("/clients")} className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors mt-0.5 shrink-0">
+          <ArrowLeft className="h-4.5 w-4.5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 mb-1">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate">{client.name}</h1>
+            <Badge variant="outline" className={`text-[11px] rounded-full px-2.5 py-0.5 shrink-0 ${statusColors[client.status] || ""}`}>
+              {statusLabels[client.status] || client.status}
             </Badge>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 text-[13px] text-muted-foreground flex-wrap">
             {client.email && <span>{client.email}</span>}
             {client.phone && <span>{client.phone}</span>}
             {client.goal && <span className="text-primary font-medium">{client.goal}</span>}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Select
-            value={client.status}
-            onValueChange={(v) => updateMut.mutate({ id: clientId, status: v as any })}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={handleExportClientPdf} className="gap-1.5 rounded-xl h-9 text-[12px]">
+            <Download className="h-3.5 w-3.5" />Ficha PDF
+          </Button>
+          <Select value={client.status} onValueChange={(v) => updateMut.mutate({ id: clientId, status: v as any })}>
+            <SelectTrigger className="w-28 rounded-xl h-9 text-[13px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Activo</SelectItem>
               <SelectItem value="paused">Pausado</SelectItem>
@@ -136,428 +277,349 @@ export default function ClientDetail() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground">Peso</p>
-            <p className="text-lg font-bold text-foreground">
-              {client.weight ? `${(client.weight / 1000).toFixed(1)} kg` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground">Altura</p>
-            <p className="text-lg font-bold text-foreground">
-              {client.height ? `${client.height} cm` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground">Edad</p>
-            <p className="text-lg font-bold text-foreground">
-              {client.age ? `${client.age} años` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="py-3 text-center">
-            <p className="text-xs text-muted-foreground">Check-ins</p>
-            <p className="text-lg font-bold text-foreground">
-              {checkInsQ.data?.length || 0}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard label="Peso" value={lastWeight ? `${lastWeight.toFixed(1)} kg` : client.weight ? `${(client.weight / 1000).toFixed(1)} kg` : "—"} trend={weightTrend as any} />
+        <StatCard label="Altura" value={client.height ? `${client.height} cm` : "—"} />
+        <StatCard label="Edad" value={client.age ? `${client.age} años` : "—"} />
+        <StatCard label="Check-ins" value={String(checkInsQ.data?.length || 0)} />
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="overview" className="gap-1.5"><User className="h-3.5 w-3.5" />General</TabsTrigger>
-          <TabsTrigger value="chat" className="gap-1.5"><MessageCircle className="h-3.5 w-3.5" />Chat</TabsTrigger>
-          <TabsTrigger value="checkins" className="gap-1.5"><ClipboardCheck className="h-3.5 w-3.5" />Check-ins</TabsTrigger>
-          <TabsTrigger value="measurements" className="gap-1.5"><Ruler className="h-3.5 w-3.5" />Medidas</TabsTrigger>
-          <TabsTrigger value="photos" className="gap-1.5"><Camera className="h-3.5 w-3.5" />Fotos</TabsTrigger>
-          <TabsTrigger value="achievements" className="gap-1.5"><Trophy className="h-3.5 w-3.5" />Logros</TabsTrigger>
-          <TabsTrigger value="assessment" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Valoración</TabsTrigger>
-          <TabsTrigger value="ai" className="gap-1.5"><Brain className="h-3.5 w-3.5" />IA</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 pb-1">
+          <TabsList className="inline-flex h-10 gap-0.5 bg-secondary/60 rounded-xl p-1">
+            <TabsTrigger value="overview" className="rounded-lg text-[13px] gap-1.5 px-3"><User className="h-3.5 w-3.5" />General</TabsTrigger>
+            <TabsTrigger value="evolution" className="rounded-lg text-[13px] gap-1.5 px-3"><BarChart3 className="h-3.5 w-3.5" />Evolución</TabsTrigger>
+            <TabsTrigger value="chat" className="rounded-lg text-[13px] gap-1.5 px-3"><MessageCircle className="h-3.5 w-3.5" />Chat</TabsTrigger>
+            <TabsTrigger value="checkins" className="rounded-lg text-[13px] gap-1.5 px-3"><ClipboardCheck className="h-3.5 w-3.5" />Check-ins</TabsTrigger>
+            <TabsTrigger value="measurements" className="rounded-lg text-[13px] gap-1.5 px-3"><Ruler className="h-3.5 w-3.5" />Medidas</TabsTrigger>
+            <TabsTrigger value="photos" className="rounded-lg text-[13px] gap-1.5 px-3"><Camera className="h-3.5 w-3.5" />Fotos</TabsTrigger>
+            <TabsTrigger value="achievements" className="rounded-lg text-[13px] gap-1.5 px-3"><Trophy className="h-3.5 w-3.5" />Logros</TabsTrigger>
+            <TabsTrigger value="assessment" className="rounded-lg text-[13px] gap-1.5 px-3"><FileText className="h-3.5 w-3.5" />Valoración</TabsTrigger>
+            <TabsTrigger value="ai" className="rounded-lg text-[13px] gap-1.5 px-3"><Brain className="h-3.5 w-3.5" />IA</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Información del Cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-muted-foreground">Nombre:</span> <span className="font-medium">{client.name}</span></div>
-                <div><span className="text-muted-foreground">Email:</span> <span className="font-medium">{client.email || "—"}</span></div>
-                <div><span className="text-muted-foreground">Teléfono:</span> <span className="font-medium">{client.phone || "—"}</span></div>
-                <div><span className="text-muted-foreground">Objetivo:</span> <span className="font-medium">{client.goal || "—"}</span></div>
-              </div>
-              {client.notes && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Notas:</span>
-                  <p className="mt-1 text-foreground">{client.notes}</p>
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-4">
+            <h3 className="text-[15px] font-semibold">Información del Cliente</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-[14px]">
+              <div><span className="text-muted-foreground">Nombre:</span> <span className="font-medium ml-1">{client.name}</span></div>
+              <div><span className="text-muted-foreground">Email:</span> <span className="font-medium ml-1">{client.email || "—"}</span></div>
+              <div><span className="text-muted-foreground">Teléfono:</span> <span className="font-medium ml-1">{client.phone || "—"}</span></div>
+              <div><span className="text-muted-foreground">Objetivo:</span> <span className="font-medium ml-1">{client.goal || "—"}</span></div>
+            </div>
+            {client.notes && <p className="text-[13px] text-muted-foreground bg-secondary/50 rounded-xl p-3">{client.notes}</p>}
+            <div className="pt-1 border-t border-border/30">
+              <span className="text-[12px] text-muted-foreground">Código de acceso: </span>
+              <code className="text-[12px] bg-secondary px-2 py-0.5 rounded-md font-mono">{client.accessCode}</code>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Evolution Tab - Charts */}
+        <TabsContent value="evolution" className="space-y-4 mt-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+              <h3 className="text-[15px] font-semibold mb-1">Evolución del Peso</h3>
+              <p className="text-[12px] text-muted-foreground mb-3">{weightData.length} registros</p>
+              <EvolutionChart data={weightData} labels={weightLabels} color="#007AFF" unit="kg" height={160} />
+              {weightData.length >= 2 && (
+                <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                  <span>Inicio: {weightData[0].toFixed(1)} kg</span>
+                  <span className={`font-semibold ${weightData[weightData.length - 1] <= weightData[0] ? "text-emerald-500" : "text-red-400"}`}>
+                    {(weightData[weightData.length - 1] - weightData[0] > 0 ? "+" : "")}{(weightData[weightData.length - 1] - weightData[0]).toFixed(1)} kg
+                  </span>
+                  <span>Actual: {weightData[weightData.length - 1].toFixed(1)} kg</span>
                 </div>
               )}
-              <div className="pt-2">
-                <span className="text-xs text-muted-foreground">Código de acceso: </span>
-                <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{client.accessCode}</code>
+            </div>
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+              <h3 className="text-[15px] font-semibold mb-1">Adherencia</h3>
+              <p className="text-[12px] text-muted-foreground mb-3">{adherenceData.length} check-ins</p>
+              <EvolutionChart data={adherenceData} labels={adherenceLabels} color="#34C759" unit="/5" height={160} />
+              {adherenceData.length >= 2 && (
+                <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                  <span>Media: {(adherenceData.reduce((a: number, b: number) => a + b, 0) / adherenceData.length).toFixed(1)}/5</span>
+                  <span>Último: {adherenceData[adherenceData.length - 1]}/5</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Waist evolution if available */}
+          {(() => {
+            const waistEntries = (measurementsQ.data || []).filter((m: any) => m.waist).map((m: any) => ({ value: m.waist / 10, date: new Date(m.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) })).reverse();
+            const waistData = waistEntries.map(e => e.value);
+            const waistLabels = waistEntries.map(e => e.date);
+            if (waistData.length < 2) return null;
+            return (
+              <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+                <h3 className="text-[15px] font-semibold mb-1">Perímetro de Cintura</h3>
+                <p className="text-[12px] text-muted-foreground mb-3">{waistData.length} registros</p>
+                <EvolutionChart data={waistData} labels={waistLabels} color="#FF9500" unit="cm" height={140} />
+                <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                  <span>Inicio: {waistData[0].toFixed(1)} cm</span>
+                  <span className={`font-semibold ${waistData[waistData.length - 1] <= waistData[0] ? "text-emerald-500" : "text-red-400"}`}>
+                    {(waistData[waistData.length - 1] - waistData[0] > 0 ? "+" : "")}{(waistData[waistData.length - 1] - waistData[0]).toFixed(1)} cm
+                  </span>
+                  <span>Actual: {waistData[waistData.length - 1].toFixed(1)} cm</span>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            );
+          })()}
+          {/* Body Fat evolution if available */}
+          {(() => {
+            const bfEntries = (measurementsQ.data || []).filter((m: any) => m.bodyFat).map((m: any) => ({ value: m.bodyFat / 10, date: new Date(m.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) })).reverse();
+            const bfData = bfEntries.map(e => e.value);
+            const bfLabels = bfEntries.map(e => e.date);
+            if (bfData.length < 2) return null;
+            return (
+              <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+                <h3 className="text-[15px] font-semibold mb-1">Grasa Corporal</h3>
+                <p className="text-[12px] text-muted-foreground mb-3">{bfData.length} registros</p>
+                <EvolutionChart data={bfData} labels={bfLabels} color="#AF52DE" unit="%" height={140} />
+                <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                  <span>Inicio: {bfData[0].toFixed(1)}%</span>
+                  <span className={`font-semibold ${bfData[bfData.length - 1] <= bfData[0] ? "text-emerald-500" : "text-red-400"}`}>
+                    {(bfData[bfData.length - 1] - bfData[0] > 0 ? "+" : "")}{(bfData[bfData.length - 1] - bfData[0]).toFixed(1)}%
+                  </span>
+                  <span>Actual: {bfData[bfData.length - 1].toFixed(1)}%</span>
+                </div>
+              </div>
+            );
+          })()}
         </TabsContent>
 
         {/* Chat Tab */}
-        <TabsContent value="chat" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Chat con {client.name}</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => motivationMut.mutate({ clientId })}
-                disabled={motivationMut.isPending}
-                className="gap-1.5"
-              >
-                {motivationMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                Motivar
+        <TabsContent value="chat" className="mt-4">
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border/30">
+              <h3 className="text-[15px] font-semibold">Chat con {client.name}</h3>
+              <Button variant="outline" size="sm" onClick={() => motivationMut.mutate({ clientId })} disabled={motivationMut.isPending} className="gap-1.5 rounded-xl h-8 text-[12px]">
+                {motivationMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}Motivar
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80 overflow-y-auto border rounded-lg p-3 mb-3 space-y-2 bg-muted/30">
-                {messages.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-8">No hay mensajes aún</p>
-                ) : (
-                  messages.map((msg: any) => (
-                    <div key={msg.id} className={`flex ${msg.senderType === "trainer" ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                        msg.senderType === "trainer"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-card text-card-foreground border"
-                      }`}>
-                        <p>{msg.message}</p>
-                        <p className={`text-[10px] mt-1 ${msg.senderType === "trainer" ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                          {new Date(msg.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newMsg}
-                  onChange={(e) => setNewMsg(e.target.value)}
-                  placeholder="Escribe un mensaje..."
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newMsg.trim()) {
-                      sendMsgMut.mutate({ clientId, message: newMsg.trim() });
-                    }
-                  }}
-                />
-                <Button
-                  onClick={() => { if (newMsg.trim()) sendMsgMut.mutate({ clientId, message: newMsg.trim() }); }}
-                  disabled={sendMsgMut.isPending || !newMsg.trim()}
-                  size="icon"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="h-80 overflow-y-auto p-4 space-y-2.5 bg-secondary/20">
+              {messages.length === 0 ? (
+                <p className="text-center text-[13px] text-muted-foreground py-12">No hay mensajes aún</p>
+              ) : messages.map((msg: any) => (
+                <div key={msg.id} className={`flex ${msg.senderType === "trainer" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-[14px] ${msg.senderType === "trainer" ? "bg-primary text-primary-foreground rounded-br-md" : "bg-card text-card-foreground border border-border/50 rounded-bl-md"}`}>
+                    <p>{msg.message}</p>
+                    <p className={`text-[10px] mt-1 ${msg.senderType === "trainer" ? "text-primary-foreground/50" : "text-muted-foreground/60"}`}>
+                      {new Date(msg.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="flex gap-2 p-3 border-t border-border/30">
+              <Input value={newMsg} onChange={(e) => setNewMsg(e.target.value)} placeholder="Escribe un mensaje..." className="rounded-xl" onKeyDown={(e) => { if (e.key === "Enter" && newMsg.trim()) sendMsgMut.mutate({ clientId, message: newMsg.trim() }); }} />
+              <Button onClick={() => { if (newMsg.trim()) sendMsgMut.mutate({ clientId, message: newMsg.trim() }); }} disabled={sendMsgMut.isPending || !newMsg.trim()} size="icon" className="rounded-xl shrink-0">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Check-ins Tab */}
-        <TabsContent value="checkins" className="space-y-4">
+        <TabsContent value="checkins" className="space-y-3 mt-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-foreground">Check-ins Semanales</h3>
-            <Button onClick={() => setShowCheckIn(true)} size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Nuevo Check-in
-            </Button>
+            <h3 className="text-[15px] font-semibold">Check-ins Semanales</h3>
+            <Button onClick={() => setShowCheckIn(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]"><Plus className="h-3.5 w-3.5" />Nuevo</Button>
           </div>
           {(checkInsQ.data || []).length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No hay check-ins registrados
-              </CardContent>
-            </Card>
-          ) : (
-            (checkInsQ.data || []).map((ci: any) => (
-              <Card key={ci.id}>
-                <CardContent className="py-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-foreground">Semana del {ci.weekStart}</span>
-                    {ci.currentWeight && <Badge variant="outline">{(ci.currentWeight / 1000).toFixed(1)} kg</Badge>}
+            <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
+              <ClipboardCheck className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No hay check-ins registrados</p>
+            </div>
+          ) : (checkInsQ.data || []).map((ci: any) => (
+            <div key={ci.id} className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-[14px]">Semana del {ci.weekStart}</span>
+                {ci.currentWeight && <Badge variant="outline" className="rounded-full text-[11px]">{(ci.currentWeight / 1000).toFixed(1)} kg</Badge>}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {[{ k: "energyLevel", l: "Energía" }, { k: "hungerLevel", l: "Hambre" }, { k: "sleepQuality", l: "Sueño" }, { k: "adherenceRating", l: "Adherencia" }].map(({ k, l }) => ci[k] != null && (
+                  <div key={k} className="bg-secondary/50 rounded-xl px-3 py-1.5 text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{l}</p>
+                    <p className="text-[14px] font-semibold">{ci[k]}/5</p>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    {ci.energyLevel && <div>Energía: <span className="font-medium">{"⭐".repeat(ci.energyLevel)}</span></div>}
-                    {ci.hungerLevel && <div>Hambre: <span className="font-medium">{"⭐".repeat(ci.hungerLevel)}</span></div>}
-                    {ci.sleepQuality && <div>Sueño: <span className="font-medium">{"⭐".repeat(ci.sleepQuality)}</span></div>}
-                    {ci.adherenceRating && <div>Adherencia: <span className="font-medium">{"⭐".repeat(ci.adherenceRating)}</span></div>}
-                  </div>
-                  {ci.notes && <p className="text-sm text-muted-foreground">{ci.notes}</p>}
-                  {ci.trainerFeedback ? (
-                    <div className="bg-primary/5 rounded p-2 text-sm">
-                      <span className="font-medium text-primary">Tu feedback:</span> {ci.trainerFeedback}
-                    </div>
-                  ) : (
-                    <FeedbackInput checkInId={ci.id} clientId={clientId} onSubmit={(fb) => feedbackMut.mutate({ id: ci.id, clientId, feedback: fb })} />
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
+                ))}
+              </div>
+              {ci.notes && <p className="text-[13px] text-muted-foreground">{ci.notes}</p>}
+              {ci.trainerFeedback ? (
+                <div className="bg-primary/5 rounded-xl p-3 text-[13px]"><span className="font-medium text-primary">Tu feedback:</span> {ci.trainerFeedback}</div>
+              ) : (
+                <FeedbackInput checkInId={ci.id} clientId={clientId} onSubmit={(fb) => feedbackMut.mutate({ id: ci.id, clientId, feedback: fb })} />
+              )}
+            </div>
+          ))}
         </TabsContent>
 
         {/* Measurements Tab */}
-        <TabsContent value="measurements" className="space-y-4">
+        <TabsContent value="measurements" className="space-y-3 mt-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-foreground">Medidas Corporales</h3>
-            <Button onClick={() => setShowMeasure(true)} size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Nueva Medida
-            </Button>
+            <h3 className="text-[15px] font-semibold">Medidas Corporales</h3>
+            <Button onClick={() => setShowMeasure(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]"><Plus className="h-3.5 w-3.5" />Nueva</Button>
           </div>
           {(measurementsQ.data || []).length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No hay medidas registradas
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
+              <Ruler className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No hay medidas registradas</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 px-2">Fecha</th>
-                    <th className="text-right py-2 px-2">Peso</th>
-                    <th className="text-right py-2 px-2">Grasa</th>
-                    <th className="text-right py-2 px-2">Pecho</th>
-                    <th className="text-right py-2 px-2">Cintura</th>
-                    <th className="text-right py-2 px-2">Cadera</th>
-                    <th className="text-right py-2 px-2">Brazos</th>
-                    <th className="text-right py-2 px-2">Muslos</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(measurementsQ.data || []).map((m: any) => (
-                    <tr key={m.id} className="border-b">
-                      <td className="py-2 px-2 font-medium">{m.date}</td>
-                      <td className="text-right py-2 px-2">{m.weight ? `${(m.weight / 1000).toFixed(1)}` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.bodyFat ? `${(m.bodyFat / 10).toFixed(1)}%` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.chest ? `${(m.chest / 10).toFixed(1)}` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.waist ? `${(m.waist / 10).toFixed(1)}` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.hips ? `${(m.hips / 10).toFixed(1)}` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.arms ? `${(m.arms / 10).toFixed(1)}` : "—"}</td>
-                      <td className="text-right py-2 px-2">{m.thighs ? `${(m.thighs / 10).toFixed(1)}` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead><tr className="border-b border-border/30 bg-secondary/30">
+                    {["Fecha", "Peso", "Grasa", "Pecho", "Cintura", "Cadera", "Brazos", "Muslos"].map(h => (
+                      <th key={h} className={`py-2.5 px-3 font-medium text-muted-foreground ${h === "Fecha" ? "text-left" : "text-right"}`}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {(measurementsQ.data || []).map((m: any) => (
+                      <tr key={m.id} className="border-b border-border/20 last:border-0">
+                        <td className="py-2.5 px-3 font-medium">{m.date}</td>
+                        <td className="text-right py-2.5 px-3">{m.weight ? `${(m.weight / 1000).toFixed(1)}` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.bodyFat ? `${(m.bodyFat / 10).toFixed(1)}%` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.chest ? `${(m.chest / 10).toFixed(1)}` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.waist ? `${(m.waist / 10).toFixed(1)}` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.hips ? `${(m.hips / 10).toFixed(1)}` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.arms ? `${(m.arms / 10).toFixed(1)}` : "—"}</td>
+                        <td className="text-right py-2.5 px-3">{m.thighs ? `${(m.thighs / 10).toFixed(1)}` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </TabsContent>
 
         {/* Photos Tab */}
-        <TabsContent value="photos" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-foreground">Fotos de Progreso</h3>
-          </div>
+        <TabsContent value="photos" className="space-y-3 mt-4">
+          <h3 className="text-[15px] font-semibold">Fotos de Progreso</h3>
           {(photosQ.data || []).length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No hay fotos de progreso
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
+              <Camera className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No hay fotos de progreso</p>
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {(photosQ.data || []).map((p: any) => (
-                <Card key={p.id} className="overflow-hidden">
+                <div key={p.id} className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
                   <img src={p.photoUrl} alt={p.photoType} className="w-full h-48 object-cover" />
-                  <CardContent className="py-2 text-xs text-muted-foreground">
-                    <div className="flex justify-between">
-                      <span>{p.date}</span>
-                      <Badge variant="outline" className="text-[10px]">{p.photoType}</Badge>
-                    </div>
-                    {p.notes && <p className="mt-1">{p.notes}</p>}
-                  </CardContent>
-                </Card>
+                  <div className="p-3 text-[12px] text-muted-foreground flex justify-between items-center">
+                    <span>{p.date}</span>
+                    <Badge variant="outline" className="text-[10px] rounded-full">{p.photoType}</Badge>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </TabsContent>
 
         {/* Achievements Tab */}
-        <TabsContent value="achievements" className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Logros Desbloqueados</h3>
+        <TabsContent value="achievements" className="space-y-3 mt-4">
+          <h3 className="text-[15px] font-semibold">Logros Desbloqueados</h3>
           {(achievementsQ.data || []).length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No hay logros desbloqueados aún
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
+              <Trophy className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No hay logros desbloqueados aún</p>
+            </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {(achievementsQ.data || []).map((a: any) => (
-                <Card key={a.id}>
-                  <CardContent className="py-4 text-center">
-                    <div className="text-3xl mb-2">{a.icon || "🏆"}</div>
-                    <p className="font-medium text-foreground">{a.name}</p>
-                    {a.description && <p className="text-xs text-muted-foreground mt-1">{a.description}</p>}
-                    <p className="text-[10px] text-muted-foreground mt-2">
-                      {new Date(a.unlockedAt).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
+                <div key={a.id} className="bg-card rounded-2xl border border-border/50 shadow-sm p-4 text-center">
+                  <div className="text-3xl mb-2">{a.icon || "🏆"}</div>
+                  <p className="font-semibold text-[14px]">{a.name}</p>
+                  {a.description && <p className="text-[12px] text-muted-foreground mt-1">{a.description}</p>}
+                  <p className="text-[10px] text-muted-foreground mt-2">{new Date(a.unlockedAt).toLocaleDateString()}</p>
+                </div>
               ))}
             </div>
           )}
         </TabsContent>
 
         {/* Assessment Tab */}
-        <TabsContent value="assessment" className="space-y-4">
+        <TabsContent value="assessment" className="space-y-3 mt-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-foreground">Valoración Inicial</h3>
-            <Button onClick={() => setShowAssessment(true)} size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> {assessmentQ.data ? "Actualizar" : "Crear"}
+            <h3 className="text-[15px] font-semibold">Valoración Inicial</h3>
+            <Button onClick={() => setShowAssessment(true)} size="sm" className="gap-1.5 rounded-xl h-8 text-[12px]">
+              <Plus className="h-3.5 w-3.5" />{assessmentQ.data ? "Actualizar" : "Crear"}
             </Button>
           </div>
           {assessmentQ.data ? (
-            <Card>
-              <CardContent className="py-4 space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  {assessmentQ.data.currentDiet && <div><span className="text-muted-foreground">Dieta actual:</span> <span className="font-medium">{assessmentQ.data.currentDiet}</span></div>}
-                  {assessmentQ.data.exerciseFrequency && <div><span className="text-muted-foreground">Frecuencia ejercicio:</span> <span className="font-medium">{assessmentQ.data.exerciseFrequency}</span></div>}
-                  {assessmentQ.data.exerciseType && <div><span className="text-muted-foreground">Tipo ejercicio:</span> <span className="font-medium">{assessmentQ.data.exerciseType}</span></div>}
-                  {assessmentQ.data.medicalConditions && <div><span className="text-muted-foreground">Condiciones médicas:</span> <span className="font-medium">{assessmentQ.data.medicalConditions}</span></div>}
-                  {assessmentQ.data.medications && <div><span className="text-muted-foreground">Medicamentos:</span> <span className="font-medium">{assessmentQ.data.medications}</span></div>}
-                  {assessmentQ.data.allergiesIntolerances && <div><span className="text-muted-foreground">Alergias:</span> <span className="font-medium">{assessmentQ.data.allergiesIntolerances}</span></div>}
-                  {assessmentQ.data.sleepHours != null && <div><span className="text-muted-foreground">Horas sueño:</span> <span className="font-medium">{assessmentQ.data.sleepHours}h</span></div>}
-                  {assessmentQ.data.stressLevel != null && <div><span className="text-muted-foreground">Estrés:</span> <span className="font-medium">{assessmentQ.data.stressLevel}/5</span></div>}
-                  {assessmentQ.data.waterIntake != null && <div><span className="text-muted-foreground">Agua diaria:</span> <span className="font-medium">{assessmentQ.data.waterIntake}ml</span></div>}
-                  {assessmentQ.data.goals && <div className="col-span-2"><span className="text-muted-foreground">Objetivos:</span> <span className="font-medium">{assessmentQ.data.goals}</span></div>}
-                  {assessmentQ.data.trainerNotes && <div className="col-span-2"><span className="text-muted-foreground">Notas del entrenador:</span> <span className="font-medium">{assessmentQ.data.trainerNotes}</span></div>}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[14px]">
+                {[
+                  { k: "currentDiet", l: "Dieta actual" }, { k: "exerciseFrequency", l: "Frecuencia ejercicio" },
+                  { k: "exerciseType", l: "Tipo ejercicio" }, { k: "medicalConditions", l: "Condiciones médicas" },
+                  { k: "medications", l: "Medicamentos" }, { k: "allergiesIntolerances", l: "Alergias" },
+                ].map(({ k, l }) => (assessmentQ.data as any)[k] && (
+                  <div key={k}><span className="text-muted-foreground text-[13px]">{l}:</span> <span className="font-medium ml-1">{(assessmentQ.data as any)[k]}</span></div>
+                ))}
+                {assessmentQ.data.sleepHours != null && <div><span className="text-muted-foreground text-[13px]">Horas sueño:</span> <span className="font-medium ml-1">{assessmentQ.data.sleepHours}h</span></div>}
+                {assessmentQ.data.stressLevel != null && <div><span className="text-muted-foreground text-[13px]">Estrés:</span> <span className="font-medium ml-1">{assessmentQ.data.stressLevel}/5</span></div>}
+              </div>
+              {assessmentQ.data.goals && <p className="text-[13px] bg-secondary/50 rounded-xl p-3"><span className="font-medium">Objetivos:</span> {assessmentQ.data.goals}</p>}
+              {assessmentQ.data.trainerNotes && <p className="text-[13px] bg-primary/5 rounded-xl p-3"><span className="font-medium text-primary">Notas:</span> {assessmentQ.data.trainerNotes}</p>}
+            </div>
           ) : (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No hay valoración inicial registrada
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-[13px] text-muted-foreground">No hay valoración inicial</p>
+            </div>
           )}
         </TabsContent>
 
         {/* AI Tab */}
-        <TabsContent value="ai" className="space-y-4">
+        <TabsContent value="ai" className="space-y-4 mt-4">
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Recommendations */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-primary" /> Recomendaciones IA
-                </CardTitle>
-                <CardDescription>Análisis basado en los datos del cliente</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={() => recommendMut.mutate({ clientId })}
-                  disabled={recommendMut.isPending}
-                  className="w-full mb-3 gap-2"
-                >
-                  {recommendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Generar Recomendaciones
-                </Button>
-                {recommendMut.data && (
-                  <div className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-3">
-                    {String(recommendMut.data)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Consult */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" /> Consulta Express
-                </CardTitle>
-                <CardDescription>Pregunta rápida sobre este cliente</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={consultQ}
-                  onChange={(e) => setConsultQ(e.target.value)}
-                  placeholder="Ej: ¿Debería reducir carbohidratos si no pierde peso?"
-                  rows={3}
-                  className="mb-3"
-                />
-                <Button
-                  onClick={() => { if (consultQ.trim()) quickConsultMut.mutate({ clientId, question: consultQ.trim() }); }}
-                  disabled={quickConsultMut.isPending || !consultQ.trim()}
-                  className="w-full gap-2"
-                >
-                  {quickConsultMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Consultar
-                </Button>
-                {quickConsultMut.data && (
-                  <div className="text-sm whitespace-pre-wrap bg-muted/50 rounded-lg p-3 mt-3">
-                    {String(quickConsultMut.data)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-1"><Brain className="h-4.5 w-4.5 text-primary" /><h3 className="text-[15px] font-semibold">Recomendaciones IA</h3></div>
+              <p className="text-[12px] text-muted-foreground mb-3">Análisis basado en los datos del cliente</p>
+              <Button onClick={() => recommendMut.mutate({ clientId })} disabled={recommendMut.isPending} className="w-full gap-2 rounded-xl h-10 mb-3">
+                {recommendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}Generar Recomendaciones
+              </Button>
+              {recommendMut.data && <div className="text-[13px] whitespace-pre-wrap bg-secondary/50 rounded-xl p-3.5 leading-relaxed">{String(recommendMut.data)}</div>}
+            </div>
+            <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-1"><Zap className="h-4.5 w-4.5 text-primary" /><h3 className="text-[15px] font-semibold">Consulta Express</h3></div>
+              <p className="text-[12px] text-muted-foreground mb-3">Pregunta rápida sobre este cliente</p>
+              <Textarea value={consultQ_text} onChange={(e) => setConsultQ_text(e.target.value)} placeholder="Ej: ¿Debería reducir carbohidratos?" rows={3} className="rounded-xl mb-3 text-[14px]" />
+              <Button onClick={() => { if (consultQ_text.trim()) quickConsultMut.mutate({ clientId, question: consultQ_text.trim() }); }} disabled={quickConsultMut.isPending || !consultQ_text.trim()} className="w-full gap-2 rounded-xl h-10">
+                {quickConsultMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Consultar
+              </Button>
+              {quickConsultMut.data && <div className="text-[13px] whitespace-pre-wrap bg-secondary/50 rounded-xl p-3.5 mt-3 leading-relaxed">{String(quickConsultMut.data)}</div>}
+            </div>
           </div>
         </TabsContent>
       </Tabs>
 
       {/* Check-in Dialog */}
       <Dialog open={showCheckIn} onOpenChange={setShowCheckIn}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuevo Check-in Semanal</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Nuevo Check-in Semanal</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label>Semana del</Label>
-              <Input type="date" value={checkInForm.weekStart} onChange={(e) => setCheckInForm(f => ({ ...f, weekStart: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Peso actual (kg)</Label>
-              <Input type="number" value={checkInForm.currentWeight} onChange={(e) => setCheckInForm(f => ({ ...f, currentWeight: e.target.value }))} placeholder="75.5" />
-            </div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Semana del</Label><Input type="date" value={checkInForm.weekStart} onChange={(e) => setCheckInForm(f => ({ ...f, weekStart: e.target.value }))} className="rounded-xl" /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Peso actual (kg)</Label><Input type="number" value={checkInForm.currentWeight} onChange={(e) => setCheckInForm(f => ({ ...f, currentWeight: e.target.value }))} placeholder="75.5" className="rounded-xl" /></div>
             <div className="grid grid-cols-2 gap-3">
-              {(["energyLevel", "hungerLevel", "sleepQuality", "adherenceRating"] as const).map((field) => (
-                <div key={field}>
-                  <Label>{field === "energyLevel" ? "Energía" : field === "hungerLevel" ? "Hambre" : field === "sleepQuality" ? "Sueño" : "Adherencia"} (1-5)</Label>
-                  <Select value={checkInForm[field]} onValueChange={(v) => setCheckInForm(f => ({ ...f, [field]: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
-                    </SelectContent>
+              {([["energyLevel", "Energía"], ["hungerLevel", "Hambre"], ["sleepQuality", "Sueño"], ["adherenceRating", "Adherencia"]] as const).map(([field, label]) => (
+                <div key={field} className="space-y-1.5">
+                  <Label className="text-[13px]">{label} (1-5)</Label>
+                  <Select value={(checkInForm as any)[field]} onValueChange={(v) => setCheckInForm(f => ({ ...f, [field]: v }))}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>{[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               ))}
             </div>
-            <div>
-              <Label>Notas</Label>
-              <Textarea value={checkInForm.notes} onChange={(e) => setCheckInForm(f => ({ ...f, notes: e.target.value }))} rows={3} />
-            </div>
-            <Button onClick={() => {
-              createCheckInMut.mutate({
-                clientId,
-                weekStart: checkInForm.weekStart,
-                currentWeight: checkInForm.currentWeight ? Math.round(parseFloat(checkInForm.currentWeight) * 1000) : undefined,
-                energyLevel: parseInt(checkInForm.energyLevel),
-                hungerLevel: parseInt(checkInForm.hungerLevel),
-                sleepQuality: parseInt(checkInForm.sleepQuality),
-                adherenceRating: parseInt(checkInForm.adherenceRating),
-                notes: checkInForm.notes || undefined,
-              });
-            }} disabled={createCheckInMut.isPending} className="w-full">
-              {createCheckInMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar Check-in
+            <div className="space-y-1.5"><Label className="text-[13px]">Notas</Label><Textarea value={checkInForm.notes} onChange={(e) => setCheckInForm(f => ({ ...f, notes: e.target.value }))} rows={3} className="rounded-xl" /></div>
+            <Button onClick={() => createCheckInMut.mutate({ clientId, weekStart: checkInForm.weekStart, currentWeight: checkInForm.currentWeight ? Math.round(parseFloat(checkInForm.currentWeight) * 1000) : undefined, energyLevel: parseInt(checkInForm.energyLevel), hungerLevel: parseInt(checkInForm.hungerLevel), sleepQuality: parseInt(checkInForm.sleepQuality), adherenceRating: parseInt(checkInForm.adherenceRating), notes: checkInForm.notes || undefined })} disabled={createCheckInMut.isPending} className="w-full rounded-xl h-11">
+              {createCheckInMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Check-in
             </Button>
           </div>
         </DialogContent>
@@ -565,39 +627,18 @@ export default function ClientDetail() {
 
       {/* Measurement Dialog */}
       <Dialog open={showMeasure} onOpenChange={setShowMeasure}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nueva Medida Corporal</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Nueva Medida Corporal</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label>Fecha</Label>
-              <Input type="date" value={measureForm.date} onChange={(e) => setMeasureForm(f => ({ ...f, date: e.target.value }))} />
-            </div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Fecha</Label><Input type="date" value={measureForm.date} onChange={(e) => setMeasureForm(f => ({ ...f, date: e.target.value }))} className="rounded-xl" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Peso (kg)</Label><Input type="number" step="0.1" value={measureForm.weight} onChange={(e) => setMeasureForm(f => ({ ...f, weight: e.target.value }))} /></div>
-              <div><Label>Grasa (%)</Label><Input type="number" step="0.1" value={measureForm.bodyFat} onChange={(e) => setMeasureForm(f => ({ ...f, bodyFat: e.target.value }))} /></div>
-              <div><Label>Pecho (cm)</Label><Input type="number" step="0.1" value={measureForm.chest} onChange={(e) => setMeasureForm(f => ({ ...f, chest: e.target.value }))} /></div>
-              <div><Label>Cintura (cm)</Label><Input type="number" step="0.1" value={measureForm.waist} onChange={(e) => setMeasureForm(f => ({ ...f, waist: e.target.value }))} /></div>
-              <div><Label>Cadera (cm)</Label><Input type="number" step="0.1" value={measureForm.hips} onChange={(e) => setMeasureForm(f => ({ ...f, hips: e.target.value }))} /></div>
-              <div><Label>Brazos (cm)</Label><Input type="number" step="0.1" value={measureForm.arms} onChange={(e) => setMeasureForm(f => ({ ...f, arms: e.target.value }))} /></div>
-              <div><Label>Muslos (cm)</Label><Input type="number" step="0.1" value={measureForm.thighs} onChange={(e) => setMeasureForm(f => ({ ...f, thighs: e.target.value }))} /></div>
+              {([["weight", "Peso (kg)"], ["bodyFat", "Grasa (%)"], ["chest", "Pecho (cm)"], ["waist", "Cintura (cm)"], ["hips", "Cadera (cm)"], ["arms", "Brazos (cm)"], ["thighs", "Muslos (cm)"]] as const).map(([field, label]) => (
+                <div key={field} className="space-y-1.5"><Label className="text-[13px]">{label}</Label><Input type="number" step="0.1" value={(measureForm as any)[field]} onChange={(e) => setMeasureForm(f => ({ ...f, [field]: e.target.value }))} className="rounded-xl" /></div>
+              ))}
             </div>
-            <div><Label>Notas</Label><Textarea value={measureForm.notes} onChange={(e) => setMeasureForm(f => ({ ...f, notes: e.target.value }))} rows={2} /></div>
-            <Button onClick={() => {
-              addMeasureMut.mutate({
-                clientId,
-                date: measureForm.date,
-                weight: measureForm.weight ? Math.round(parseFloat(measureForm.weight) * 1000) : undefined,
-                bodyFat: measureForm.bodyFat ? Math.round(parseFloat(measureForm.bodyFat) * 10) : undefined,
-                chest: measureForm.chest ? Math.round(parseFloat(measureForm.chest) * 10) : undefined,
-                waist: measureForm.waist ? Math.round(parseFloat(measureForm.waist) * 10) : undefined,
-                hips: measureForm.hips ? Math.round(parseFloat(measureForm.hips) * 10) : undefined,
-                arms: measureForm.arms ? Math.round(parseFloat(measureForm.arms) * 10) : undefined,
-                thighs: measureForm.thighs ? Math.round(parseFloat(measureForm.thighs) * 10) : undefined,
-                notes: measureForm.notes || undefined,
-              });
-            }} disabled={addMeasureMut.isPending} className="w-full">
-              {addMeasureMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar Medida
+            <div className="space-y-1.5"><Label className="text-[13px]">Notas</Label><Textarea value={measureForm.notes} onChange={(e) => setMeasureForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="rounded-xl" /></div>
+            <Button onClick={() => addMeasureMut.mutate({ clientId, date: measureForm.date, weight: measureForm.weight ? Math.round(parseFloat(measureForm.weight) * 1000) : undefined, bodyFat: measureForm.bodyFat ? Math.round(parseFloat(measureForm.bodyFat) * 10) : undefined, chest: measureForm.chest ? Math.round(parseFloat(measureForm.chest) * 10) : undefined, waist: measureForm.waist ? Math.round(parseFloat(measureForm.waist) * 10) : undefined, hips: measureForm.hips ? Math.round(parseFloat(measureForm.hips) * 10) : undefined, arms: measureForm.arms ? Math.round(parseFloat(measureForm.arms) * 10) : undefined, thighs: measureForm.thighs ? Math.round(parseFloat(measureForm.thighs) * 10) : undefined, notes: measureForm.notes || undefined })} disabled={addMeasureMut.isPending} className="w-full rounded-xl h-11">
+              {addMeasureMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Medida
             </Button>
           </div>
         </DialogContent>
@@ -605,50 +646,31 @@ export default function ClientDetail() {
 
       {/* Assessment Dialog */}
       <Dialog open={showAssessment} onOpenChange={setShowAssessment}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Valoración Inicial</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
+          <DialogHeader><DialogTitle className="text-[17px]">Valoración Inicial</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Dieta actual</Label><Textarea value={assessForm.currentDiet} onChange={(e) => setAssessForm(f => ({ ...f, currentDiet: e.target.value }))} rows={2} placeholder="Describe su alimentación habitual..." /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Dieta actual</Label><Textarea value={assessForm.currentDiet} onChange={(e) => setAssessForm(f => ({ ...f, currentDiet: e.target.value }))} rows={2} placeholder="Describe su alimentación habitual..." className="rounded-xl" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Frecuencia ejercicio</Label><Input value={assessForm.exerciseFrequency} onChange={(e) => setAssessForm(f => ({ ...f, exerciseFrequency: e.target.value }))} placeholder="3-4 días/semana" /></div>
-              <div><Label>Tipo ejercicio</Label><Input value={assessForm.exerciseType} onChange={(e) => setAssessForm(f => ({ ...f, exerciseType: e.target.value }))} placeholder="Pesas, cardio..." /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Frecuencia ejercicio</Label><Input value={assessForm.exerciseFrequency} onChange={(e) => setAssessForm(f => ({ ...f, exerciseFrequency: e.target.value }))} placeholder="3-4 días/semana" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Tipo ejercicio</Label><Input value={assessForm.exerciseType} onChange={(e) => setAssessForm(f => ({ ...f, exerciseType: e.target.value }))} placeholder="Pesas, cardio..." className="rounded-xl" /></div>
             </div>
-            <div><Label>Condiciones médicas</Label><Input value={assessForm.medicalConditions} onChange={(e) => setAssessForm(f => ({ ...f, medicalConditions: e.target.value }))} placeholder="Ninguna, diabetes..." /></div>
-            <div><Label>Medicamentos</Label><Input value={assessForm.medications} onChange={(e) => setAssessForm(f => ({ ...f, medications: e.target.value }))} placeholder="Ninguno..." /></div>
-            <div><Label>Alergias/Intolerancias</Label><Input value={assessForm.allergiesIntolerances} onChange={(e) => setAssessForm(f => ({ ...f, allergiesIntolerances: e.target.value }))} placeholder="Lactosa, gluten..." /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Condiciones médicas</Label><Input value={assessForm.medicalConditions} onChange={(e) => setAssessForm(f => ({ ...f, medicalConditions: e.target.value }))} placeholder="Ninguna, diabetes..." className="rounded-xl" /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Medicamentos</Label><Input value={assessForm.medications} onChange={(e) => setAssessForm(f => ({ ...f, medications: e.target.value }))} placeholder="Ninguno..." className="rounded-xl" /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Alergias/Intolerancias</Label><Input value={assessForm.allergiesIntolerances} onChange={(e) => setAssessForm(f => ({ ...f, allergiesIntolerances: e.target.value }))} placeholder="Lactosa, gluten..." className="rounded-xl" /></div>
             <div className="grid grid-cols-3 gap-3">
-              <div><Label>Horas sueño</Label><Input type="number" value={assessForm.sleepHours} onChange={(e) => setAssessForm(f => ({ ...f, sleepHours: e.target.value }))} placeholder="7" /></div>
-              <div>
-                <Label>Estrés (1-5)</Label>
+              <div className="space-y-1.5"><Label className="text-[13px]">Horas sueño</Label><Input type="number" value={assessForm.sleepHours} onChange={(e) => setAssessForm(f => ({ ...f, sleepHours: e.target.value }))} placeholder="7" className="rounded-xl" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Estrés (1-5)</Label>
                 <Select value={assessForm.stressLevel} onValueChange={(v) => setAssessForm(f => ({ ...f, stressLevel: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                   <SelectContent>{[1,2,3,4,5].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div><Label>Agua (ml/día)</Label><Input type="number" value={assessForm.waterIntake} onChange={(e) => setAssessForm(f => ({ ...f, waterIntake: e.target.value }))} placeholder="2000" /></div>
+              <div className="space-y-1.5"><Label className="text-[13px]">Agua (ml/día)</Label><Input type="number" value={assessForm.waterIntake} onChange={(e) => setAssessForm(f => ({ ...f, waterIntake: e.target.value }))} placeholder="2000" className="rounded-xl" /></div>
             </div>
-            <div><Label>Objetivos</Label><Textarea value={assessForm.goals} onChange={(e) => setAssessForm(f => ({ ...f, goals: e.target.value }))} rows={2} placeholder="Objetivos del cliente..." /></div>
-            <div><Label>Notas del entrenador</Label><Textarea value={assessForm.trainerNotes} onChange={(e) => setAssessForm(f => ({ ...f, trainerNotes: e.target.value }))} rows={2} placeholder="Tus observaciones..." /></div>
-            <Button onClick={() => {
-              createAssessMut.mutate({
-                clientId,
-                currentDiet: assessForm.currentDiet || undefined,
-                exerciseFrequency: assessForm.exerciseFrequency || undefined,
-                exerciseType: assessForm.exerciseType || undefined,
-                medicalConditions: assessForm.medicalConditions || undefined,
-                medications: assessForm.medications || undefined,
-                allergiesIntolerances: assessForm.allergiesIntolerances || undefined,
-                sleepHours: assessForm.sleepHours ? parseInt(assessForm.sleepHours) : undefined,
-                stressLevel: parseInt(assessForm.stressLevel),
-                waterIntake: assessForm.waterIntake ? parseInt(assessForm.waterIntake) : undefined,
-                alcoholFrequency: assessForm.alcoholFrequency || undefined,
-                smokingStatus: assessForm.smokingStatus || undefined,
-                goals: assessForm.goals || undefined,
-                trainerNotes: assessForm.trainerNotes || undefined,
-              });
-            }} disabled={createAssessMut.isPending} className="w-full">
-              {createAssessMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Guardar Valoración
+            <div className="space-y-1.5"><Label className="text-[13px]">Objetivos</Label><Textarea value={assessForm.goals} onChange={(e) => setAssessForm(f => ({ ...f, goals: e.target.value }))} rows={2} placeholder="Objetivos del cliente..." className="rounded-xl" /></div>
+            <div className="space-y-1.5"><Label className="text-[13px]">Notas del entrenador</Label><Textarea value={assessForm.trainerNotes} onChange={(e) => setAssessForm(f => ({ ...f, trainerNotes: e.target.value }))} rows={2} placeholder="Tus observaciones..." className="rounded-xl" /></div>
+            <Button onClick={() => createAssessMut.mutate({ clientId, currentDiet: assessForm.currentDiet || undefined, exerciseFrequency: assessForm.exerciseFrequency || undefined, exerciseType: assessForm.exerciseType || undefined, medicalConditions: assessForm.medicalConditions || undefined, medications: assessForm.medications || undefined, allergiesIntolerances: assessForm.allergiesIntolerances || undefined, sleepHours: assessForm.sleepHours ? parseInt(assessForm.sleepHours) : undefined, stressLevel: parseInt(assessForm.stressLevel), waterIntake: assessForm.waterIntake ? parseInt(assessForm.waterIntake) : undefined, alcoholFrequency: assessForm.alcoholFrequency || undefined, smokingStatus: assessForm.smokingStatus || undefined, goals: assessForm.goals || undefined, trainerNotes: assessForm.trainerNotes || undefined })} disabled={createAssessMut.isPending} className="w-full rounded-xl h-11">
+              {createAssessMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Valoración
             </Button>
           </div>
         </DialogContent>
@@ -657,24 +679,19 @@ export default function ClientDetail() {
   );
 }
 
-// Small helper component for inline feedback
 function FeedbackInput({ checkInId, clientId, onSubmit }: { checkInId: number; clientId: number; onSubmit: (fb: string) => void }) {
   const [show, setShow] = useState(false);
   const [text, setText] = useState("");
   if (!show) return (
-    <Button variant="ghost" size="sm" onClick={() => setShow(true)} className="text-xs gap-1">
+    <Button variant="ghost" size="sm" onClick={() => setShow(true)} className="text-[12px] gap-1 h-7 rounded-lg">
       <Edit2 className="h-3 w-3" /> Añadir feedback
     </Button>
   );
   return (
     <div className="flex gap-2">
-      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Tu feedback..." className="text-sm" />
-      <Button size="sm" onClick={() => { if (text.trim()) onSubmit(text.trim()); }} disabled={!text.trim()}>
-        <Send className="h-3.5 w-3.5" />
-      </Button>
-      <Button size="sm" variant="ghost" onClick={() => setShow(false)}>
-        <X className="h-3.5 w-3.5" />
-      </Button>
+      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Tu feedback..." className="text-[13px] rounded-xl" />
+      <Button size="sm" onClick={() => { if (text.trim()) onSubmit(text.trim()); }} disabled={!text.trim()} className="rounded-xl"><Send className="h-3.5 w-3.5" /></Button>
+      <Button size="sm" variant="ghost" onClick={() => setShow(false)} className="rounded-xl"><X className="h-3.5 w-3.5" /></Button>
     </div>
   );
 }

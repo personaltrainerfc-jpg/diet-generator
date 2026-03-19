@@ -1,4 +1,4 @@
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { z } from "zod";
 import {
@@ -483,5 +483,81 @@ ${assessment ? `Condiciones médicas: ${assessment.medicalConditions || "ninguna
       });
 
       return (response.choices[0]?.message?.content as string) || "No se pudo procesar la consulta.";
+    }),
+});
+
+// ── Client Portal Router (Client-facing, public with code auth) ──
+export const clientPortalRouter = router({
+  loginByCode: publicProcedure
+    .input(z.object({ accessCode: z.string().min(1).max(32) }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client) throw new Error("Código de acceso inválido");
+      if (client.status === "inactive") throw new Error("Tu cuenta está desactivada. Contacta con tu entrenador.");
+      return { clientId: client.id, name: client.name, status: client.status };
+    }),
+
+  getProfile: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return { id: client.id, name: client.name, email: client.email, phone: client.phone, age: client.age, weight: client.weight, height: client.height, goal: client.goal, status: client.status };
+    }),
+
+  getActiveDiet: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getClientActiveDiet(input.clientId);
+    }),
+
+  logAdherence: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      dietId: z.number(), date: z.string(), mealNumber: z.number(),
+      completed: z.number().min(0).max(1),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return logAdherence({ clientId: input.clientId, dietId: input.dietId, date: input.date, mealNumber: input.mealNumber, completed: input.completed, notes: input.notes });
+    }),
+
+  sendMessage: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      message: z.string().min(1).max(2000),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return sendMessage({ clientId: input.clientId, senderType: "client", message: input.message });
+    }),
+
+  getMessages: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string(), limit: z.number().optional() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getMessages(input.clientId, input.limit || 50);
+    }),
+
+  getAchievements: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getClientAchievements(input.clientId);
+    }),
+
+  getCheckIns: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getCheckIns(input.clientId);
     }),
 });
