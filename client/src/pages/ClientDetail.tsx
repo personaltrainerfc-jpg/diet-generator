@@ -126,6 +126,10 @@ export default function ClientDetail() {
   const createTagMut = trpc.clientMgmt.createTag.useMutation({ onSuccess: () => { toast.success("Etiqueta creada"); allTagsQ.refetch(); } });
   const cloneDietMut = trpc.clientMgmt.cloneDietToClient.useMutation({ onSuccess: () => { toast.success("Dieta clonada y asignada"); activeDietQ.refetch(); dietHistoryQ.refetch(); } });
   const invitationsQ = trpc.clientMgmt.getInvitations.useQuery({ clientId }, { enabled: clientId > 0 });
+  // Adherencia diaria del cliente (últimos 30 días)
+  const [adherenceStartDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); });
+  const [adherenceEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const dailyAdherenceQ = trpc.clientMgmt.getAdherenceRange.useQuery({ clientId, startDate: adherenceStartDate, endDate: adherenceEndDate }, { enabled: clientId > 0 });
   const sendInviteMut = trpc.clientMgmt.sendInvitation.useMutation({ onSuccess: (data) => { toast.success(`Invitación enviada. Código: ${data.accessCode}`); invitationsQ.refetch(); setInviteEmail(""); } });
   const resendInviteMut = trpc.clientMgmt.resendInvitation.useMutation({ onSuccess: () => { toast.success("Invitación reenviada"); invitationsQ.refetch(); } });
 
@@ -165,13 +169,26 @@ export default function ClientDetail() {
   const weightData = useMemo(() => weightEntries.map(e => e.value), [weightEntries]);
   const weightLabels = useMemo(() => weightEntries.map(e => e.date), [weightEntries]);
 
-  // Adherence data from check-ins
+  // Adherence data from check-ins (weekly)
   const adherenceEntries = useMemo(() => {
     const cis = checkInsQ.data || [];
     return cis.filter((c: any) => c.adherenceRating).map((c: any) => ({ value: c.adherenceRating, date: new Date(c.weekStart).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) })).reverse();
   }, [checkInsQ.data]);
   const adherenceData = useMemo(() => adherenceEntries.map(e => e.value), [adherenceEntries]);
   const adherenceLabels = useMemo(() => adherenceEntries.map(e => e.date), [adherenceEntries]);
+
+  // Daily adherence data (from client portal)
+  const dailyAdherenceEntries = useMemo(() => {
+    const logs = dailyAdherenceQ.data || [];
+    return logs.map((a: any) => ({
+      value: a.completed ?? 0,
+      date: new Date(a.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }),
+      rawDate: a.date,
+      notes: a.notes,
+    })).sort((x: any, y: any) => x.rawDate.localeCompare(y.rawDate));
+  }, [dailyAdherenceQ.data]);
+  const dailyAdherenceData = useMemo(() => dailyAdherenceEntries.map(e => e.value), [dailyAdherenceEntries]);
+  const dailyAdherenceLabels = useMemo(() => dailyAdherenceEntries.map(e => e.date), [dailyAdherenceEntries]);
 
   if (!client) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -426,6 +443,47 @@ export default function ClientDetail() {
             )}
           </div>
 
+          {/* Adherencia Diaria del Cliente */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[15px] font-semibold flex items-center gap-2"><BarChart3 className="h-4 w-4 text-emerald-500" />Adherencia Diaria</h3>
+              <span className="text-[11px] text-muted-foreground">Últimos 30 días</span>
+            </div>
+            {dailyAdherenceQ.isLoading ? (
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : dailyAdherenceEntries.length === 0 ? (
+              <div className="text-center py-6">
+                <BarChart3 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">El cliente aún no ha registrado adherencia diaria</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Los registros aparecerán aquí cuando el cliente use su portal</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Visual calendar grid */}
+                <div className="flex flex-wrap gap-1">
+                  {dailyAdherenceEntries.map((entry: any, i: number) => (
+                    <div key={i} title={`${entry.date}: ${entry.value}% ${entry.notes ? '- ' + entry.notes : ''}`} className={`w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold cursor-default ${
+                      entry.value >= 80 ? 'bg-emerald-500/20 text-emerald-600' :
+                      entry.value >= 50 ? 'bg-yellow-500/20 text-yellow-600' :
+                      'bg-red-500/20 text-red-500'
+                    }`}>{entry.value}</div>
+                  ))}
+                </div>
+                {/* Summary stats */}
+                <div className="flex items-center gap-4 text-[12px] text-muted-foreground pt-2 border-t border-border/30">
+                  <span>Registros: <strong className="text-foreground">{dailyAdherenceEntries.length}</strong></span>
+                  <span>Media: <strong className={`${(dailyAdherenceData.reduce((a: number, b: number) => a + b, 0) / dailyAdherenceData.length) >= 70 ? 'text-emerald-500' : 'text-yellow-500'}`}>{(dailyAdherenceData.reduce((a: number, b: number) => a + b, 0) / dailyAdherenceData.length).toFixed(0)}%</strong></span>
+                  <span>Último: <strong className="text-foreground">{dailyAdherenceData[dailyAdherenceData.length - 1]}%</strong></span>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20"></span><span>≥80%</span>
+                    <span className="w-2.5 h-2.5 rounded-sm bg-yellow-500/20"></span><span>≥50%</span>
+                    <span className="w-2.5 h-2.5 rounded-sm bg-red-500/20"></span><span>&lt;50%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Plan Nutricional Activo */}
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-3">
             <div className="flex items-center justify-between">
@@ -577,14 +635,26 @@ export default function ClientDetail() {
               )}
             </div>
             <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
-              <h3 className="text-[15px] font-semibold mb-1">Adherencia</h3>
-              <p className="text-[12px] text-muted-foreground mb-3">{adherenceData.length} check-ins</p>
-              <EvolutionChart data={adherenceData} labels={adherenceLabels} color="#34C759" unit="/5" height={160} />
-              {adherenceData.length >= 1 && (
-                <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
-                  <span>Media: {(adherenceData.reduce((a: number, b: number) => a + b, 0) / adherenceData.length).toFixed(1)}/5</span>
-                  <span>Último: {adherenceData[adherenceData.length - 1]}/5</span>
-                </div>
+              <h3 className="text-[15px] font-semibold mb-1">Adherencia Diaria</h3>
+              <p className="text-[12px] text-muted-foreground mb-3">{dailyAdherenceData.length > 0 ? `${dailyAdherenceData.length} registros diarios` : `${adherenceData.length} check-ins semanales`}</p>
+              {dailyAdherenceData.length > 0 ? (
+                <>
+                  <EvolutionChart data={dailyAdherenceData} labels={dailyAdherenceLabels} color="#34C759" unit="%" height={160} />
+                  <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                    <span>Media: {(dailyAdherenceData.reduce((a: number, b: number) => a + b, 0) / dailyAdherenceData.length).toFixed(0)}%</span>
+                    <span>Último: {dailyAdherenceData[dailyAdherenceData.length - 1]}%</span>
+                  </div>
+                </>
+              ) : adherenceData.length > 0 ? (
+                <>
+                  <EvolutionChart data={adherenceData} labels={adherenceLabels} color="#34C759" unit="/5" height={160} />
+                  <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
+                    <span>Media: {(adherenceData.reduce((a: number, b: number) => a + b, 0) / adherenceData.length).toFixed(1)}/5</span>
+                    <span>Último: {adherenceData[adherenceData.length - 1]}/5</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-[13px] text-muted-foreground text-center py-6">Sin datos de adherencia aún</p>
               )}
             </div>
           </div>

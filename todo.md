@@ -169,3 +169,8 @@
 - [x] E3: Mensajes motivación no automáticos (IA genera sugerencia, entrenador decide enviar/editar/descartar, mensajes variados sin repetir estructura en últimos 10, adaptados al momento del cliente)
 - [x] E4: Dieta colapsada por defecto en app cliente (resumen visual, expandir al pulsar día/comida, mejor UX móvil)
 - [x] E5: Sección "Fin de Semana" en app cliente (nueva sección en navegación principal)
+
+## Bloque F: Mejoras sesión 6
+
+- [x] F1: Valoración automática IA al registrar fin de semana (ajustes escritos sobre cómo abordar los siguientes días, sin tocar la dieta)
+- [x] F2: Bug: La adherencia registrada por el cliente no aparece en el panel del entrenador

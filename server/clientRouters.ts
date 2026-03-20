@@ -1116,11 +1116,12 @@ export const clientPortalRouter = router({
       return { success: true };
     }),
 
-  // ── Weekend AI Feedback ──
+  // ── Weekend AI Feedback with automatic assessment and weekly adjustments ──
   getWeekendFeedback: publicProcedure
     .input(z.object({
       clientId: z.number(), accessCode: z.string(),
       weekendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      clientNotes: z.string().max(1000).optional(),
     }))
     .mutation(async ({ input }) => {
       const client = await getClientByAccessCode(input.accessCode);
@@ -1128,17 +1129,59 @@ export const clientPortalRouter = router({
       const meals = await getWeekendMeals(input.clientId, input.weekendDate);
       if (meals.length === 0) throw new Error("No hay comidas registradas para este fin de semana");
       const activeDiet = await getClientActiveDiet(input.clientId);
+      
+      // Get recent adherence for context
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const recentAdherence = await getAdherenceRange(input.clientId, weekAgo.toISOString().slice(0, 10), new Date().toISOString().slice(0, 10));
+      const avgAdherence = recentAdherence.length > 0 ? Math.round(recentAdherence.reduce((sum, a) => sum + (a.completed ?? 0), 0) / recentAdherence.length) : null;
+      
+      // Get previous weekend feedback for variety
+      const prevFeedbacks = await getWeekendFeedbackList(input.clientId);
+      const lastFeedback = prevFeedbacks.length > 0 ? prevFeedbacks[0]?.feedback?.slice(0, 200) : null;
+      
       const mealsList = meals.map(m => `${m.mealType}: ${m.description}${m.calories ? ` (~${m.calories} kcal)` : ""}${m.isHealthy === 1 ? " [saludable]" : m.isHealthy === 0 ? " [menos saludable]" : ""}`).join("\n");
+      
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: `Eres un nutricionista deportivo. Analiza las comidas del fin de semana de ${client.name} y da feedback constructivo. Su objetivo es: ${client.goal || "mejorar su salud"}. ${activeDiet ? `Su dieta tiene ${(activeDiet as any).totalCalories} kcal/día objetivo.` : ""} Da una puntuación del 1-10 y 3-4 líneas de feedback. Formato: PUNTUACIÓN: X/10\n\nFEEDBACK:\n(texto)` },
-          { role: "user", content: `Comidas del fin de semana:\n${mealsList}` },
+          { role: "system", content: `Eres un nutricionista deportivo experto. Tu tarea es analizar las comidas del fin de semana de ${client.name} y generar:
+
+1. **VALORACIÓN** (puntuación del 1 al 10 con justificación breve)
+2. **ANÁLISIS** del fin de semana (qué ha hecho bien, qué podría mejorar)
+3. **AJUSTES PARA LOS PRÓXIMOS DÍAS** (recomendaciones concretas y prácticas para compensar o mantener, SIN modificar la dieta base, solo consejos de comportamiento alimentario)
+
+Contexto del cliente:
+- Objetivo: ${client.goal || "mejorar su salud"}
+- Peso: ${client.weight ? (client.weight / 1000).toFixed(1) + " kg" : "desconocido"}
+${activeDiet ? `- Dieta activa: ${(activeDiet as any).totalCalories} kcal/día, tipo ${(activeDiet as any).dietType}` : "- Sin dieta activa"}
+${avgAdherence !== null ? `- Adherencia media última semana: ${avgAdherence}%` : ""}
+${input.clientNotes ? `- Notas del cliente sobre su fin de semana: "${input.clientNotes}"` : ""}
+${lastFeedback ? `- Último feedback dado (NO repitas la misma estructura ni frases): "${lastFeedback}..."` : ""}
+
+Formato de respuesta OBLIGATORIO:
+PUNTUACIÓN: X/10
+
+VALORACIÓN:
+(2-3 líneas analizando el fin de semana)
+
+AJUSTES PARA LOS PRÓXIMOS DÍAS:
+- (3-5 recomendaciones concretas y prácticas para lunes-viernes, sin cambiar la dieta base)
+
+Sé directo, motivador y personalizado. Usa un tono cercano pero profesional. Cada respuesta debe ser única y diferente a las anteriores.` },
+          { role: "user", content: `Comidas del fin de semana (${input.weekendDate}):\n${mealsList}` },
         ],
       });
       const text = (response.choices[0]?.message?.content as string) || "No se pudo generar feedback.";
       const scoreMatch = text.match(/(\d+)\/10/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
       const id = await addWeekendFeedback({ clientId: input.clientId, weekendDate: input.weekendDate, feedback: text, score: score ?? undefined });
+      
+      // Notify trainer about weekend feedback
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `🌟 Feedback fin de semana - ${client.name}`, content: `${client.name} ha registrado su fin de semana (${input.weekendDate}). Puntuación: ${score ?? "?"}/10. ${meals.length} comidas registradas.` });
+      } catch (e) { /* non-critical */ }
+      
       return { id, feedback: text, score };
     }),
 

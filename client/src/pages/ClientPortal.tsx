@@ -1397,9 +1397,8 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
   const addFeedbackMut = trpc.clientPortal.getWeekendFeedback.useMutation({ onSuccess: () => { toast.success("Feedback guardado"); feedbackQ.refetch(); } });
   const addMealMut = trpc.clientPortal.addWeekendMeal.useMutation({ onSuccess: () => { toast.success("Comida registrada"); mealsQ.refetch(); setMealForm({ description: "", mealType: "almuerzo", photo: "" }); } });
 
-  const [showFeedback, setShowFeedback] = useState(false);
   const [showMeal, setShowMeal] = useState(false);
-  const [feedbackForm, setFeedbackForm] = useState({ date: new Date().toISOString().split("T")[0], overallScore: "3", notes: "", followedPlan: true });
+  const [feedbackForm, setFeedbackForm] = useState({ date: new Date().toISOString().split("T")[0], notes: "" });
   const [mealForm, setMealForm] = useState({ description: "", mealType: "almuerzo", photo: "" });
 
   const isWeekend = [0, 6].includes(new Date().getDay());
@@ -1426,10 +1425,14 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
           <p className="text-[13px] font-semibold">Registrar Comida</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">Anota lo que has comido</p>
         </button>
-        <button onClick={() => setShowFeedback(true)} className="bg-card rounded-2xl border border-border/50 p-4 text-left hover:bg-accent/30 transition-colors">
+        <button onClick={() => {
+          const el = document.getElementById('ai-feedback-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+          else toast.info("Registra comidas primero para obtener tu valoración IA");
+        }} className="bg-card rounded-2xl border border-border/50 p-4 text-left hover:bg-accent/30 transition-colors">
           <Award className="h-5 w-5 text-amber-500 mb-2" />
-          <p className="text-[13px] font-semibold">Valorar Fin de Semana</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Puntúa tu adherencia</p>
+          <p className="text-[13px] font-semibold">Valoración IA</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Análisis y ajustes</p>
         </button>
       </div>
 
@@ -1458,29 +1461,47 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
         )}
       </div>
 
-      {/* Weekend feedback history */}
+      {/* AI Feedback button */}
+      {(mealsQ.data || []).length > 0 && (
+        <div id="ai-feedback-section" className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20 p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <Award className="h-5 w-5 text-primary" />
+            <h3 className="text-[15px] font-semibold">Obtener Valoración IA</h3>
+          </div>
+          <p className="text-[13px] text-muted-foreground mb-3">Basada en tus comidas registradas, la IA analizará tu fin de semana y te dará recomendaciones personalizadas para los próximos días.</p>
+          <div className="space-y-2 mb-3">
+            <Label className="text-[13px]">Notas sobre tu fin de semana (opcional)</Label>
+            <Textarea value={feedbackForm.notes} onChange={(e) => setFeedbackForm(f => ({ ...f, notes: e.target.value }))} placeholder="¿Cómo te has sentido? ¿Alguna comida fuera de lo habitual? ¿Evento social?" rows={2} className="rounded-xl text-[13px]" />
+          </div>
+          <Button onClick={() => {
+            addFeedbackMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, weekendDate: feedbackForm.date, clientNotes: feedbackForm.notes || undefined });
+          }} disabled={addFeedbackMut.isPending} className="w-full rounded-xl h-11">
+            {addFeedbackMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            {addFeedbackMut.isPending ? "Analizando tu fin de semana..." : "Obtener Valoración y Ajustes"}
+          </Button>
+        </div>
+      )}
+
+      {/* Weekend feedback history with AI analysis */}
       <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
-        <h3 className="text-[15px] font-semibold">Historial de Valoraciones</h3>
+        <h3 className="text-[15px] font-semibold">Valoraciones y Ajustes</h3>
         {(feedbackQ.data || []).length === 0 ? (
-          <p className="text-[13px] text-muted-foreground text-center py-6">Sin valoraciones aún.</p>
+          <p className="text-[13px] text-muted-foreground text-center py-6">Sin valoraciones aún. Registra tus comidas y solicita una valoración IA.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {(feedbackQ.data || []).slice(0, 10).map((fb: any) => (
-              <div key={fb.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
-                <div>
+              <div key={fb.id} className="rounded-xl border border-border/50 overflow-hidden">
+                <div className="flex items-center justify-between p-3 bg-secondary/30">
                   <p className="text-[12px] text-muted-foreground">{new Date(fb.date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
-                  {fb.notes && <p className="text-[12px] mt-0.5">{fb.notes}</p>}
+                  {fb.score != null && (
+                    <span className={`text-[13px] font-bold px-2.5 py-0.5 rounded-lg ${fb.score >= 7 ? 'bg-green-500/10 text-green-600' : fb.score >= 4 ? 'bg-amber-500/10 text-amber-600' : 'bg-red-500/10 text-red-500'}`}>
+                      {fb.score}/10
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] px-2 py-0.5 rounded-md ${fb.followedPlan ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-400'}`}>
-                    {fb.followedPlan ? 'Siguió plan' : 'Se desvió'}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {[1,2,3,4,5].map(s => (
-                      <div key={s} className={`w-2 h-2 rounded-full ${s <= fb.overallScore ? 'bg-amber-400' : 'bg-border'}`} />
-                    ))}
-                  </div>
-                </div>
+                {fb.feedback && (
+                  <div className="p-3 text-[13px] leading-relaxed whitespace-pre-wrap">{fb.feedback}</div>
+                )}
               </div>
             ))}
           </div>
@@ -1519,41 +1540,7 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
         </DialogContent>
       </Dialog>
 
-      {/* Feedback Dialog */}
-      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Valorar Fin de Semana</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Puntuación general (1-5)</Label>
-              <div className="flex gap-2">
-                {[1,2,3,4,5].map(s => (
-                  <button key={s} onClick={() => setFeedbackForm(f => ({ ...f, overallScore: String(s) }))} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center text-[15px] font-bold transition-all ${parseInt(feedbackForm.overallScore) >= s ? 'border-amber-400 bg-amber-400/10 text-amber-500' : 'border-border text-muted-foreground'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">¿Seguiste el plan?</Label>
-              <div className="flex gap-2">
-                <Button variant={feedbackForm.followedPlan ? "default" : "outline"} size="sm" onClick={() => setFeedbackForm(f => ({ ...f, followedPlan: true }))} className="rounded-xl flex-1">Sí</Button>
-                <Button variant={!feedbackForm.followedPlan ? "default" : "outline"} size="sm" onClick={() => setFeedbackForm(f => ({ ...f, followedPlan: false }))} className="rounded-xl flex-1">No</Button>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Notas (opcional)</Label>
-              <Textarea value={feedbackForm.notes} onChange={(e) => setFeedbackForm(f => ({ ...f, notes: e.target.value }))} placeholder="¿Cómo fue tu fin de semana?" rows={3} className="rounded-xl" />
-            </div>
-            <Button onClick={() => {
-              addFeedbackMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, weekendDate: feedbackForm.date });
-              setShowFeedback(false);
-            }} disabled={addFeedbackMut.isPending} className="w-full rounded-xl h-11">
-              {addFeedbackMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Valoración
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Old feedback dialog removed - now inline AI feedback */}
     </div>
   );
 }
