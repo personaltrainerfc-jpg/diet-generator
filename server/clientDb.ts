@@ -529,3 +529,111 @@ export async function deleteMealReminder(id: number) {
   const db = await getDb(); assertDb(db);
   await db.delete(mealReminders).where(eq(mealReminders.id, id));
 }
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE E: Invitaciones, Motivation Logs, Weekend
+// ═══════════════════════════════════════════════════════
+
+import { clientInvitations, motivationLogs, weekendMeals, weekendFeedback } from "../drizzle/schema";
+import crypto from "crypto";
+import { lt } from "drizzle-orm";
+
+// ── Client Invitations ──
+export async function createInvitation(data: { clientId: number; trainerId: number; email: string }) {
+  const db = await getDb(); assertDb(db);
+  const inviteCode = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72h
+  const [result] = await db.insert(clientInvitations).values({
+    clientId: data.clientId,
+    trainerId: data.trainerId,
+    email: data.email,
+    inviteCode,
+    expiresAt,
+  }).$returningId();
+  return { id: result.id, inviteCode, expiresAt };
+}
+
+export async function getInvitationByCode(code: string) {
+  const db = await getDb(); assertDb(db);
+  const rows = await db.select().from(clientInvitations).where(eq(clientInvitations.inviteCode, code)).limit(1);
+  return rows[0] || null;
+}
+
+export async function getClientInvitations(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(clientInvitations).where(eq(clientInvitations.clientId, clientId)).orderBy(desc(clientInvitations.createdAt));
+}
+
+export async function updateInvitationStatus(id: number, status: "pending" | "accepted" | "expired", acceptedAt?: Date) {
+  const db = await getDb(); assertDb(db);
+  await db.update(clientInvitations).set({ 
+    status: status as any, // inviteStatus enum
+    ...(acceptedAt ? { acceptedAt } : {}),
+  }).where(eq(clientInvitations.id, id));
+}
+
+export async function expireOldInvitations() {
+  const db = await getDb(); assertDb(db);
+  await db.update(clientInvitations)
+    .set({ status: "expired" as any })
+    .where(and(
+      eq(clientInvitations.status, "pending" as any),
+      lt(clientInvitations.expiresAt, new Date())
+    ));
+}
+
+// ── Motivation Logs ──
+export async function logMotivationMessage(data: { clientId: number; message: string; sentByTrainer?: number }) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(motivationLogs).values({
+    clientId: data.clientId,
+    message: data.message,
+    sentByTrainer: data.sentByTrainer || 0,
+  }).$returningId();
+  return result.id;
+}
+
+export async function getRecentMotivationMessages(clientId: number, limit = 10) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(motivationLogs).where(eq(motivationLogs.clientId, clientId)).orderBy(desc(motivationLogs.createdAt)).limit(limit);
+}
+
+export async function markMotivationSent(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.update(motivationLogs).set({ sentByTrainer: 1 }).where(eq(motivationLogs.id, id));
+}
+
+// ── Weekend Meals ──
+export async function addWeekendMeal(data: {
+  clientId: number; date: string; mealType: string; description: string;
+  photoUrl?: string; calories?: number; isHealthy?: number; notes?: string;
+}) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(weekendMeals).values(data).$returningId();
+  return result.id;
+}
+
+export async function getWeekendMeals(clientId: number, date?: string) {
+  const db = await getDb(); assertDb(db);
+  if (date) {
+    return db.select().from(weekendMeals).where(and(eq(weekendMeals.clientId, clientId), eq(weekendMeals.date, date))).orderBy(weekendMeals.createdAt);
+  }
+  return db.select().from(weekendMeals).where(eq(weekendMeals.clientId, clientId)).orderBy(desc(weekendMeals.createdAt)).limit(50);
+}
+
+export async function deleteWeekendMeal(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.delete(weekendMeals).where(eq(weekendMeals.id, id));
+}
+
+// ── Weekend Feedback ──
+export async function addWeekendFeedback(data: { clientId: number; weekendDate: string; feedback: string; score?: number }) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(weekendFeedback).values(data).$returningId();
+  return result.id;
+}
+
+export async function getWeekendFeedbackList(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(weekendFeedback).where(eq(weekendFeedback.clientId, clientId)).orderBy(desc(weekendFeedback.createdAt)).limit(20);
+}

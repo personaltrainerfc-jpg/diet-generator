@@ -23,6 +23,11 @@ import {
   logSleep, getSleepLogs,
   logWellness, getWellnessLogs,
   setMealReminder, getMealReminders, deleteMealReminder,
+  // Bloque E: Invitaciones, Motivación, Weekend
+  createInvitation, getInvitationByCode, getClientInvitations, updateInvitationStatus, expireOldInvitations,
+  logMotivationMessage, getRecentMotivationMessages, markMotivationSent,
+  addWeekendMeal, getWeekendMeals, deleteWeekendMeal,
+  addWeekendFeedback, getWeekendFeedbackList,
 } from "./clientDb";
 import { storagePut } from "./storage";
 import { getFullDiet } from "./db";
@@ -409,30 +414,131 @@ export const clientRouter = router({
     return getTrainerDashboardStats(ctx.user.id);
   }),
 
-  // Motivational message via LLM
-  sendMotivation: protectedProcedure
+  // Motivational message via LLM (genera sugerencia, NO envía automáticamente)
+  generateMotivation: protectedProcedure
     .input(z.object({ clientId: z.number(), context: z.string().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
       const client = await getClientById(input.clientId);
       if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
       
+      // Obtener últimos 10 mensajes para evitar repeticiones
+      const recentMessages = await getRecentMotivationMessages(input.clientId, 10);
+      const recentTexts = recentMessages.map(m => m.message).join("\n---\n");
+      
+      // Obtener datos del cliente para personalizar
+      const adherence = await getAdherenceRange(input.clientId, new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), new Date().toISOString().slice(0, 10));
+      const measurements = await getMeasurements(input.clientId);
+      const latestWeight = measurements.length > 0 ? measurements[0] : null;
+      const dayOfWeek = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][new Date().getDay()];
+      
+      const adherenceRate = adherence.length > 0 ? Math.round(adherence.filter(a => a.completed).length / adherence.length * 100) : null;
+      
       const response = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: `Eres un entrenador personal motivador. Genera un mensaje corto y motivacional (máximo 2 frases) para un cliente llamado ${client.name}. ${input.context ? `Contexto: ${input.context}` : ""} El mensaje debe ser cálido, personal y motivador. Responde SOLO con el mensaje, sin comillas ni formato extra.`
+            content: `Eres un entrenador personal motivador experto. Genera UN mensaje motivacional único (máximo 2-3 frases) para ${client.name}.
+
+REGLAS ESTRICTAS:
+- NUNCA repitas frases, estructuras ni expresiones de los mensajes anteriores
+- Cada mensaje debe ser COMPLETAMENTE diferente en tono, estructura y contenido
+- Varía entre: humor, datos concretos, metáforas, preguntas retóricas, retos, celebraciones, reflexiones
+- Adaptáte al momento: hoy es ${dayOfWeek}${adherenceRate !== null ? `, adherencia semanal: ${adherenceRate}%` : ""}${latestWeight ? `, último peso: ${(latestWeight.weight! / 1000).toFixed(1)}kg` : ""}${input.context ? `, contexto: ${input.context}` : ""}
+- Objetivo del cliente: ${client.goal || "mejorar su salud"}
+
+MENSAJES ANTERIORES (NO repitas nada similar):
+${recentTexts || "(ninguno aún)"}
+
+Responde SOLO con el mensaje, sin comillas ni formato extra.`
           },
-          { role: "user", content: "Genera un mensaje motivacional" }
+          { role: "user", content: "Genera un mensaje motivacional único y diferente a todos los anteriores" }
         ],
       });
 
       const message = (response.choices[0]?.message?.content as string) || "¡Sigue así, vas genial! 💪";
-      const id = await sendMessage({
-        clientId: input.clientId,
-        senderType: "trainer",
-        message,
-      });
-      return { id, message };
+      // Guardar en log como sugerencia (NO enviado aún)
+      const logId = await logMotivationMessage({ clientId: input.clientId, message, sentByTrainer: 0 });
+      return { logId, message };
+    }),
+
+  // Enviar mensaje motivacional (el entrenador decide enviar o editar)
+  sendMotivation: protectedProcedure
+    .input(z.object({ clientId: z.number(), logId: z.number().optional(), message: z.string().min(1).max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      // Marcar como enviado si viene de una sugerencia
+      if (input.logId) await markMotivationSent(input.logId);
+      // Enviar como mensaje del chat
+      const id = await sendMessage({ clientId: input.clientId, senderType: "trainer", message: input.message });
+      return { id, message: input.message };
+    }),
+
+  // Historial de mensajes motivacionales
+  getMotivationHistory: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getRecentMotivationMessages(input.clientId, 20);
+    }),
+
+  // ── Invitaciones por Email ──
+  sendInvitation: protectedProcedure
+    .input(z.object({ clientId: z.number(), email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      // Expirar invitaciones antiguas
+      await expireOldInvitations();
+      // Crear nueva invitación
+      const invitation = await createInvitation({ clientId: input.clientId, trainerId: ctx.user.id, email: input.email });
+      // Enviar notificación (simula email)
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `Invitación enviada a ${input.email}`, content: `Código de acceso: ${client.accessCode}\nEnlace de invitación generado para ${client.name}` });
+      } catch {}
+      return { ...invitation, accessCode: client.accessCode };
+    }),
+
+  getInvitations: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      await expireOldInvitations();
+      return getClientInvitations(input.clientId);
+    }),
+
+  resendInvitation: protectedProcedure
+    .input(z.object({ clientId: z.number(), email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      await expireOldInvitations();
+      const invitation = await createInvitation({ clientId: input.clientId, trainerId: ctx.user.id, email: input.email });
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `Invitación reenviada a ${input.email}`, content: `Código: ${client.accessCode} para ${client.name}` });
+      } catch {}
+      return { ...invitation, accessCode: client.accessCode };
+    }),
+
+  // ── Weekend Meals (trainer view) ──
+  getClientWeekendMeals: protectedProcedure
+    .input(z.object({ clientId: z.number(), date: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getWeekendMeals(input.clientId, input.date);
+    }),
+
+  getClientWeekendFeedback: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getWeekendFeedbackList(input.clientId);
     }),
 
   // AI Recommendations
@@ -956,5 +1062,91 @@ export const clientPortalRouter = router({
         .filter(([, items]) => items.length > 0)
         .map(([name, items]) => ({ name, items: items.map(i => ({ text: i, checked: false })) }));
       return { sections };
+    }),
+
+  // ── Weekend Meals ──
+  addWeekendMeal: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      mealType: z.string().min(1).max(50),
+      description: z.string().min(1).max(2000),
+      photoBase64: z.string().optional(),
+      calories: z.number().int().optional(),
+      isHealthy: z.number().int().min(0).max(1).optional(),
+      notes: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      let photoUrl: string | undefined;
+      if (input.photoBase64) {
+        const buffer = Buffer.from(input.photoBase64, "base64");
+        const key = `weekend-meals/${input.clientId}/${Date.now()}.jpg`;
+        const result = await storagePut(key, buffer, "image/jpeg");
+        photoUrl = result.url;
+      }
+      const id = await addWeekendMeal({
+        clientId: input.clientId, date: input.date, mealType: input.mealType,
+        description: input.description, photoUrl, calories: input.calories,
+        isHealthy: input.isHealthy, notes: input.notes,
+      });
+      // Notificar al entrenador
+      try {
+        const { notifyOwner } = await import("./_core/notification");
+        await notifyOwner({ title: `${client.name} registró comida de fin de semana`, content: `${input.mealType}: ${input.description.slice(0, 100)}` });
+      } catch {}
+      return { id, photoUrl };
+    }),
+
+  getWeekendMeals: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string(), date: z.string().optional() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getWeekendMeals(input.clientId, input.date);
+    }),
+
+  deleteWeekendMeal: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string(), id: z.number() }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      await deleteWeekendMeal(input.id);
+      return { success: true };
+    }),
+
+  // ── Weekend AI Feedback ──
+  getWeekendFeedback: publicProcedure
+    .input(z.object({
+      clientId: z.number(), accessCode: z.string(),
+      weekendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const meals = await getWeekendMeals(input.clientId, input.weekendDate);
+      if (meals.length === 0) throw new Error("No hay comidas registradas para este fin de semana");
+      const activeDiet = await getClientActiveDiet(input.clientId);
+      const mealsList = meals.map(m => `${m.mealType}: ${m.description}${m.calories ? ` (~${m.calories} kcal)` : ""}${m.isHealthy === 1 ? " [saludable]" : m.isHealthy === 0 ? " [menos saludable]" : ""}`).join("\n");
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: `Eres un nutricionista deportivo. Analiza las comidas del fin de semana de ${client.name} y da feedback constructivo. Su objetivo es: ${client.goal || "mejorar su salud"}. ${activeDiet ? `Su dieta tiene ${(activeDiet as any).totalCalories} kcal/día objetivo.` : ""} Da una puntuación del 1-10 y 3-4 líneas de feedback. Formato: PUNTUACIÓN: X/10\n\nFEEDBACK:\n(texto)` },
+          { role: "user", content: `Comidas del fin de semana:\n${mealsList}` },
+        ],
+      });
+      const text = (response.choices[0]?.message?.content as string) || "No se pudo generar feedback.";
+      const scoreMatch = text.match(/(\d+)\/10/);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+      const id = await addWeekendFeedback({ clientId: input.clientId, weekendDate: input.weekendDate, feedback: text, score: score ?? undefined });
+      return { id, feedback: text, score };
+    }),
+
+  getWeekendFeedbackHistory: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getWeekendFeedbackList(input.clientId);
     }),
 });

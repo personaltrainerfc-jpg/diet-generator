@@ -161,3 +161,11 @@
 ## Otros (sesión 4)
 
 - [x] Logo NutriFlow aún más grande en ambas apps (sidebar entrenador + portal cliente)
+
+## Bloque E: Mejoras sesión 5
+
+- [x] E1: Invitación por email al crear cliente (enlace único con código de un solo uso, caduca 72h, pantalla de registro con usuario/contraseña, estado visible: pendiente/aceptada/caducada, reenviar)
+- [x] E2: Adherencia desde el primer día (mostrar historial desde el primer registro sin mínimo de días, crece en tiempo real)
+- [x] E3: Mensajes motivación no automáticos (IA genera sugerencia, entrenador decide enviar/editar/descartar, mensajes variados sin repetir estructura en últimos 10, adaptados al momento del cliente)
+- [x] E4: Dieta colapsada por defecto en app cliente (resumen visual, expandir al pulsar día/comida, mejor UX móvil)
+- [x] E5: Sección "Fin de Semana" en app cliente (nueva sección en navegación principal)

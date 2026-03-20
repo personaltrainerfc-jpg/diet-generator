@@ -40,6 +40,38 @@ vi.mock("./clientDb", () => ({
   getAssessment: vi.fn().mockResolvedValue(null),
   updateAssessment: vi.fn().mockResolvedValue(undefined),
   getTrainerDashboardStats: vi.fn().mockResolvedValue({ totalClients: 5, activeClients: 3, unreadMessages: 2, todayAdherence: 85 }),
+  getRecentMotivationMessages: vi.fn().mockResolvedValue([]),
+  logMotivation: vi.fn().mockResolvedValue(1),
+  logMotivationMessage: vi.fn().mockResolvedValue(1),
+  updateMotivationLog: vi.fn().mockResolvedValue(undefined),
+  markMotivationSent: vi.fn().mockResolvedValue(undefined),
+  createInvitation: vi.fn().mockResolvedValue({ id: 1, token: "test-token" }),
+  getInvitationsByClient: vi.fn().mockResolvedValue([]),
+  getInvitationByToken: vi.fn().mockResolvedValue(null),
+  updateInvitationStatus: vi.fn().mockResolvedValue(undefined),
+  addWeekendMeal: vi.fn().mockResolvedValue(1),
+  getWeekendMeals: vi.fn().mockResolvedValue([]),
+  deleteWeekendMeal: vi.fn().mockResolvedValue(undefined),
+  addWeekendFeedback: vi.fn().mockResolvedValue(1),
+  getWeekendFeedbackList: vi.fn().mockResolvedValue([]),
+  addFavoriteFood: vi.fn().mockResolvedValue(1),
+  getFavoriteFoods: vi.fn().mockResolvedValue([]),
+  deleteFavoriteFood: vi.fn().mockResolvedValue(undefined),
+  setClientTags: vi.fn().mockResolvedValue(undefined),
+  createTemplate: vi.fn().mockResolvedValue(1),
+  getTemplates: vi.fn().mockResolvedValue([]),
+  deleteTemplate: vi.fn().mockResolvedValue(undefined),
+  addHydration: vi.fn().mockResolvedValue(1),
+  getHydrationLogs: vi.fn().mockResolvedValue([]),
+  addSleepLog: vi.fn().mockResolvedValue(1),
+  getSleepLogs: vi.fn().mockResolvedValue([]),
+  addWellnessLog: vi.fn().mockResolvedValue(1),
+  getWellnessLogs: vi.fn().mockResolvedValue([]),
+  addMealReminder: vi.fn().mockResolvedValue(1),
+  getMealReminders: vi.fn().mockResolvedValue([]),
+  deleteMealReminder: vi.fn().mockResolvedValue(undefined),
+  addProgressMetric: vi.fn().mockResolvedValue(1),
+  getProgressMetrics: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock LLM
@@ -222,9 +254,18 @@ describe("Client Management Module", () => {
       expect(result).toBeDefined();
     });
 
-    it("should send motivation message", async () => {
+    it("should generate motivation suggestion", async () => {
       const caller = createCaller();
-      const result = await caller.clientMgmt.sendMotivation({ clientId: 1 });
+      const result = await caller.clientMgmt.generateMotivation({ clientId: 1 });
+      expect(result).toHaveProperty("message");
+      expect(result).toHaveProperty("logId");
+    });
+
+    it("should send motivation message with custom text", async () => {
+      const caller = createCaller();
+      const gen = await caller.clientMgmt.generateMotivation({ clientId: 1 });
+      const result = await caller.clientMgmt.sendMotivation({ clientId: 1, message: gen.message, logId: gen.logId });
+      expect(result).toHaveProperty("id");
       expect(result).toHaveProperty("message");
     });
   });

@@ -23,7 +23,13 @@ import {
 
 /* ─── Chart.js Evolution Chart ─── */
 function EvolutionChart({ data, labels, color = "#007AFF", unit = "", height = 160 }: { data: number[]; labels: string[]; color?: string; unit?: string; height?: number }) {
-  if (data.length < 2) return <p className="text-[13px] text-muted-foreground text-center py-6">Se necesitan al menos 2 registros</p>;
+  if (data.length === 0) return <p className="text-[13px] text-muted-foreground text-center py-6">Sin registros aún</p>;
+  if (data.length === 1) return (
+    <div className="flex flex-col items-center justify-center py-6">
+      <div className="text-3xl font-bold" style={{ color }}>{data[0]}{unit}</div>
+      <p className="text-[12px] text-muted-foreground mt-1">{labels[0]}</p>
+    </div>
+  );
   const chartData = {
     labels,
     datasets: [{
@@ -99,7 +105,10 @@ export default function ClientDetail() {
   // Mutations
   const updateMut = trpc.clientMgmt.update.useMutation({ onSuccess: () => { toast.success("Cliente actualizado"); clientQ.refetch(); } });
   const sendMsgMut = trpc.clientMgmt.sendMessage.useMutation({ onSuccess: () => { messagesQ.refetch(); setNewMsg(""); } });
-  const motivationMut = trpc.clientMgmt.sendMotivation.useMutation({ onSuccess: () => { toast.success("Mensaje motivacional enviado"); messagesQ.refetch(); } });
+  const generateMotivationMut = trpc.clientMgmt.generateMotivation.useMutation();
+  const sendMotivationMut = trpc.clientMgmt.sendMotivation.useMutation({ onSuccess: () => { toast.success("Mensaje motivacional enviado"); messagesQ.refetch(); setMotivationDraft(null); setMotivationLogId(null); } });
+  const [motivationDraft, setMotivationDraft] = useState<string | null>(null);
+  const [motivationLogId, setMotivationLogId] = useState<number | null>(null);
   const recommendMut = trpc.clientMgmt.getRecommendations.useMutation();
   const quickConsultMut = trpc.clientMgmt.quickConsult.useMutation();
   const createCheckInMut = trpc.clientMgmt.createCheckIn.useMutation({ onSuccess: () => { toast.success("Check-in registrado"); checkInsQ.refetch(); setShowCheckIn(false); } });
@@ -116,6 +125,9 @@ export default function ClientDetail() {
   const removeTagMut = trpc.clientMgmt.removeTag.useMutation({ onSuccess: () => { toast.success("Etiqueta eliminada"); clientTagsQ.refetch(); } });
   const createTagMut = trpc.clientMgmt.createTag.useMutation({ onSuccess: () => { toast.success("Etiqueta creada"); allTagsQ.refetch(); } });
   const cloneDietMut = trpc.clientMgmt.cloneDietToClient.useMutation({ onSuccess: () => { toast.success("Dieta clonada y asignada"); activeDietQ.refetch(); dietHistoryQ.refetch(); } });
+  const invitationsQ = trpc.clientMgmt.getInvitations.useQuery({ clientId }, { enabled: clientId > 0 });
+  const sendInviteMut = trpc.clientMgmt.sendInvitation.useMutation({ onSuccess: (data) => { toast.success(`Invitación enviada. Código: ${data.accessCode}`); invitationsQ.refetch(); setInviteEmail(""); } });
+  const resendInviteMut = trpc.clientMgmt.resendInvitation.useMutation({ onSuccess: () => { toast.success("Invitación reenviada"); invitationsQ.refetch(); } });
 
   // Local state
   const [newMsg, setNewMsg] = useState("");
@@ -135,6 +147,8 @@ export default function ClientDetail() {
   const [tagInput, setTagInput] = useState("");
   const [cloneSourceId, setCloneSourceId] = useState<string>("");
   const [cloneCalories, setCloneCalories] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [showInvite, setShowInvite] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const client = clientQ.data;
@@ -339,6 +353,41 @@ export default function ClientDetail() {
               <code className="text-[12px] bg-secondary px-2 py-0.5 rounded-md font-mono">{client.accessCode}</code>
             </div>
 
+            {/* Invitación por Email */}
+            <div className="pt-3 border-t border-border/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Invitación por Email</span>
+                {(() => {
+                  const invites = invitationsQ.data || [];
+                  const latest = invites[0];
+                  if (!latest) return <Badge variant="outline" className="text-[10px] h-5">Sin invitar</Badge>;
+                  if (latest.status === 'accepted') return <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-[10px] h-5">Aceptada</Badge>;
+                  if (latest.status === 'expired') return <Badge variant="destructive" className="text-[10px] h-5">Caducada</Badge>;
+                  return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-[10px] h-5">Pendiente</Badge>;
+                })()}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="email@ejemplo.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="h-8 text-[13px] rounded-lg flex-1" />
+                <Button size="sm" className="h-8 text-[12px] rounded-lg gap-1" onClick={() => {
+                  if (!inviteEmail) { toast.error("Introduce un email"); return; }
+                  sendInviteMut.mutate({ clientId, email: inviteEmail });
+                }} disabled={sendInviteMut.isPending || !inviteEmail}>
+                  {sendInviteMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                  {(invitationsQ.data || []).length > 0 ? 'Reenviar' : 'Enviar'}
+                </Button>
+              </div>
+              {(invitationsQ.data || []).length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {(invitationsQ.data || []).slice(0, 3).map((inv: any) => (
+                    <div key={inv.id} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{inv.email} — {new Date(inv.createdAt).toLocaleDateString('es-ES')}</span>
+                      <span className={inv.status === 'accepted' ? 'text-green-500' : inv.status === 'expired' ? 'text-red-400' : 'text-yellow-500'}>{inv.status === 'accepted' ? 'Aceptada' : inv.status === 'expired' ? 'Caducada' : 'Pendiente (72h)'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Client Tags */}
             <div className="pt-3 border-t border-border/30">
               <div className="flex items-center justify-between mb-2">
@@ -531,7 +580,7 @@ export default function ClientDetail() {
               <h3 className="text-[15px] font-semibold mb-1">Adherencia</h3>
               <p className="text-[12px] text-muted-foreground mb-3">{adherenceData.length} check-ins</p>
               <EvolutionChart data={adherenceData} labels={adherenceLabels} color="#34C759" unit="/5" height={160} />
-              {adherenceData.length >= 2 && (
+              {adherenceData.length >= 1 && (
                 <div className="flex items-center justify-between mt-3 text-[12px] text-muted-foreground">
                   <span>Media: {(adherenceData.reduce((a: number, b: number) => a + b, 0) / adherenceData.length).toFixed(1)}/5</span>
                   <span>Último: {adherenceData[adherenceData.length - 1]}/5</span>
@@ -588,10 +637,22 @@ export default function ClientDetail() {
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border/30">
               <h3 className="text-[15px] font-semibold">Chat con {client.name}</h3>
-              <Button variant="outline" size="sm" onClick={() => motivationMut.mutate({ clientId })} disabled={motivationMut.isPending} className="gap-1.5 rounded-xl h-8 text-[12px]">
-                {motivationMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}Motivar
+              <Button variant="outline" size="sm" onClick={() => generateMotivationMut.mutate({ clientId }, { onSuccess: (data) => { setMotivationDraft(data.message); setMotivationLogId(data.logId); } })} disabled={generateMotivationMut.isPending} className="gap-1.5 rounded-xl h-8 text-[12px]">
+                {generateMotivationMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}Generar Mensaje
               </Button>
             </div>
+            {motivationDraft && (
+              <div className="px-4 py-3 bg-primary/5 border-b border-primary/20">
+                <p className="text-[11px] font-medium text-primary mb-1.5 uppercase tracking-wide">Sugerencia de IA (edita antes de enviar)</p>
+                <textarea className="w-full bg-card border border-border/50 rounded-xl px-3 py-2 text-[14px] resize-none" rows={2} value={motivationDraft} onChange={(e) => setMotivationDraft(e.target.value)} />
+                <div className="flex gap-2 mt-2">
+                  <Button size="sm" className="h-7 text-[12px] rounded-lg" onClick={() => sendMotivationMut.mutate({ clientId, logId: motivationLogId || undefined, message: motivationDraft })} disabled={sendMotivationMut.isPending}>
+                    {sendMotivationMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}Enviar al cliente
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-[12px] rounded-lg" onClick={() => { setMotivationDraft(null); setMotivationLogId(null); }}>Descartar</Button>
+                </div>
+              </div>
+            )}
             <div className="h-80 overflow-y-auto p-4 space-y-2.5 bg-secondary/20">
               {messages.length === 0 ? (
                 <p className="text-center text-[13px] text-muted-foreground py-12">No hay mensajes aún</p>

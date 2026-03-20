@@ -451,3 +451,65 @@ export const mealReminders = mysqlTable("meal_reminders", {
 
 export type MealReminder = typeof mealReminders.$inferSelect;
 export type InsertMealReminder = typeof mealReminders.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE E: Mejoras sesión 5
+// ═══════════════════════════════════════════════════════
+
+// ── Client Invitations (invitaciones por email) ──
+export const clientInvitations = mysqlTable("client_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  trainerId: int("trainerId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  inviteCode: varchar("inviteCode", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("inviteStatus", ["pending", "accepted", "expired"]).default("pending").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  acceptedAt: timestamp("acceptedAt"),
+});
+
+export type ClientInvitation = typeof clientInvitations.$inferSelect;
+export type InsertClientInvitation = typeof clientInvitations.$inferInsert;
+
+// ── Motivation Message Log (historial para evitar repeticiones) ──
+export const motivationLogs = mysqlTable("motivation_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  message: text("message").notNull(),
+  sentByTrainer: int("sentByTrainer").default(0).notNull(), // 0=solo sugerido, 1=enviado
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MotivationLog = typeof motivationLogs.$inferSelect;
+export type InsertMotivationLog = typeof motivationLogs.$inferInsert;
+
+// ── Weekend Meals (comidas de fin de semana del cliente) ──
+export const weekendMeals = mysqlTable("weekend_meals", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  mealType: varchar("mealType", { length: 50 }).notNull(), // desayuno, almuerzo, cena, snack
+  description: text("description").notNull(),
+  photoUrl: text("photoUrl"),
+  calories: int("calories"),
+  isHealthy: int("isHealthy"), // 1=sí, 0=no (autoevaluación)
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WeekendMeal = typeof weekendMeals.$inferSelect;
+export type InsertWeekendMeal = typeof weekendMeals.$inferInsert;
+
+// ── Weekend AI Feedback (feedback IA sobre fin de semana) ──
+export const weekendFeedback = mysqlTable("weekend_feedback", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  weekendDate: varchar("weekendDate", { length: 10 }).notNull(), // YYYY-MM-DD del sábado
+  feedback: text("feedback").notNull(),
+  score: int("score"), // 1-10 puntuación global
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WeekendFeedbackType = typeof weekendFeedback.$inferSelect;
+export type InsertWeekendFeedback = typeof weekendFeedback.$inferInsert;

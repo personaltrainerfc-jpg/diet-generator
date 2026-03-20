@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown } from "lucide-react";
+import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,6 +88,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
     { id: "diet", label: "Mi Dieta", icon: Utensils },
     { id: "tracking", label: "Seguimiento", icon: TrendingUp },
     { id: "wellness", label: "Bienestar", icon: Heart },
+    { id: "weekend", label: "Fin de Semana", icon: Calendar },
     { id: "shopping", label: "Compra", icon: ShoppingCart },
     { id: "chat", label: "Chat", icon: MessageSquare },
   ];
@@ -133,6 +134,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
         {tab === "diet" && <DietTab dietQ={dietQ} session={session} />}
         {tab === "tracking" && <TrackingTab session={session} dietId={dietQ.data?.id} />}
         {tab === "wellness" && <WellnessTab session={session} />}
+        {tab === "weekend" && <WeekendTab session={session} />}
         {tab === "shopping" && <ShoppingTab session={session} />}
         {tab === "chat" && <ChatTab session={session} />}
       </div>
@@ -166,6 +168,10 @@ function DietTab({ dietQ, session }: { dietQ: any; session: { clientId: number; 
     onError: (e) => toast.error(e.message),
   });
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
+  const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
+  const toggleDay = (idx: number) => setExpandedDays(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; });
+  const toggleMeal = (key: string) => setExpandedMeals(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   if (dietQ.isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!dietQ.data) return (
     <div className="text-center py-16">
@@ -186,60 +192,77 @@ function DietTab({ dietQ, session }: { dietQ: any; session: { clientId: number; 
         </div>
       </div>
 
-      {diet.menus?.map((menu: any, mi: number) => (
-        <div key={mi} className="space-y-3">
-          <h3 className="text-[15px] font-semibold text-muted-foreground">Día {mi + 1}</h3>
-          {menu.meals?.map((meal: any, mealIdx: number) => {
-            // Calculate real totals from foods
-            const mealTotals = (meal.foods || []).reduce(
-              (acc: any, f: any) => ({
-                calories: acc.calories + (f.calories || 0),
-                protein: acc.protein + (f.protein || 0),
-                carbs: acc.carbs + (f.carbs || 0),
-                fats: acc.fats + (f.fats || 0),
-              }),
-              { calories: 0, protein: 0, carbs: 0, fats: 0 }
-            );
-            return (
-              <div key={mealIdx} className="bg-card rounded-xl border border-border/50 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[14px] font-semibold">{meal.mealName}</h4>
-                  <span className="text-[12px] text-muted-foreground">{mealTotals.calories} kcal</span>
+      {diet.menus?.map((menu: any, mi: number) => {
+        const dayExpanded = expandedDays.has(mi);
+        const dayTotals = (menu.meals || []).reduce((acc: any, meal: any) => {
+          const mealT = (meal.foods || []).reduce((a: any, f: any) => ({ cal: a.cal + (f.calories||0), p: a.p + (f.protein||0) }), { cal: 0, p: 0 });
+          return { cal: acc.cal + mealT.cal, p: acc.p + mealT.p };
+        }, { cal: 0, p: 0 });
+        return (
+          <div key={mi} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+            <button onClick={() => toggleDay(mi)} className="w-full flex items-center justify-between p-4 hover:bg-secondary/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-bold ${dayExpanded ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>{mi + 1}</div>
+                <div className="text-left">
+                  <h3 className="text-[14px] font-semibold">Día {mi + 1}</h3>
+                  <p className="text-[11px] text-muted-foreground">{(menu.meals || []).length} comidas · {dayTotals.cal} kcal</p>
                 </div>
-                {meal.description && (
-                  <p className="text-[12px] text-primary/80 italic mb-2">{meal.description}</p>
-                )}
-                <div className="space-y-1.5">
-                  {meal.foods?.map((food: any, fi: number) => (
-                    <div key={fi} className="flex items-center justify-between text-[13px]">
-                      <span>{food.name}</span>
-                      <span className="text-muted-foreground">{food.quantity}{food.unit}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
-                  <span>P: {mealTotals.protein}g</span>
-                  <span>C: {mealTotals.carbs}g</span>
-                  <span>G: {mealTotals.fats}g</span>
-                </div>
-                <Button
-                  variant="ghost" size="sm"
-                  className="mt-2 gap-1.5 text-[12px] text-primary h-7 px-2"
-                  onClick={() => recipeStepsMut.mutate({
-                    clientId: session.clientId, accessCode: session.accessCode,
-                    mealName: meal.mealName,
-                    foods: (meal.foods || []).map((f: any) => ({ name: f.name, quantity: f.quantity })),
-                  })}
-                  disabled={recipeStepsMut.isPending}
-                >
-                  {recipeStepsMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChefHat className="h-3 w-3" />}
-                  Preparación
-                </Button>
               </div>
-            );
-          })}
-        </div>
-      ))}
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dayExpanded ? 'rotate-180' : ''}`} />
+            </button>
+            {dayExpanded && (
+              <div className="px-4 pb-4 space-y-2">
+                {menu.meals?.map((meal: any, mealIdx: number) => {
+                  const mealKey = `${mi}-${mealIdx}`;
+                  const mealExpanded = expandedMeals.has(mealKey);
+                  const mealTotals = (meal.foods || []).reduce(
+                    (acc: any, f: any) => ({ calories: acc.calories + (f.calories || 0), protein: acc.protein + (f.protein || 0), carbs: acc.carbs + (f.carbs || 0), fats: acc.fats + (f.fats || 0) }),
+                    { calories: 0, protein: 0, carbs: 0, fats: 0 }
+                  );
+                  return (
+                    <div key={mealIdx} className="rounded-xl border border-border/30 overflow-hidden">
+                      <button onClick={() => toggleMeal(mealKey)} className="w-full flex items-center justify-between p-3 hover:bg-secondary/20 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold">{meal.mealName}</span>
+                          {meal.description && <span className="text-[11px] text-primary/60 italic hidden sm:inline">{meal.description}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-muted-foreground">{mealTotals.calories} kcal</span>
+                          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${mealExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {mealExpanded && (
+                        <div className="px-3 pb-3 border-t border-border/20">
+                          <div className="space-y-1.5 mt-2">
+                            {meal.foods?.map((food: any, fi: number) => (
+                              <div key={fi} className="flex items-center justify-between text-[13px]">
+                                <span>{food.name}</span>
+                                <span className="text-muted-foreground">{food.quantity}{food.unit}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
+                            <span>P: {mealTotals.protein}g</span>
+                            <span>C: {mealTotals.carbs}g</span>
+                            <span>G: {mealTotals.fats}g</span>
+                          </div>
+                          <Button variant="ghost" size="sm" className="mt-2 gap-1.5 text-[12px] text-primary h-7 px-2"
+                            onClick={() => recipeStepsMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, mealName: meal.mealName, foods: (meal.foods || []).map((f: any) => ({ name: f.name, quantity: f.quantity })) })}
+                            disabled={recipeStepsMut.isPending}
+                          >
+                            {recipeStepsMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChefHat className="h-3 w-3" />}
+                            Preparación
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Export PDF button */}
       <Button
@@ -1361,6 +1384,176 @@ function ShoppingTab({ session }: { session: { clientId: number; name: string; a
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ─── Weekend Tab ─── */
+function WeekendTab({ session }: { session: { clientId: number; name: string; accessCode: string } }) {
+  const now = new Date();
+  const weekendDate = now.toISOString().split("T")[0];
+  const feedbackQ = trpc.clientPortal.getWeekendFeedbackHistory.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const mealsQ = trpc.clientPortal.getWeekendMeals.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const addFeedbackMut = trpc.clientPortal.getWeekendFeedback.useMutation({ onSuccess: () => { toast.success("Feedback guardado"); feedbackQ.refetch(); } });
+  const addMealMut = trpc.clientPortal.addWeekendMeal.useMutation({ onSuccess: () => { toast.success("Comida registrada"); mealsQ.refetch(); setMealForm({ description: "", mealType: "almuerzo", photo: "" }); } });
+
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showMeal, setShowMeal] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({ date: new Date().toISOString().split("T")[0], overallScore: "3", notes: "", followedPlan: true });
+  const [mealForm, setMealForm] = useState({ description: "", mealType: "almuerzo", photo: "" });
+
+  const isWeekend = [0, 6].includes(new Date().getDay());
+
+  return (
+    <div className="space-y-4">
+      {/* Weekend header */}
+      <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-2xl border border-amber-500/20 p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <Calendar className="h-5 w-5 text-amber-500" />
+          <h2 className="text-[17px] font-bold uppercase tracking-wider">FIN DE SEMANA</h2>
+        </div>
+        <p className="text-[13px] text-muted-foreground">
+          {isWeekend
+            ? "Es fin de semana. Registra tus comidas y cómo te has sentido para que tu entrenador pueda ajustar tu plan."
+            : "Aquí puedes revisar tus registros de fin de semana y prepararte para el próximo."}
+        </p>
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={() => setShowMeal(true)} className="bg-card rounded-2xl border border-border/50 p-4 text-left hover:bg-accent/30 transition-colors">
+          <Utensils className="h-5 w-5 text-primary mb-2" />
+          <p className="text-[13px] font-semibold">Registrar Comida</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Anota lo que has comido</p>
+        </button>
+        <button onClick={() => setShowFeedback(true)} className="bg-card rounded-2xl border border-border/50 p-4 text-left hover:bg-accent/30 transition-colors">
+          <Award className="h-5 w-5 text-amber-500 mb-2" />
+          <p className="text-[13px] font-semibold">Valorar Fin de Semana</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Puntúa tu adherencia</p>
+        </button>
+      </div>
+
+      {/* Recent weekend meals */}
+      <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+        <h3 className="text-[15px] font-semibold">Comidas de Fin de Semana</h3>
+        {(mealsQ.data || []).length === 0 ? (
+          <p className="text-[13px] text-muted-foreground text-center py-6">Sin comidas registradas aún. Pulsa "Registrar Comida" para empezar.</p>
+        ) : (
+          <div className="space-y-2">
+            {(mealsQ.data || []).slice(0, 20).map((meal: any) => (
+              <div key={meal.id} className="flex items-start gap-3 p-3 rounded-xl bg-secondary/30">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <Utensils className="h-4 w-4 text-amber-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-medium capitalize">{meal.mealType}</span>
+                    <span className="text-[10px] text-muted-foreground">{new Date(meal.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</span>
+                  </div>
+                  <p className="text-[13px] mt-0.5">{meal.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Weekend feedback history */}
+      <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+        <h3 className="text-[15px] font-semibold">Historial de Valoraciones</h3>
+        {(feedbackQ.data || []).length === 0 ? (
+          <p className="text-[13px] text-muted-foreground text-center py-6">Sin valoraciones aún.</p>
+        ) : (
+          <div className="space-y-2">
+            {(feedbackQ.data || []).slice(0, 10).map((fb: any) => (
+              <div key={fb.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
+                <div>
+                  <p className="text-[12px] text-muted-foreground">{new Date(fb.date).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}</p>
+                  {fb.notes && <p className="text-[12px] mt-0.5">{fb.notes}</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] px-2 py-0.5 rounded-md ${fb.followedPlan ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-400'}`}>
+                    {fb.followedPlan ? 'Siguió plan' : 'Se desvió'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[1,2,3,4,5].map(s => (
+                      <div key={s} className={`w-2 h-2 rounded-full ${s <= fb.overallScore ? 'bg-amber-400' : 'bg-border'}`} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add Meal Dialog */}
+      <Dialog open={showMeal} onOpenChange={setShowMeal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Registrar Comida de Fin de Semana</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Tipo de comida</Label>
+              <Select value={mealForm.mealType} onValueChange={(v) => setMealForm(f => ({ ...f, mealType: v }))}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desayuno">Desayuno</SelectItem>
+                  <SelectItem value="almuerzo">Almuerzo</SelectItem>
+                  <SelectItem value="cena">Cena</SelectItem>
+                  <SelectItem value="snack">Snack</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">¿Qué has comido?</Label>
+              <Textarea value={mealForm.description} onChange={(e) => setMealForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe lo que has comido..." rows={3} className="rounded-xl" />
+            </div>
+            <Button onClick={() => {
+              if (!mealForm.description.trim()) { toast.error("Describe lo que has comido"); return; }
+              addMealMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, date: new Date().toISOString().split("T")[0], mealType: mealForm.mealType, description: mealForm.description });
+            }} disabled={addMealMut.isPending} className="w-full rounded-xl h-11">
+              {addMealMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Comida
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feedback Dialog */}
+      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Valorar Fin de Semana</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Puntuación general (1-5)</Label>
+              <div className="flex gap-2">
+                {[1,2,3,4,5].map(s => (
+                  <button key={s} onClick={() => setFeedbackForm(f => ({ ...f, overallScore: String(s) }))} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center text-[15px] font-bold transition-all ${parseInt(feedbackForm.overallScore) >= s ? 'border-amber-400 bg-amber-400/10 text-amber-500' : 'border-border text-muted-foreground'}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">¿Seguiste el plan?</Label>
+              <div className="flex gap-2">
+                <Button variant={feedbackForm.followedPlan ? "default" : "outline"} size="sm" onClick={() => setFeedbackForm(f => ({ ...f, followedPlan: true }))} className="rounded-xl flex-1">Sí</Button>
+                <Button variant={!feedbackForm.followedPlan ? "default" : "outline"} size="sm" onClick={() => setFeedbackForm(f => ({ ...f, followedPlan: false }))} className="rounded-xl flex-1">No</Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Notas (opcional)</Label>
+              <Textarea value={feedbackForm.notes} onChange={(e) => setFeedbackForm(f => ({ ...f, notes: e.target.value }))} placeholder="¿Cómo fue tu fin de semana?" rows={3} className="rounded-xl" />
+            </div>
+            <Button onClick={() => {
+              addFeedbackMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, weekendDate: feedbackForm.date });
+              setShowFeedback(false);
+            }} disabled={addFeedbackMut.isPending} className="w-full rounded-xl h-11">
+              {addFeedbackMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Guardar Valoración
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
