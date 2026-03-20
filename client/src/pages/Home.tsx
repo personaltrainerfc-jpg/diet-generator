@@ -249,7 +249,7 @@ export default function Home() {
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Name */}
         <Section>
-          <SectionTitle icon={ChefHat} color="text-primary">Nombre</SectionTitle>
+          <SectionTitle icon={ChefHat} color="text-primary">NOMBRE DEL PLAN</SectionTitle>
           <div className="mt-3">
             <Input
               value={name}
