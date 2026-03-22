@@ -35,7 +35,7 @@ export default function TrainerDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {statCards.map(({ label, value, icon: Icon, color, bg, onClick }) => (
-          <div key={label} onClick={onClick} className={`bg-card rounded-2xl border border-border/50 shadow-sm p-4 ${onClick ? "cursor-pointer hover:shadow-md" : ""} transition-all`}>
+          <div key={label} onClick={onClick} className={`bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-4 ${onClick ? "cursor-pointer hover:shadow-md" : ""} transition-all`}>
             <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center mb-3`}>
               <Icon className={`h-5 w-5 ${color}`} />
             </div>
@@ -50,7 +50,7 @@ export default function TrainerDashboard() {
         <h2 className="text-[15px] font-semibold mb-3">Acciones Rápidas</h2>
         <div className="space-y-2">
           {quickActions.map(({ label, desc, icon: Icon, color, bg, path }) => (
-            <div key={label} onClick={() => setLocation(path)} className="bg-card rounded-2xl border border-border/50 shadow-sm flex items-center gap-4 p-4 cursor-pointer hover:shadow-md transition-all group">
+            <div key={label} onClick={() => setLocation(path)} className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm flex items-center gap-4 p-4 cursor-pointer hover:shadow-md transition-all group">
               <div className={`h-11 w-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
                 <Icon className={`h-5 w-5 ${color}`} />
               </div>

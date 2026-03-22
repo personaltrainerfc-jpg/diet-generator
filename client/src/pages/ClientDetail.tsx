@@ -360,6 +360,8 @@ export default function ClientDetail() {
             <TabsTrigger value="achievements" className="rounded-lg text-[13px] gap-1.5 px-3"><Trophy className="h-3.5 w-3.5" />Logros</TabsTrigger>
             <TabsTrigger value="assessment" className="rounded-lg text-[13px] gap-1.5 px-3"><FileText className="h-3.5 w-3.5" />Valoración</TabsTrigger>
             <TabsTrigger value="ai" className="rounded-lg text-[13px] gap-1.5 px-3"><Brain className="h-3.5 w-3.5" />IA</TabsTrigger>
+            <TabsTrigger value="personalization" className="rounded-lg text-[13px] gap-1.5 px-3"><Sparkles className="h-3.5 w-3.5" />Perfil</TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-lg text-[13px] gap-1.5 px-3"><Activity className="h-3.5 w-3.5" />Actividad</TabsTrigger>
           </TabsList>
         </div>
 
@@ -1042,6 +1044,16 @@ export default function ClientDetail() {
             </div>
           </div>
         </TabsContent>
+
+        {/* Personalization Profile Tab */}
+        <TabsContent value="personalization" className="space-y-4 mt-4">
+          <PersonalizationPanel clientId={clientId} />
+        </TabsContent>
+
+        {/* Activity Tab */}
+        <TabsContent value="activity" className="space-y-4 mt-4">
+          <ActivityPanel clientId={clientId} />
+        </TabsContent>
       </Tabs>
 
       {/* Check-in Dialog */}
@@ -1273,5 +1285,248 @@ function FeedbackInput({ checkInId, clientId, onSubmit }: { checkInId: number; c
       <Button size="sm" onClick={() => { if (text.trim()) onSubmit(text.trim()); }} disabled={!text.trim()} className="rounded-xl"><Send className="h-3.5 w-3.5" /></Button>
       <Button size="sm" variant="ghost" onClick={() => setShow(false)} className="rounded-xl"><X className="h-3.5 w-3.5" /></Button>
     </div>
+  );
+}
+
+// ── Personalization Panel ──
+function PersonalizationPanel({ clientId }: { clientId: number }) {
+  const profileQ = trpc.clientMgmt.getClientPersonalization.useQuery({ clientId });
+  const analyzeMut = trpc.clientMgmt.analyzeClientProfile.useMutation({
+    onSuccess: () => { toast.success("Perfil analizado"); profileQ.refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const profile = profileQ.data?.profile as any;
+  const preferences = profileQ.data?.preferences || [];
+
+  const categoryLabels: Record<string, string> = {
+    food_likes: "Le gusta",
+    food_dislikes: "No le gusta",
+    schedule: "Horarios",
+    habits: "Hábitos",
+  };
+
+  const categoryColors: Record<string, string> = {
+    food_likes: "#6BCB77",
+    food_dislikes: "#FF6B6B",
+    schedule: "#4ECDC4",
+    habits: "#FFD93D",
+  };
+
+  return (
+    <>
+      {/* Analyze button */}
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4.5 w-4.5 text-primary" />
+            <h3 className="text-[15px] font-semibold">Motor de Personalización</h3>
+          </div>
+          <Button onClick={() => analyzeMut.mutate({ clientId })} disabled={analyzeMut.isPending} size="sm" className="rounded-xl gap-1.5">
+            {analyzeMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Brain className="h-3.5 w-3.5" />}
+            Analizar
+          </Button>
+        </div>
+        <p className="text-[12px] text-muted-foreground">
+          Analiza todos los datos del cliente (adherencia, bienestar, sueño, actividad, conversaciones IA) para construir un perfil de personalización completo.
+        </p>
+      </div>
+
+      {/* Learned preferences */}
+      {preferences.length > 0 && (
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+          <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2">
+            <Heart className="h-4 w-4 text-pink-500" />
+            Preferencias Aprendidas
+          </h3>
+          <div className="space-y-2">
+            {Object.entries(
+              preferences.reduce((acc: Record<string, typeof preferences>, p) => {
+                const cat = p.category;
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(p);
+                return acc;
+              }, {})
+            ).map(([category, prefs]) => (
+              <div key={category}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: categoryColors[category] || "#999" }}>
+                  {categoryLabels[category] || category}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {prefs.map((p: any) => (
+                    <span
+                      key={p.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] border"
+                      style={{
+                        borderColor: (categoryColors[category] || "#999") + "40",
+                        backgroundColor: (categoryColors[category] || "#999") + "10",
+                        color: categoryColors[category] || "#999",
+                      }}
+                    >
+                      {p.value}
+                      {p.confidence && (
+                        <span className="opacity-50 text-[9px]">{p.confidence}%</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Profile data */}
+      {profile && (
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+          <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2">
+            <Brain className="h-4 w-4 text-primary" />
+            Perfil Aprendido
+          </h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            {[
+              { label: "Alimentos favoritos", data: profile.foodLikes, color: "#6BCB77" },
+              { label: "Alimentos rechazados", data: profile.foodDislikes, color: "#FF6B6B" },
+              { label: "Horarios preferidos", data: profile.preferredMealTimes, color: "#4ECDC4" },
+              { label: "Preferencias de compra", data: profile.shoppingPreferences, color: "#FFD93D" },
+              { label: "Factores de estrés", data: profile.stressFactors, color: "#FF8C42" },
+              { label: "Motivaciones", data: profile.motivationTriggers, color: "#A78BFA" },
+            ].map(({ label, data, color }) => (
+              <div key={label}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color }}>{label}</p>
+                {Array.isArray(data) && data.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {data.map((item: string, i: number) => (
+                      <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border" style={{ borderColor: color + "30", color }}>{item}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Sin datos</p>
+                )}
+              </div>
+            ))}
+            {profile.cookingSkill && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1 text-blue-400">Nivel de cocina</p>
+                <p className="text-[13px]">{profile.cookingSkill}</p>
+              </div>
+            )}
+            {profile.activityPattern && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1 text-green-400">Patrón de actividad</p>
+                <p className="text-[13px]">{profile.activityPattern}</p>
+              </div>
+            )}
+            {profile.sleepPattern && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1 text-indigo-400">Patrón de sueño</p>
+                <p className="text-[13px]">{profile.sleepPattern}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!profile && preferences.length === 0 && !profileQ.isLoading && (
+        <div className="text-center py-8">
+          <Brain className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">Sin datos de personalización aún</p>
+          <p className="text-muted-foreground text-[12px] mt-1">Pulsa "Analizar" para generar el perfil aprendido del cliente</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Activity Panel (Trainer view) ──
+function ActivityPanel({ clientId }: { clientId: number }) {
+  const activityQ = trpc.clientMgmt.getClientActivity.useQuery({ clientId });
+  const data = activityQ.data || [];
+  const weekData = data.slice(0, 7).reverse();
+  const maxSteps = Math.max(...weekData.map(d => d.steps || 0), 1);
+
+  return (
+    <>
+      {/* Weekly chart */}
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+        <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          Actividad Semanal
+        </h3>
+        {weekData.length === 0 ? (
+          <div className="text-center py-6">
+            <Activity className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Sin datos de actividad</p>
+          </div>
+        ) : (
+          <div className="flex items-end gap-1.5 h-36">
+            {weekData.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">{(d.steps || 0).toLocaleString()}</span>
+                <div
+                  className="w-full rounded-t-lg transition-all"
+                  style={{
+                    height: `${Math.max(4, ((d.steps || 0) / maxSteps) * 100)}%`,
+                    backgroundColor: "#6BCB77",
+                    opacity: 0.6 + ((d.steps || 0) / maxSteps) * 0.4,
+                  }}
+                />
+                <span className="text-[9px] text-muted-foreground">{d.date.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Summary stats */}
+      {data.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-4 text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Promedio pasos</p>
+            <p className="text-xl font-bold text-primary mt-1">
+              {Math.round(data.reduce((s, d) => s + (d.steps || 0), 0) / data.length).toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-4 text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Min. activos/día</p>
+            <p className="text-xl font-bold text-green-500 mt-1">
+              {Math.round(data.reduce((s, d) => s + (d.activeMinutes || 0), 0) / data.length)}
+            </p>
+          </div>
+          <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-4 text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cal. quemadas/día</p>
+            <p className="text-xl font-bold text-orange-500 mt-1">
+              {Math.round(data.reduce((s, d) => s + (d.caloriesBurned || 0), 0) / data.length)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* History */}
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+        <h3 className="text-[15px] font-semibold mb-3">Historial de Actividad</h3>
+        {activityQ.isLoading ? (
+          <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : data.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">Sin registros de actividad</p>
+        ) : (
+          <div className="space-y-2">
+            {data.slice(0, 20).map((log) => (
+              <div key={log.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                <div>
+                  <p className="text-[13px] font-medium">{log.date}</p>
+                  <p className="text-[11px] text-muted-foreground">{log.source || "manual"}</p>
+                </div>
+                <div className="flex gap-4 text-right">
+                  {log.steps != null && <div><p className="text-[13px] font-semibold text-primary">{log.steps.toLocaleString()}</p><p className="text-[9px] text-muted-foreground">pasos</p></div>}
+                  {log.activeMinutes != null && <div><p className="text-[13px] font-semibold">{log.activeMinutes}</p><p className="text-[9px] text-muted-foreground">min</p></div>}
+                  {log.caloriesBurned != null && <div><p className="text-[13px] font-semibold">{log.caloriesBurned}</p><p className="text-[9px] text-muted-foreground">kcal</p></div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -28,6 +28,16 @@ import {
   logMotivationMessage, getRecentMotivationMessages, markMotivationSent,
   addWeekendMeal, getWeekendMeals, deleteWeekendMeal,
   addWeekendFeedback, getWeekendFeedbackList,
+  // Bloque F: Asistente IA
+  getOrCreateConversation, getConversationById, updateConversationMessages, getRecentConversations,
+  getAssistantConfig, upsertAssistantConfig,
+  createEscalationAlert, getEscalationAlerts, resolveEscalationAlert,
+  // Bloque G: Personalización
+  addLearnedPreference, getLearnedPreferences,
+  getPersonalizationProfile, upsertPersonalizationProfile,
+  // Bloque H: Wearables
+  logActivity, getActivityLogs,
+  getWearableConnection, upsertWearableConnection, disconnectWearable,
 } from "./clientDb";
 import { storagePut } from "./storage";
 import { getFullDiet } from "./db";
@@ -744,6 +754,133 @@ ${assessment ? `Condiciones médicas: ${assessment.medicalConditions || "ninguna
       if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
       return getWellnessLogs(input.clientId);
     }),
+
+  // ═══ AI Assistant Config (Trainer) ═══
+  getAiConfig: protectedProcedure.query(async ({ ctx }) => {
+    return getAssistantConfig(ctx.user.id);
+  }),
+
+  updateAiConfig: protectedProcedure
+    .input(z.object({
+      assistantName: z.string().max(100).optional(),
+      tone: z.string().max(50).optional(),
+      customRules: z.string().max(2000).optional(),
+      escalationKeywords: z.array(z.string()).optional(),
+      enabled: z.number().min(0).max(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const id = await upsertAssistantConfig(ctx.user.id, input);
+      return { id };
+    }),
+
+  getEscalationAlerts: protectedProcedure
+    .input(z.object({ resolved: z.boolean().optional() }))
+    .query(async ({ ctx, input }) => {
+      return getEscalationAlerts(ctx.user.id, input.resolved);
+    }),
+
+  resolveAlert: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await resolveEscalationAlert(input.id);
+      return { success: true };
+    }),
+
+  // ═══ Client Activity (Trainer view) ═══
+  getClientActivity: protectedProcedure
+    .input(z.object({ clientId: z.number(), startDate: z.string().optional(), endDate: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      return getActivityLogs(input.clientId, input.startDate, input.endDate);
+    }),
+
+  // ═══ Client Personalization Profile (Trainer view) ═══
+  getClientPersonalization: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      const profile = await getPersonalizationProfile(input.clientId);
+      const preferences = await getLearnedPreferences(input.clientId);
+      return { profile: profile?.profileData || null, preferences };
+    }),
+
+  analyzeClientProfile: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      
+      // Gather all data
+      const preferences = await getLearnedPreferences(input.clientId);
+      const wellness = await getWellnessLogs(input.clientId, 30);
+      const sleep = await getSleepLogs(input.clientId, 30);
+      const activity = await getActivityLogs(input.clientId);
+      const checkIns = await getCheckIns(input.clientId);
+      const assessment = await getAssessment(input.clientId);
+      
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `Analiza todos los datos del cliente y genera un perfil de personalización completo en JSON. El perfil debe incluir:
+- foodLikes: alimentos que le gustan (array de strings)
+- foodDislikes: alimentos que no le gustan (array de strings)
+- preferredMealTimes: horarios preferidos de comida (array de strings)
+- cookingSkill: nivel de cocina ("bajo", "medio", "alto")
+- shoppingPreferences: preferencias de compra (array de strings)
+- activityPattern: patrón de actividad (string descriptivo)
+- sleepPattern: patrón de sueño (string descriptivo)
+- stressFactors: factores de estrés identificados (array de strings)
+- motivationTriggers: qué le motiva (array de strings)
+
+Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes para un campo, usa un array vacío o "desconocido".`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              clientName: client.name,
+              goal: client.goal,
+              preferences: preferences.map(p => ({ category: p.category, key: p.key, value: p.value, confidence: p.confidence })),
+              recentWellness: wellness.slice(0, 10),
+              recentSleep: sleep.slice(0, 10),
+              recentActivity: activity.slice(0, 10),
+              checkIns: checkIns.slice(0, 5),
+              assessment,
+            }),
+          },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "personalization_profile",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                foodLikes: { type: "array", items: { type: "string" } },
+                foodDislikes: { type: "array", items: { type: "string" } },
+                preferredMealTimes: { type: "array", items: { type: "string" } },
+                cookingSkill: { type: "string" },
+                shoppingPreferences: { type: "array", items: { type: "string" } },
+                activityPattern: { type: "string" },
+                sleepPattern: { type: "string" },
+                stressFactors: { type: "array", items: { type: "string" } },
+                motivationTriggers: { type: "array", items: { type: "string" } },
+              },
+              required: ["foodLikes", "foodDislikes", "preferredMealTimes", "cookingSkill", "shoppingPreferences", "activityPattern", "sleepPattern", "stressFactors", "motivationTriggers"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      const content = response.choices[0]?.message?.content as string;
+      const profileData = JSON.parse(content);
+      await upsertPersonalizationProfile(input.clientId, profileData);
+      return { profileData };
+    }),
 });
 
 // ── Client Portal Router (Client-facing, public with code auth) ──
@@ -1206,4 +1343,265 @@ Sé directo, motivador y personalizado. Usa un tono cercano pero profesional. Ca
       await updateClient(input.clientId, { archetype: input.archetype });
       return { success: true, archetype: input.archetype };
     }),
+
+  // ═══════════════════════════════════════════════════════
+  // BLOQUE F: Asistente IA Conversacional
+  // ═══════════════════════════════════════════════════════
+
+  aiChat: publicProcedure
+    .input(z.object({
+      clientId: z.number(),
+      accessCode: z.string(),
+      message: z.string().min(1).max(2000),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+
+      // Get or create today's conversation
+      const conversation = await getOrCreateConversation(input.clientId);
+      const messages = (conversation.messages as any[]) || [];
+
+      // Add user message
+      messages.push({ role: "user", content: input.message, timestamp: Date.now() });
+
+      // Get assistant config from trainer
+      const config = await getAssistantConfig(client.trainerId);
+      const assistantName = config?.assistantName || "NutriBot";
+      const tone = config?.tone || "amigable";
+      const customRules = config?.customRules || "";
+      const escalationKeywords = (config?.escalationKeywords as string[]) || ["dolor", "mareo", "vomit", "desmay", "urgen", "médico", "hospital", "alergia"];
+
+      // Check for escalation keywords
+      const lowerMsg = input.message.toLowerCase();
+      const needsEscalation = escalationKeywords.some(kw => lowerMsg.includes(kw.toLowerCase()));
+
+      // Build context: active diet, recent adherence, wellness, preferences
+      const activeDiet = await getClientActiveDiet(input.clientId);
+      const recentWellness = await getWellnessLogs(input.clientId, 3);
+      const recentAdherence = await getAdherenceRange(
+        input.clientId,
+        new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
+        new Date().toISOString().slice(0, 10)
+      );
+      const preferences = await getLearnedPreferences(input.clientId);
+      const profile = await getPersonalizationProfile(input.clientId);
+
+      // Build system prompt
+      let systemPrompt = `Eres ${assistantName}, el asistente nutricional IA de NutriFlow. Tu tono es ${tone}.
+Estas ayudando a ${client.name}${client.goal ? ` cuyo objetivo es: ${client.goal}` : ""}.
+${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase()}. Adapta tu estilo a este personaje.` : ""}
+`;
+
+      if (activeDiet) {
+        const d = activeDiet as any;
+        systemPrompt += `\nDieta activa: "${d.name}" - ${d.totalCalories} kcal/día, ${d.mealsPerDay} comidas, tipo ${d.dietType}.`;
+        if (d.menus && d.menus.length > 0) {
+          const menu = d.menus[0];
+          if (menu.meals) {
+            systemPrompt += `\nComidas del menú actual: ${menu.meals.map((m: any) => m.mealName).join(", ")}.`;
+          }
+        }
+      }
+
+      if (recentWellness.length > 0) {
+        const last = recentWellness[0];
+        systemPrompt += `\nÚltimo bienestar (${last.date}): energía ${last.energy}/5, ánimo ${last.mood}/5, digestión ${last.digestion}/5.`;
+      }
+
+      if (recentAdherence.length > 0) {
+        const completed = recentAdherence.filter((a: any) => a.completed === 1).length;
+        const total = recentAdherence.length;
+        systemPrompt += `\nAdherencia última semana: ${Math.round(completed / total * 100)}% (${completed}/${total} comidas).`;
+      }
+
+      if (profile?.profileData) {
+        const p = profile.profileData as any;
+        if (p.foodLikes?.length) systemPrompt += `\nAlimentos favoritos: ${p.foodLikes.join(", ")}.`;
+        if (p.foodDislikes?.length) systemPrompt += `\nAlimentos que no le gustan: ${p.foodDislikes.join(", ")}.`;
+      }
+
+      if (customRules) {
+        systemPrompt += `\n\nReglas del entrenador: ${customRules}`;
+      }
+
+      systemPrompt += `\n\nIMPORTANTE:
+- Responde SIEMPRE en español.
+- Sé conciso (máximo 3-4 párrafos).
+- Si el cliente pregunta algo fuera de nutrición/salud, redirige amablemente.
+- NUNCA cambies la dieta del cliente. Solo puedes dar consejos, resolver dudas y motivar.
+- Si detectas algo urgente (dolor, mareo, síntomas), recomienda contactar al entrenador o un profesional médico.`;
+
+      // Build LLM messages (keep last 10 for context)
+      const contextMessages = messages.slice(-10);
+      const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        { role: "system", content: systemPrompt },
+        ...contextMessages.map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ];
+
+      const response = await invokeLLM({ messages: llmMessages });
+      const reply = (response.choices[0]?.message?.content as string) || "Lo siento, no pude procesar tu mensaje. Inténtalo de nuevo.";
+
+      // Add assistant reply
+      messages.push({ role: "assistant", content: reply, timestamp: Date.now() });
+
+      // Update conversation
+      await updateConversationMessages(conversation.id, messages);
+
+      // Create escalation alert if needed
+      if (needsEscalation) {
+        await createEscalationAlert({
+          clientId: input.clientId,
+          trainerId: client.trainerId,
+          reason: `Palabra clave detectada en chat IA: "${input.message.slice(0, 100)}"`,
+          conversationId: conversation.id,
+        });
+        try {
+          const { notifyOwner } = await import("./_core/notification");
+          await notifyOwner({
+            title: `⚠️ Alerta IA - ${client.name}`,
+            content: `El asistente IA detectó una posible urgencia: "${input.message.slice(0, 150)}"`,
+          });
+        } catch {}
+      }
+
+      // Extract preferences from conversation (async, non-blocking)
+      extractPreferencesFromChat(input.clientId, input.message, reply).catch(() => {});
+
+      return { reply, conversationId: conversation.id };
+    }),
+
+  aiChatHistory: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const conversations = await getRecentConversations(input.clientId, 5);
+      return conversations;
+    }),
+
+  // ═══════════════════════════════════════════════════════
+  // BLOQUE G: Wearables / Actividad
+  // ═══════════════════════════════════════════════════════
+
+  logActivity: publicProcedure
+    .input(z.object({
+      clientId: z.number(),
+      accessCode: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      steps: z.number().int().min(0).optional(),
+      activeMinutes: z.number().int().min(0).optional(),
+      caloriesBurned: z.number().int().min(0).optional(),
+      heartRateAvg: z.number().int().min(30).max(220).optional(),
+      heartRateMax: z.number().int().min(30).max(250).optional(),
+      source: z.string().max(50).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const { accessCode, ...data } = input;
+      const id = await logActivity(data);
+      return { id };
+    }),
+
+  getActivityLogs: publicProcedure
+    .input(z.object({
+      clientId: z.number(),
+      accessCode: z.string(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getActivityLogs(input.clientId, input.startDate, input.endDate);
+    }),
+
+  getWearableConnections: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const connections = await getWearableConnection(input.clientId);
+      // Don't expose tokens
+      return (Array.isArray(connections) ? connections : [connections].filter(Boolean)).map((c: any) => ({
+        id: c.id, provider: c.provider, status: c.status, lastSyncAt: c.lastSyncAt,
+      }));
+    }),
+
+  // ═══════════════════════════════════════════════════════
+  // BLOQUE H: Perfil de Personalización
+  // ═══════════════════════════════════════════════════════
+
+  getPersonalizationProfile: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const profile = await getPersonalizationProfile(input.clientId);
+      const preferences = await getLearnedPreferences(input.clientId);
+      return { profile: profile?.profileData || null, preferences };
+    }),
 });
+
+// ── Helper: Extract preferences from AI chat ──
+async function extractPreferencesFromChat(clientId: number, userMessage: string, assistantReply: string) {
+  try {
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `Analiza esta conversación y extrae preferencias alimentarias del usuario. Devuelve un JSON con el formato:
+{"preferences": [{"category": "food_likes"|"food_dislikes"|"schedule"|"habits", "key": "nombre_corto", "value": "descripción", "confidence": 50-100}]}
+Si no hay preferencias claras, devuelve {"preferences": []}. Solo extrae información explícita, no suposiciones.`,
+        },
+        { role: "user", content: `Usuario: "${userMessage}"\nAsistente: "${assistantReply}"` },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "preferences_extraction",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              preferences: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    category: { type: "string" },
+                    key: { type: "string" },
+                    value: { type: "string" },
+                    confidence: { type: "integer" },
+                  },
+                  required: ["category", "key", "value", "confidence"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["preferences"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const content = response.choices[0]?.message?.content as string;
+    if (content) {
+      const parsed = JSON.parse(content);
+      for (const pref of parsed.preferences || []) {
+        await addLearnedPreference({
+          clientId,
+          category: pref.category,
+          key: pref.key,
+          value: pref.value,
+          confidence: pref.confidence,
+          source: "ai_chat",
+        });
+      }
+    }
+  } catch {
+    // Non-critical, silently fail
+  }
+}

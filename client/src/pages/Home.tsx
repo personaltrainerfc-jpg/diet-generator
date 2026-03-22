@@ -40,7 +40,7 @@ const DAY_NAMES = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"
 /* ─── Section wrapper ─── */
 function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-card border border-border/50 p-5 md:p-6 ${className}`}>
+    <div className={`rounded-2xl bg-card text-card-foreground border border-border/50 p-5 md:p-6 shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -48,7 +48,7 @@ function Section({ children, className = "" }: { children: React.ReactNode; clas
 
 function SectionTitle({ icon: Icon, color, children }: { icon: any; color: string; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-foreground mb-1 uppercase tracking-wide">
+    <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-card-foreground mb-1 uppercase tracking-wide">
       <Icon className={`h-[18px] w-[18px] ${color}`} strokeWidth={1.5} />
       {children}
     </h2>
@@ -238,8 +238,8 @@ export default function Home() {
               onClick={() => applyTemplate(template)}
               className="flex flex-col items-center gap-1 p-3 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer group"
             >
-              <span className="text-xl">{template.icon}</span>
-              <span className="text-[11px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight text-center uppercase">{template.name}</span>
+              <img src={template.iconImage} alt={template.name} className="h-8 w-8 object-contain" />
+              <span className="text-[11px] font-medium text-card-foreground group-hover:text-primary transition-colors leading-tight text-center uppercase">{template.name}</span>
               <span className="text-[10px] text-muted-foreground">{template.totalCalories}</span>
             </button>
           ))}
@@ -277,7 +277,7 @@ export default function Home() {
                     : "border-border/50 hover:border-border hover:bg-accent/30"
                 }`}
               >
-                <span className={`text-[13px] font-semibold uppercase tracking-wide ${dietType === dt.value ? "text-primary" : "text-foreground"}`}>
+                <span className={`text-[13px] font-semibold uppercase tracking-wide ${dietType === dt.value ? "text-primary" : "text-card-foreground"}`}>
                   {dt.label}
                 </span>
                 <span className="text-[12px] text-muted-foreground leading-relaxed">{dt.description}</span>
@@ -302,7 +302,7 @@ export default function Home() {
                     : "border-border/50 hover:border-border hover:bg-accent/30"
                 }`}
               >
-                <span className={`text-[13px] font-semibold uppercase tracking-wide ${cookingLevel === cl.value ? "text-primary" : "text-foreground"}`}>
+                <span className={`text-[13px] font-semibold uppercase tracking-wide ${cookingLevel === cl.value ? "text-primary" : "text-card-foreground"}`}>
                   {cl.label}
                 </span>
                 <span className="text-[12px] text-muted-foreground leading-relaxed">{cl.description}</span>
@@ -344,7 +344,7 @@ export default function Home() {
         {/* Macros */}
         <Section>
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-[15px] font-semibold text-foreground uppercase tracking-wide">Macronutrientes</h2>
+            <h2 className="text-[15px] font-semibold text-card-foreground uppercase tracking-wide">Macronutrientes</h2>
             {(macroSum < 95 || macroSum > 105) && (
               <span className="flex items-center gap-1 text-[12px] text-destructive font-medium">
                 <AlertCircle className="h-3.5 w-3.5" />
@@ -551,7 +551,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 w-full justify-center py-2 uppercase tracking-wide"
+          className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-card-foreground transition-colors duration-200 w-full justify-center py-2 uppercase tracking-wide"
         >
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           {showAdvanced ? "Ocultar opciones avanzadas" : "Opciones avanzadas"}
@@ -565,7 +565,7 @@ export default function Home() {
               <div className="space-y-5 mt-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[13px] font-medium text-foreground">Medidas caseras</p>
+                    <p className="text-[13px] font-medium text-card-foreground">Medidas caseras</p>
                     <p className="text-[12px] text-muted-foreground">Punados, filetes, tazas en vez de gramos.</p>
                   </div>
                   <Switch checked={useHomeMeasures} onCheckedChange={setUseHomeMeasures} />
@@ -576,7 +576,7 @@ export default function Home() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <ShoppingCart className="h-4 w-4 text-blue-500" />
-                    <p className="text-[13px] font-medium text-foreground">Supermercado</p>
+                    <p className="text-[13px] font-medium text-card-foreground">Supermercado</p>
                   </div>
                   <p className="text-[12px] text-muted-foreground mb-3">Adaptar alimentos a productos disponibles.</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -588,7 +588,7 @@ export default function Home() {
                         className={`px-3 py-1.5 rounded-lg text-[12px] transition-all duration-200 cursor-pointer ${
                           supermarket === s.value
                             ? "bg-primary text-primary-foreground font-medium shadow-sm"
-                            : "bg-accent/50 text-foreground hover:bg-accent"
+                            : "bg-accent/50 text-card-foreground hover:bg-accent"
                         }`}
                       >
                         {s.label}
@@ -640,7 +640,7 @@ export default function Home() {
                 <div className="space-y-2">
                   {dailyTargets.map((dt, idx) => (
                     <div key={dt.day} className="p-3 rounded-xl bg-accent/30 space-y-2">
-                      <p className="text-[13px] font-medium text-foreground">
+                      <p className="text-[13px] font-medium text-card-foreground">
                         {totalMenus <= 7 ? DAY_NAMES[idx] || `Dia ${dt.day}` : `Menu ${dt.day}`}
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -685,7 +685,7 @@ export default function Home() {
                       }`}
                     >
                       <div>
-                        <span className="text-[13px] font-medium text-foreground">{recipe.name}</span>
+                        <span className="text-[13px] font-medium text-card-foreground">{recipe.name}</span>
                         <span className="text-[11px] text-muted-foreground ml-2">
                           {recipe.totalCalories} kcal
                         </span>

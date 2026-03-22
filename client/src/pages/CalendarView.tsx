@@ -72,7 +72,7 @@ export default function CalendarView() {
 
       <div className="grid lg:grid-cols-[1fr_300px] gap-6">
         {/* Calendar */}
-        <div className="bg-card rounded-2xl border border-border/50 p-5">
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 rounded-lg">
               <ChevronLeft className="h-4 w-4" />
@@ -137,7 +137,7 @@ export default function CalendarView() {
         {/* Sidebar: Alerts */}
         <div className="space-y-4">
           {/* Needs attention */}
-          <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="bg-card text-card-foreground rounded-2xl border border-border/50 p-4 shadow-sm">
             <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />Necesitan atención
             </h3>
@@ -169,7 +169,7 @@ export default function CalendarView() {
           </div>
 
           {/* Quick stats */}
-          <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="bg-card text-card-foreground rounded-2xl border border-border/50 p-4 shadow-sm">
             <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" />Resumen
             </h3>

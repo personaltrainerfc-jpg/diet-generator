@@ -638,3 +638,237 @@ export async function getWeekendFeedbackList(clientId: number) {
   const db = await getDb(); assertDb(db);
   return db.select().from(weekendFeedback).where(eq(weekendFeedback.clientId, clientId)).orderBy(desc(weekendFeedback.createdAt)).limit(20);
 }
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE F: Asistente IA Conversacional
+// ═══════════════════════════════════════════════════════
+
+import {
+  aiConversations, aiAssistantConfig, aiEscalationAlerts,
+  learnedPreferences, personalizationProfiles,
+  activityLogs, wearableConnections
+} from "../drizzle/schema";
+
+// ── AI Conversations ──
+export async function getOrCreateConversation(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  // Get today's conversation or create new one
+  const today = new Date().toISOString().split("T")[0];
+  const rows = await db.select().from(aiConversations)
+    .where(eq(aiConversations.clientId, clientId))
+    .orderBy(desc(aiConversations.updatedAt))
+    .limit(1);
+  
+  if (rows[0]) {
+    const lastUpdate = new Date(rows[0].updatedAt).toISOString().split("T")[0];
+    if (lastUpdate === today) return rows[0];
+  }
+  
+  // Create new conversation
+  const [result] = await db.insert(aiConversations).values({
+    clientId,
+    messages: [],
+  }).$returningId();
+  
+  const newRows = await db.select().from(aiConversations).where(eq(aiConversations.id, result.id)).limit(1);
+  return newRows[0];
+}
+
+export async function getConversationById(id: number) {
+  const db = await getDb(); assertDb(db);
+  const rows = await db.select().from(aiConversations).where(eq(aiConversations.id, id)).limit(1);
+  return rows[0] || null;
+}
+
+export async function updateConversationMessages(id: number, messages: Array<{ role: "user" | "assistant"; content: string; timestamp: number }>, summary?: string) {
+  const db = await getDb(); assertDb(db);
+  await db.update(aiConversations).set({ messages, ...(summary ? { summary } : {}) }).where(eq(aiConversations.id, id));
+}
+
+export async function getRecentConversations(clientId: number, limit = 5) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(aiConversations)
+    .where(eq(aiConversations.clientId, clientId))
+    .orderBy(desc(aiConversations.updatedAt))
+    .limit(limit);
+}
+
+// ── AI Assistant Config ──
+export async function getAssistantConfig(trainerId: number) {
+  const db = await getDb(); assertDb(db);
+  const rows = await db.select().from(aiAssistantConfig)
+    .where(eq(aiAssistantConfig.trainerId, trainerId))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function upsertAssistantConfig(trainerId: number, data: Partial<{
+  assistantName: string; tone: string; customRules: string;
+  escalationKeywords: string[]; enabled: number;
+}>) {
+  const db = await getDb(); assertDb(db);
+  const existing = await getAssistantConfig(trainerId);
+  if (existing) {
+    await db.update(aiAssistantConfig).set(data).where(eq(aiAssistantConfig.id, existing.id));
+    return existing.id;
+  }
+  const [result] = await db.insert(aiAssistantConfig).values({ trainerId, ...data }).$returningId();
+  return result.id;
+}
+
+// ── AI Escalation Alerts ──
+export async function createEscalationAlert(data: { clientId: number; trainerId: number; reason: string; conversationId?: number }) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(aiEscalationAlerts).values(data).$returningId();
+  return result.id;
+}
+
+export async function getEscalationAlerts(trainerId: number, resolved = false) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(aiEscalationAlerts)
+    .where(and(eq(aiEscalationAlerts.trainerId, trainerId), eq(aiEscalationAlerts.resolved, resolved ? 1 : 0)))
+    .orderBy(desc(aiEscalationAlerts.createdAt));
+}
+
+export async function resolveEscalationAlert(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.update(aiEscalationAlerts).set({ resolved: 1 }).where(eq(aiEscalationAlerts.id, id));
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE G: Motor de Personalización Progresiva
+// ═══════════════════════════════════════════════════════
+
+export async function addLearnedPreference(data: {
+  clientId: number; category: string; key: string; value: string; confidence?: number; source: string;
+}) {
+  const db = await getDb(); assertDb(db);
+  // Upsert: if same category+key exists, update
+  const existing = await db.select().from(learnedPreferences)
+    .where(and(
+      eq(learnedPreferences.clientId, data.clientId),
+      eq(learnedPreferences.category, data.category),
+      eq(learnedPreferences.key, data.key)
+    ))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(learnedPreferences).set({
+      value: data.value,
+      confidence: data.confidence ?? existing[0].confidence,
+      source: data.source,
+    }).where(eq(learnedPreferences.id, existing[0].id));
+    return existing[0].id;
+  }
+  
+  const [result] = await db.insert(learnedPreferences).values(data).$returningId();
+  return result.id;
+}
+
+export async function getLearnedPreferences(clientId: number, category?: string) {
+  const db = await getDb(); assertDb(db);
+  if (category) {
+    return db.select().from(learnedPreferences)
+      .where(and(eq(learnedPreferences.clientId, clientId), eq(learnedPreferences.category, category)))
+      .orderBy(desc(learnedPreferences.confidence));
+  }
+  return db.select().from(learnedPreferences)
+    .where(eq(learnedPreferences.clientId, clientId))
+    .orderBy(desc(learnedPreferences.confidence));
+}
+
+export async function getPersonalizationProfile(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  const rows = await db.select().from(personalizationProfiles)
+    .where(eq(personalizationProfiles.clientId, clientId))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function upsertPersonalizationProfile(clientId: number, profileData: any) {
+  const db = await getDb(); assertDb(db);
+  const existing = await getPersonalizationProfile(clientId);
+  if (existing) {
+    await db.update(personalizationProfiles).set({ profileData, lastAnalyzedAt: new Date() })
+      .where(eq(personalizationProfiles.id, existing.id));
+    return existing.id;
+  }
+  const [result] = await db.insert(personalizationProfiles).values({ clientId, profileData }).$returningId();
+  return result.id;
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE H: Integración Wearables
+// ═══════════════════════════════════════════════════════
+
+export async function logActivity(data: {
+  clientId: number; date: string; steps?: number; activeMinutes?: number;
+  caloriesBurned?: number; heartRateAvg?: number; heartRateMax?: number;
+  source?: string; rawData?: Record<string, any>;
+}) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(activityLogs)
+    .where(and(eq(activityLogs.clientId, data.clientId), eq(activityLogs.date, data.date)))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(activityLogs).set(data).where(eq(activityLogs.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(activityLogs).values(data).$returningId();
+  return result.id;
+}
+
+export async function getActivityLogs(clientId: number, startDate?: string, endDate?: string) {
+  const db = await getDb(); assertDb(db);
+  if (startDate && endDate) {
+    return db.select().from(activityLogs)
+      .where(and(eq(activityLogs.clientId, clientId), gte(activityLogs.date, startDate), lte(activityLogs.date, endDate)))
+      .orderBy(desc(activityLogs.date));
+  }
+  return db.select().from(activityLogs)
+    .where(eq(activityLogs.clientId, clientId))
+    .orderBy(desc(activityLogs.date))
+    .limit(30);
+}
+
+export async function getWearableConnection(clientId: number, provider?: string) {
+  const db = await getDb(); assertDb(db);
+  if (provider) {
+    const rows = await db.select().from(wearableConnections)
+      .where(and(eq(wearableConnections.clientId, clientId), eq(wearableConnections.provider, provider)))
+      .limit(1);
+    return rows[0] || null;
+  }
+  return db.select().from(wearableConnections)
+    .where(eq(wearableConnections.clientId, clientId));
+}
+
+export async function upsertWearableConnection(clientId: number, data: {
+  provider: string; accessToken?: string; refreshToken?: string; expiresAt?: Date;
+}) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(wearableConnections)
+    .where(and(eq(wearableConnections.clientId, clientId), eq(wearableConnections.provider, data.provider)))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(wearableConnections).set({
+      ...data,
+      lastSyncAt: new Date(),
+      status: "connected" as any,
+    }).where(eq(wearableConnections.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(wearableConnections).values({
+    clientId,
+    ...data,
+    lastSyncAt: new Date(),
+  }).$returningId();
+  return result.id;
+}
+
+export async function disconnectWearable(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.update(wearableConnections).set({ status: "disconnected" as any }).where(eq(wearableConnections.id, id));
+}

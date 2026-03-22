@@ -66,7 +66,7 @@ export default function Recipes() {
       ) : recipesQuery.data && recipesQuery.data.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recipesQuery.data.map(recipe => (
-            <div key={recipe.id} className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-all p-5 group">
+            <div key={recipe.id} className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-all p-5 group">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><ChefHat className="h-4.5 w-4.5 text-primary" /></div>
@@ -86,7 +86,7 @@ export default function Recipes() {
           ))}
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm flex flex-col items-center justify-center py-16 text-center">
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm flex flex-col items-center justify-center py-16 text-center">
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4"><BookOpen className="h-8 w-8 text-muted-foreground/40" /></div>
           <h3 className="text-[17px] font-semibold mb-1">No tienes recetas</h3>
           <p className="text-[13px] text-muted-foreground mb-5 max-w-xs">Crea tu primera receta para poder incluirla en las dietas que generes.</p>

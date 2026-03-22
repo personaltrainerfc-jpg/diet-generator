@@ -514,3 +514,131 @@ export const weekendFeedback = mysqlTable("weekend_feedback", {
 
 export type WeekendFeedbackType = typeof weekendFeedback.$inferSelect;
 export type InsertWeekendFeedback = typeof weekendFeedback.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE F: Asistente IA Conversacional
+// ═══════════════════════════════════════════════════════
+
+// ── AI Conversations (historial de chat con el asistente IA) ──
+export const aiConversations = mysqlTable("ai_conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  messages: json("messages").$type<Array<{ role: "user" | "assistant"; content: string; timestamp: number }>>().notNull(),
+  summary: text("summary"), // resumen automático para contexto
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiConversation = typeof aiConversations.$inferSelect;
+export type InsertAiConversation = typeof aiConversations.$inferInsert;
+
+// ── AI Assistant Config (configuración del asistente por entrenador) ──
+export const aiAssistantConfig = mysqlTable("ai_assistant_config", {
+  id: int("id").autoincrement().primaryKey(),
+  trainerId: int("trainerId").notNull(),
+  assistantName: varchar("assistantName", { length: 100 }).default("NutriBot").notNull(),
+  tone: varchar("tone", { length: 50 }).default("amigable").notNull(), // amigable, profesional, motivador
+  customRules: text("customRules"), // reglas personalizadas del entrenador
+  escalationKeywords: json("escalationKeywords").$type<string[]>(), // palabras que disparan alerta
+  enabled: int("enabled").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiAssistantConfig = typeof aiAssistantConfig.$inferSelect;
+export type InsertAiAssistantConfig = typeof aiAssistantConfig.$inferInsert;
+
+// ── AI Escalation Alerts (alertas cuando el cliente necesita al entrenador) ──
+export const aiEscalationAlerts = mysqlTable("ai_escalation_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  trainerId: int("trainerId").notNull(),
+  reason: text("reason").notNull(),
+  conversationId: int("conversationId"),
+  resolved: int("resolved").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiEscalationAlert = typeof aiEscalationAlerts.$inferSelect;
+export type InsertAiEscalationAlert = typeof aiEscalationAlerts.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE G: Motor de Personalización Progresiva
+// ═══════════════════════════════════════════════════════
+
+// ── Learned Preferences (preferencias aprendidas del cliente) ──
+export const learnedPreferences = mysqlTable("learned_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // food_likes, food_dislikes, schedule, habits
+  key: varchar("key_name", { length: 100 }).notNull(),
+  value: text("value").notNull(),
+  confidence: int("confidence").default(50).notNull(), // 0-100
+  source: varchar("source", { length: 50 }).notNull(), // ai_chat, adherence, checkin, manual
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LearnedPreference = typeof learnedPreferences.$inferSelect;
+export type InsertLearnedPreference = typeof learnedPreferences.$inferInsert;
+
+// ── Personalization Profiles (perfil evolutivo compilado) ──
+export const personalizationProfiles = mysqlTable("personalization_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  profileData: json("profileData").$type<{
+    foodLikes: string[];
+    foodDislikes: string[];
+    preferredMealTimes: string[];
+    cookingSkill: string;
+    shoppingPreferences: string[];
+    activityPattern: string;
+    sleepPattern: string;
+    stressFactors: string[];
+    motivationTriggers: string[];
+  }>().notNull(),
+  lastAnalyzedAt: timestamp("lastAnalyzedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PersonalizationProfile = typeof personalizationProfiles.$inferSelect;
+export type InsertPersonalizationProfile = typeof personalizationProfiles.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE H: Integración Wearables
+// ═══════════════════════════════════════════════════════
+
+// ── Activity Logs (datos de actividad del wearable o manual) ──
+export const activityLogs = mysqlTable("activity_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  steps: int("steps"),
+  activeMinutes: int("activeMinutes"),
+  caloriesBurned: int("caloriesBurned"),
+  heartRateAvg: int("heartRateAvg"),
+  heartRateMax: int("heartRateMax"),
+  source: varchar("source", { length: 50 }).default("manual").notNull(), // manual, fitbit, garmin, apple_health
+  rawData: json("rawData").$type<Record<string, any>>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;
+
+// ── Wearable Connections (conexiones de dispositivos) ──
+export const wearableConnections = mysqlTable("wearable_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  provider: varchar("provider", { length: 50 }).notNull(), // fitbit, garmin, apple_health, google_fit
+  accessToken: text("accessToken"),
+  refreshToken: text("refreshToken"),
+  expiresAt: timestamp("expiresAt"),
+  lastSyncAt: timestamp("lastSyncAt"),
+  status: mysqlEnum("wearableStatus", ["connected", "disconnected", "expired"]).default("connected").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WearableConnection = typeof wearableConnections.$inferSelect;
+export type InsertWearableConnection = typeof wearableConnections.$inferInsert;

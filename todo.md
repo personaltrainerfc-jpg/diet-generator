@@ -191,3 +191,49 @@
 - [ ] G12: Rediseñar Home (generador de dietas) con tema oscuro
 - [ ] G13: Rediseñar todas las páginas secundarias (historial, recetas, plantillas, calendario)
 - [ ] G14: Splash screen con imagen grupal + logo NutriFlow
+
+## H: Diseño - Tarjetas claras sobre fondo oscuro
+- [x] H1: Rediseñar sistema de tarjetas: fondo blanco/gris claro (#F5F5F7) sobre fondo oscuro general
+- [x] H2: Aplicar tarjetas claras en panel entrenador (Home, Clients, ClientDetail, Dashboard)
+- [x] H3: Aplicar tarjetas claras en portal del cliente (todas las secciones)
+- [x] H4: Textos negros/gris oscuro dentro de tarjetas, títulos blancos fuera
+- [x] H5: Border-radius 16px y sombra sutil en todas las tarjetas
+
+## I: Diseño - Iconos cartoon personalizados
+- [x] I1: Generar iconos cartoon (fuego, bíceps, balanza, aguacate, carne, ensalada)
+- [x] I2: Subir iconos al CDN
+- [x] I3: Sustituir todos los emojis estándar por iconos cartoon en ambas apps
+- [x] I4: Asegurar consistencia visual con personajes NutriFlow
+
+## J: Asistente IA Conversacional 24/7
+- [x] J1: Schema DB: tabla ai_conversations (clientId, messages JSON, createdAt)
+- [x] J2: Schema DB: tabla ai_assistant_config (trainerId, tono, nombre, reglas escalado)
+- [x] J3: Backend: endpoint chat con contexto del cliente (dieta, macros, adherencia, peso)
+- [x] J4: Backend: sistema de escalado al entrenador para preguntas sensibles
+- [x] J5: Backend: guardar historial de conversaciones
+- [x] J6: Frontend cliente: sección "Asistente" en navegación con chat UI
+- [x] J7: Frontend entrenador: ver resumen conversaciones de cada cliente
+- [x] J8: Frontend entrenador: configurar nombre, tono y reglas del asistente
+- [x] J9: Seguridad: filtro para no dar consejos médicos ni recomendar suplementos
+
+## K: Motor de Personalización Progresiva
+- [x] K1: Backend: análisis de patrones de adherencia por alimento y día
+- [x] K2: Backend: detectar alimentos con alta/baja aceptación
+- [x] K3: Backend: detectar patrones de sueño vs adherencia
+- [x] K4: Backend: analizar respuesta del peso a ajustes calóricos
+- [x] K5: Backend: generar perfil aprendido del cliente
+- [x] K6: Backend: incorporar perfil aprendido en prompt de generación de dietas
+- [x] K7: Frontend entrenador: sección "Perfil aprendido" en detalle del cliente
+- [x] K8: Frontend entrenador: indicador visual de nivel de personalización
+- [x] K9: Frontend entrenador: editar/corregir datos aprendidos
+
+## L: Integración con Wearables
+- [x] L1: Schema DB: tabla wearable_connections (clientId, platform, tokens, lastSync)
+- [x] L2: Schema DB: tabla activity_data (clientId, date, steps, calories, sleep, hrv)
+- [x] L3: Backend: endpoints para conectar/desconectar plataformas
+- [x] L4: Backend: sincronización de datos (simulada/manual por ahora)
+- [x] L5: Backend: reglas de ajuste nutricional basadas en actividad
+- [x] L6: Frontend cliente: sección "Mi actividad" con datos del día
+- [x] L7: Frontend cliente: configuración de conexión de wearables
+- [x] L8: Frontend entrenador: vista de actividad y sueño en perfil del cliente
+- [x] L9: Alertas al entrenador por actividad baja o sueño insuficiente

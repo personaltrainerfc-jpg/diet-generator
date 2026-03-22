@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays } from "lucide-react";
+import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays, Bot } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -39,6 +39,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: FileStack, label: "Plantillas", path: "/templates" },
   { icon: CalendarDays, label: "Calendario", path: "/calendar" },
+  { icon: Bot, label: "Asistente IA", path: "/ai-config" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

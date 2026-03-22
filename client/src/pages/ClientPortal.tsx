@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown } from "lucide-react";
+import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown, Bot, Activity } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -139,6 +139,8 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
     { id: "weekend", label: "Fin de Semana", icon: Calendar },
     { id: "shopping", label: "Compra", icon: ShoppingCart },
     { id: "chat", label: "Chat", icon: MessageSquare },
+    { id: "assistant", label: "Asistente", icon: Bot },
+    { id: "activity", label: "Actividad", icon: Activity },
   ];
 
   return (
@@ -205,6 +207,8 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
         {tab === "weekend" && <WeekendTab session={session} />}
         {tab === "shopping" && <ShoppingTab session={session} archetype={archetype} />}
         {tab === "chat" && <ChatTab session={session} />}
+        {tab === "assistant" && <AssistantTab session={session} archetype={archetype} accentColor={accentColor} />}
+        {tab === "activity" && <ActivityTab session={session} accentColor={accentColor} />}
       </div>
 
       {/* Mobile bottom nav with archetype accent */}
@@ -1616,6 +1620,303 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
       </Dialog>
 
       {/* Old feedback dialog removed - now inline AI feedback */}
+    </div>
+  );
+}
+
+// ── Assistant Tab (AI Chat) ──
+function AssistantTab({ session, archetype, accentColor }: { session: { clientId: number; name: string; accessCode: string }; archetype?: ArchetypeId; accentColor: string }) {
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string; timestamp: number }>>([]);
+  const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const archetypeData = archetype ? ARCHETYPES.find(a => a.id === archetype) : null;
+
+  // Load chat history
+  const historyQ = trpc.clientPortal.aiChatHistory.useQuery(
+    { clientId: session.clientId, accessCode: session.accessCode },
+    { refetchOnWindowFocus: false }
+  );
+
+  useEffect(() => {
+    if (historyQ.data && historyQ.data.length > 0) {
+      const latest = historyQ.data[0];
+      if (latest?.messages) {
+        setMessages(latest.messages as any[]);
+      }
+    }
+  }, [historyQ.data]);
+
+  const chatMut = trpc.clientPortal.aiChat.useMutation({
+    onSuccess: (data) => {
+      setMessages(prev => [...prev, { role: "assistant", content: data.reply, timestamp: Date.now() }]);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, chatMut.isPending]);
+
+  const handleSend = () => {
+    const trimmed = input.trim();
+    if (!trimmed || chatMut.isPending) return;
+    setMessages(prev => [...prev, { role: "user", content: trimmed, timestamp: Date.now() }]);
+    setInput("");
+    chatMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, message: trimmed });
+    inputRef.current?.focus();
+  };
+
+  const suggestedPrompts = [
+    "\u00bfQu\u00e9 puedo comer como snack saludable?",
+    "\u00bfC\u00f3mo puedo mejorar mi adherencia?",
+    "Tengo hambre entre comidas, \u00bfqu\u00e9 hago?",
+    "\u00bfPuedo sustituir alg\u00fan alimento de mi dieta?",
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4 flex items-center gap-3" style={{ borderLeft: `3px solid ${accentColor}` }}>
+        {archetypeData ? (
+          <img src={archetypeData.image} alt={archetypeData.name} className="h-12 w-12 object-contain" />
+        ) : (
+          <Bot className="h-8 w-8 text-primary" />
+        )}
+        <div>
+          <h3 className="font-semibold text-[15px]">Asistente NutriFlow</h3>
+          <p className="text-[12px] text-muted-foreground">Tu asistente nutricional 24/7. Pregunta lo que necesites sobre tu dieta.</p>
+        </div>
+      </div>
+
+      {/* Chat area */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm overflow-hidden" style={{ height: "calc(100vh - 340px)", minHeight: "400px" }}>
+        <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3" style={{ paddingBottom: "80px" }}>
+          {messages.length === 0 && !historyQ.isLoading && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+              {archetypeData && (
+                <img src={archetypeData.image} alt={archetypeData.name} className="h-20 w-20 object-contain opacity-60" />
+              )}
+              <p className="text-muted-foreground text-sm">\u00a1Hola {session.name}! Soy tu asistente. Preg\u00fantame lo que necesites.</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {suggestedPrompts.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setInput(prompt); }}
+                    className="text-[12px] px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && archetypeData && (
+                <img src={archetypeData.image} alt="" className="h-7 w-7 object-contain mt-1 flex-shrink-0" />
+              )}
+              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                msg.role === "user"
+                  ? "text-white"
+                  : "bg-muted/50 text-card-foreground"
+              }`} style={msg.role === "user" ? { backgroundColor: accentColor } : undefined}>
+                {msg.content.split("\n").map((line, j) => (
+                  <p key={j} className={j > 0 ? "mt-1.5" : ""}>{line}</p>
+                ))}
+              </div>
+              {msg.role === "user" && (
+                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center mt-1 flex-shrink-0">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {chatMut.isPending && (
+            <div className="flex gap-2 items-start">
+              {archetypeData && <img src={archetypeData.image} alt="" className="h-7 w-7 object-contain mt-1" />}
+              <div className="bg-muted/50 rounded-2xl px-4 py-3">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: "0ms" }} />
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: "150ms" }} />
+                  <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: "300ms" }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-border/30 bg-card" style={{ position: "sticky" }}>
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Escribe tu pregunta..."
+              className="flex-1 min-h-[40px] max-h-[100px] resize-none text-[13px] rounded-xl"
+              rows={1}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || chatMut.isPending}
+              size="icon"
+              className="h-10 w-10 rounded-xl flex-shrink-0"
+              style={{ backgroundColor: accentColor }}
+            >
+              {chatMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Activity Tab (Wearables / Manual) ──
+function ActivityTab({ session, accentColor }: { session: { clientId: number; name: string; accessCode: string }; accentColor: string }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [steps, setSteps] = useState("");
+  const [activeMinutes, setActiveMinutes] = useState("");
+  const [caloriesBurned, setCaloriesBurned] = useState("");
+
+  const activityQ = trpc.clientPortal.getActivityLogs.useQuery(
+    { clientId: session.clientId, accessCode: session.accessCode },
+    { refetchOnWindowFocus: false }
+  );
+
+  const logMut = trpc.clientPortal.logActivity.useMutation({
+    onSuccess: () => {
+      toast.success("Actividad registrada");
+      activityQ.refetch();
+      setSteps(""); setActiveMinutes(""); setCaloriesBurned("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleLog = () => {
+    if (!steps && !activeMinutes && !caloriesBurned) {
+      toast.error("Introduce al menos un dato");
+      return;
+    }
+    logMut.mutate({
+      clientId: session.clientId,
+      accessCode: session.accessCode,
+      date,
+      steps: steps ? parseInt(steps) : undefined,
+      activeMinutes: activeMinutes ? parseInt(activeMinutes) : undefined,
+      caloriesBurned: caloriesBurned ? parseInt(caloriesBurned) : undefined,
+      source: "manual",
+    });
+  };
+
+  const weekData = (activityQ.data || []).slice(0, 7).reverse();
+  const maxSteps = Math.max(...weekData.map(d => d.steps || 0), 1);
+
+  return (
+    <div className="space-y-4">
+      {/* Quick log */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4 space-y-3">
+        <h3 className="font-semibold text-[15px] flex items-center gap-2">
+          <Activity className="h-4 w-4" style={{ color: accentColor }} />
+          Registrar Actividad
+        </h3>
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-xl" />
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <Label className="text-[11px] text-muted-foreground">Pasos</Label>
+            <Input type="number" placeholder="0" value={steps} onChange={(e) => setSteps(e.target.value)} className="rounded-xl" />
+          </div>
+          <div>
+            <Label className="text-[11px] text-muted-foreground">Min. activos</Label>
+            <Input type="number" placeholder="0" value={activeMinutes} onChange={(e) => setActiveMinutes(e.target.value)} className="rounded-xl" />
+          </div>
+          <div>
+            <Label className="text-[11px] text-muted-foreground">Cal. quemadas</Label>
+            <Input type="number" placeholder="0" value={caloriesBurned} onChange={(e) => setCaloriesBurned(e.target.value)} className="rounded-xl" />
+          </div>
+        </div>
+        <Button onClick={handleLog} disabled={logMut.isPending} className="w-full rounded-xl" style={{ backgroundColor: accentColor }}>
+          {logMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+          Registrar
+        </Button>
+      </div>
+
+      {/* Weekly chart */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
+        <h3 className="font-semibold text-[15px] mb-3">Pasos \u00faltimos 7 d\u00edas</h3>
+        {weekData.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-6">Sin datos de actividad a\u00fan</p>
+        ) : (
+          <div className="flex items-end gap-1 h-32">
+            {weekData.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-[10px] text-muted-foreground">{(d.steps || 0).toLocaleString()}</span>
+                <div
+                  className="w-full rounded-t-md transition-all"
+                  style={{
+                    height: `${Math.max(4, ((d.steps || 0) / maxSteps) * 100)}%`,
+                    backgroundColor: accentColor,
+                    opacity: 0.7 + ((d.steps || 0) / maxSteps) * 0.3,
+                  }}
+                />
+                <span className="text-[9px] text-muted-foreground">{d.date.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* History */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
+        <h3 className="font-semibold text-[15px] mb-3">Historial</h3>
+        {activityQ.isLoading ? (
+          <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : (activityQ.data || []).length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">No hay registros de actividad</p>
+        ) : (
+          <div className="space-y-2">
+            {(activityQ.data || []).slice(0, 14).map((log) => (
+              <div key={log.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                <div>
+                  <p className="text-[13px] font-medium">{log.date}</p>
+                  <p className="text-[11px] text-muted-foreground">{log.source}</p>
+                </div>
+                <div className="flex gap-4 text-right">
+                  {log.steps != null && <div><p className="text-[13px] font-semibold" style={{ color: accentColor }}>{log.steps.toLocaleString()}</p><p className="text-[9px] text-muted-foreground">pasos</p></div>}
+                  {log.activeMinutes != null && <div><p className="text-[13px] font-semibold">{log.activeMinutes}</p><p className="text-[9px] text-muted-foreground">min</p></div>}
+                  {log.caloriesBurned != null && <div><p className="text-[13px] font-semibold">{log.caloriesBurned}</p><p className="text-[9px] text-muted-foreground">kcal</p></div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Wearable connections placeholder */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
+        <h3 className="font-semibold text-[15px] mb-2">Dispositivos</h3>
+        <p className="text-[12px] text-muted-foreground mb-3">Conecta tu wearable para sincronizar datos autom\u00e1ticamente.</p>
+        <div className="grid grid-cols-2 gap-2">
+          {["Fitbit", "Garmin", "Apple Health", "Google Fit"].map((provider) => (
+            <button
+              key={provider}
+              onClick={() => toast.info("Integraci\u00f3n con " + provider + " pr\u00f3ximamente")}
+              className="flex items-center gap-2 p-3 rounded-xl border border-border/50 text-[12px] text-muted-foreground hover:border-foreground/30 transition-colors"
+            >
+              <Activity className="h-4 w-4" />
+              {provider}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

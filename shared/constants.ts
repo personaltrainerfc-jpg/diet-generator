@@ -40,11 +40,22 @@ export const COOKING_LEVELS = [
 
 export type CookingLevel = typeof COOKING_LEVELS[number]["value"];
 
+// Cartoon icon URLs
+export const CARTOON_ICONS = {
+  fire: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/fire-icon-fhBrSztUNc7aA3hW2PHcHG.webp",
+  muscle: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/muscle-icon-guuczayrpADh7MfmRfTWWy.webp",
+  balance: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/balance-icon-LPydaFACtqRiji54JqD7kr.webp",
+  avocado: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/avocado-icon-NNAA96BpzP6ePiSqhku7qU.webp",
+  steak: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/steak-icon-V5UkEcM6rRqYVeJEHgNrhd.webp",
+  salad: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/salad-icon-KRpCLDB8arhGvBAiey7wGE.webp",
+} as const;
+
 // Quick templates
 export const QUICK_TEMPLATES = [
   {
     name: "Definición",
     icon: "🔥",
+    iconImage: CARTOON_ICONS.fire,
     totalCalories: 1800,
     proteinPercent: 35,
     carbsPercent: 40,
@@ -56,6 +67,7 @@ export const QUICK_TEMPLATES = [
   {
     name: "Volumen",
     icon: "💪",
+    iconImage: CARTOON_ICONS.muscle,
     totalCalories: 2800,
     proteinPercent: 30,
     carbsPercent: 45,
@@ -67,6 +79,7 @@ export const QUICK_TEMPLATES = [
   {
     name: "Mantenimiento",
     icon: "⚖️",
+    iconImage: CARTOON_ICONS.balance,
     totalCalories: 2200,
     proteinPercent: 30,
     carbsPercent: 45,
@@ -78,6 +91,7 @@ export const QUICK_TEMPLATES = [
   {
     name: "Keto",
     icon: "🥑",
+    iconImage: CARTOON_ICONS.avocado,
     totalCalories: 2000,
     proteinPercent: 25,
     carbsPercent: 5,
@@ -89,6 +103,7 @@ export const QUICK_TEMPLATES = [
   {
     name: "Paleo",
     icon: "🥩",
+    iconImage: CARTOON_ICONS.steak,
     totalCalories: 2200,
     proteinPercent: 30,
     carbsPercent: 30,
@@ -100,6 +115,7 @@ export const QUICK_TEMPLATES = [
   {
     name: "Real Food",
     icon: "🥗",
+    iconImage: CARTOON_ICONS.salad,
     totalCalories: 2000,
     proteinPercent: 30,
     carbsPercent: 40,

@@ -16,6 +16,7 @@ import TrainerDashboard from "./pages/TrainerDashboard";
 import ClientPortal from "./pages/ClientPortal";
 import Templates from "./pages/Templates";
 import CalendarView from "./pages/CalendarView";
+import AiConfig from "./pages/AiConfig";
 
 function DashboardRouter() {
   return (
@@ -31,6 +32,7 @@ function DashboardRouter() {
         <Route path="/dashboard" component={TrainerDashboard} />
         <Route path="/templates" component={Templates} />
         <Route path="/calendar" component={CalendarView} />
+        <Route path="/ai-config" component={AiConfig} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

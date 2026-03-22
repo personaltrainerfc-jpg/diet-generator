@@ -94,7 +94,7 @@ export default function Templates() {
           {filtered.map((t: any) => {
             const tags = typeof t.tags === "string" ? JSON.parse(t.tags || "[]") : (t.tags || []);
             return (
-              <div key={t.id} className="bg-card rounded-2xl border border-border/50 p-5 hover:border-primary/30 transition-colors">
+              <div key={t.id} className="bg-card text-card-foreground rounded-2xl border border-border/50 p-5 hover:border-primary/30 transition-colors shadow-sm">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="text-[15px] font-semibold">{t.name}</h3>

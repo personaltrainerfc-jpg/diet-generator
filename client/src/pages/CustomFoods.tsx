@@ -52,7 +52,7 @@ export default function CustomFoods() {
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : foods && foods.length > 0 ? (
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-border/50">
@@ -89,7 +89,7 @@ export default function CustomFoods() {
           <div className="px-5 py-2.5 bg-secondary/30 text-[11px] text-muted-foreground font-medium">Valores por cada 100g</div>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm flex flex-col items-center justify-center py-16 text-center">
+        <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm flex flex-col items-center justify-center py-16 text-center">
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4"><Apple className="h-8 w-8 text-muted-foreground/40" /></div>
           <h3 className="text-[17px] font-semibold mb-1">No tienes alimentos</h3>
           <p className="text-[13px] text-muted-foreground mb-5 max-w-xs">Crea alimentos con macros específicos para incluirlos en tus dietas.</p>

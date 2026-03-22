@@ -58,7 +58,7 @@ export default function Clients() {
       {clientsQuery.isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : filtered.length === 0 ? (
-        <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-16 text-center">
+        <div className="bg-card text-card-foreground rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-16 text-center shadow-sm">
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4"><Users className="h-8 w-8 text-muted-foreground/40" /></div>
           <h3 className="text-[17px] font-semibold mb-1">{search ? "Sin resultados" : "No tienes clientes aún"}</h3>
           <p className="text-[13px] text-muted-foreground mb-5 max-w-xs">{search ? "Prueba con otro término" : "Crea tu primer cliente para empezar"}</p>
@@ -67,7 +67,7 @@ export default function Clients() {
       ) : (
         <div className="space-y-2">
           {filtered.map((client: any) => (
-            <div key={client.id} className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setLocation(`/clients/${client.id}`)}>
+            <div key={client.id} className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setLocation(`/clients/${client.id}`)}>
               <div className="flex items-center gap-4 p-4">
                 {(() => {
                   const arch = client.archetype ? ARCHETYPES.find((a: any) => a.id === client.archetype) : null;

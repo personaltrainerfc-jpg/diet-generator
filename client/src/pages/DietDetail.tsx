@@ -53,7 +53,7 @@ function EditableMealName({ meal, onSave }: { meal: FullMeal; onSave: (name: str
     );
   }
   return (
-    <button onClick={() => { setValue(meal.mealName); setEditing(true); }} className="text-[15px] font-semibold text-foreground hover:text-primary transition-colors">
+    <button onClick={() => { setValue(meal.mealName); setEditing(true); }} className="text-[15px] font-semibold text-card-foreground hover:text-primary transition-colors">
       {meal.mealName}
     </button>
   );
@@ -239,7 +239,7 @@ function FoodRow({ food, mealName, onUpdateFood, onDeleteFood }: {
       <div className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-secondary/60 transition-all group/food">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-[13px] text-foreground truncate">{current.name}</span>
+            <span className="font-medium text-[13px] text-card-foreground truncate">{current.name}</span>
             {showAlt && <Badge variant="outline" className="text-[9px] py-0 px-1.5 text-primary border-primary/20 rounded-full">ALT</Badge>}
           </div>
           <EditableQuantity value={current.quantity} onSave={(v) => onUpdateFood(food.id, { foodId: food.id, quantity: v, recalcFromDb: true })} />
@@ -464,7 +464,7 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
         <DialogHeader><DialogTitle className="text-[17px] font-semibold">Añadir comida</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-[13px] font-medium text-foreground mb-1.5 block">Nombre</label>
+            <label className="text-[13px] font-medium text-card-foreground mb-1.5 block">Nombre</label>
             <Input placeholder="Ej: Merienda, Pre-entreno..." value={name} onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !isLoading) { onAdd(name.trim() || "Nueva comida"); } }}
               disabled={isLoading} autoFocus className="rounded-xl" />
@@ -536,7 +536,7 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             <Icon className={`h-5 w-5 text-${color}-500`} />
             <div>
               <p className="text-[11px] text-muted-foreground">{label}</p>
-              <p className="font-bold text-[15px] text-foreground tabular-nums">{value}</p>
+              <p className="font-bold text-[15px] text-card-foreground tabular-nums">{value}</p>
             </div>
           </div>
         ))}

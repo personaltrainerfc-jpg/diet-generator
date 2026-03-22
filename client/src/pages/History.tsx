@@ -87,11 +87,11 @@ export default function History() {
       </div>
 
       {!diets || diets.length === 0 ? (
-        <div className="rounded-2xl bg-card border border-border/50 p-10 flex flex-col items-center text-center">
+        <div className="rounded-2xl bg-card text-card-foreground border border-border/50 p-10 flex flex-col items-center text-center shadow-sm">
           <div className="h-14 w-14 rounded-2xl bg-accent flex items-center justify-center mb-4">
             <ChefHat className="h-7 w-7 text-muted-foreground" />
           </div>
-          <h3 className="text-[17px] font-semibold text-foreground mb-1">Sin dietas</h3>
+          <h3 className="text-[17px] font-semibold text-card-foreground mb-1">Sin dietas</h3>
           <p className="text-[14px] text-muted-foreground max-w-xs mb-5">
             Crea tu primera dieta personalizada con inteligencia artificial.
           </p>
@@ -104,12 +104,12 @@ export default function History() {
           {diets.map(diet => (
             <div
               key={diet.id}
-              className="rounded-2xl bg-card border border-border/50 p-4 hover:bg-accent/30 transition-colors duration-200 cursor-pointer group"
+              className="rounded-2xl bg-card text-card-foreground border border-border/50 p-4 hover:bg-accent/30 transition-colors duration-200 cursor-pointer group shadow-sm"
               onClick={() => setLocation(`/diet/${diet.id}`)}
             >
               <div className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[15px] font-semibold text-foreground truncate">{diet.name}</h3>
+                  <h3 className="text-[15px] font-semibold text-card-foreground truncate">{diet.name}</h3>
                   <div className="flex items-center gap-3 mt-1.5">
                     <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
                       <Flame className="h-3 w-3 text-orange-500" />
@@ -182,7 +182,7 @@ export default function History() {
           </DialogHeader>
           <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
-              <label className="text-[13px] font-medium text-foreground">Nombre de la nueva dieta</label>
+              <label className="text-[13px] font-medium text-card-foreground">Nombre de la nueva dieta</label>
               <Input
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
