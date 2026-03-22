@@ -61,7 +61,7 @@ export default function ClientPortal() {
           <div className="text-center mb-8">
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-20 object-contain mx-auto mb-4" />
             <h1 className="text-2xl font-bold tracking-tight uppercase">Portal del Cliente</h1>
-            <p className="text-white/60 text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
+            <p className="text-muted-foreground text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
           </div>
           <div className="space-y-3">
             <Input
@@ -80,7 +80,7 @@ export default function ClientPortal() {
               Acceder
             </Button>
           </div>
-          <p className="text-center text-[13px] text-white/50 mt-6">
+          <p className="text-center text-[13px] text-muted-foreground mt-6">
             Tu entrenador te proporcionará el código de acceso
           </p>
         </div>
@@ -146,7 +146,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
   return (
     <div className="min-h-screen bg-background" data-archetype={archetype || undefined}>
       {/* Header with mascot */}
-      <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(11,13,24,0.85)" }}>
+      <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-border/50 bg-background/95">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {archetypeData ? (
@@ -156,10 +156,10 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
             )}
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight uppercase" style={{ color: accentColor }}>{session.name}</h1>
-              {profileQ.data?.goal && <p className="text-[13px] text-white/60">{profileQ.data.goal}</p>}
+              {profileQ.data?.goal && <p className="text-[13px] text-muted-foreground">{profileQ.data.goal}</p>}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-white/70 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-muted-foreground hover:text-foreground">
             Cerrar sesión
           </Button>
         </div>
@@ -173,7 +173,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
               <img src={archetypeData.image} alt={archetypeData.name} className="h-16 w-16 object-contain drop-shadow-lg flex-shrink-0" />
               <div>
                 <p className="text-[15px] font-semibold text-foreground">{getGreeting(session.name, archetype)}</p>
-                <p className="text-[13px] text-white/60 mt-0.5">Tu compañero <span style={{ color: accentColor }} className="font-semibold">{archetypeData.name}</span> te acompaña</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">Tu compañero <span style={{ color: accentColor }} className="font-semibold">{archetypeData.name}</span> te acompaña</p>
               </div>
             </div>
           </div>
@@ -212,14 +212,14 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       </div>
 
       {/* Mobile bottom nav with archetype accent */}
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom" style={{ backgroundColor: "rgba(11,13,24,0.92)" }}>
+      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom bg-background/95">
         <div className="flex justify-around py-2">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="flex flex-col items-center gap-0.5 px-3 py-1 transition-colors"
-              style={{ color: tab === t.id ? accentColor : "rgba(255,255,255,0.4)" }}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${tab !== t.id ? "text-muted-foreground" : ""}`}
+              style={{ color: tab === t.id ? accentColor : undefined }}
             >
               <t.icon className="h-5 w-5" />
               <span className="text-[10px] font-medium">{t.label}</span>
@@ -1730,7 +1730,7 @@ function AssistantTab({ session, archetype, accentColor }: { session: { clientId
               )}
               <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
                 msg.role === "user"
-                  ? "text-white"
+                  ? "text-primary-foreground"
                   : "bg-muted/50 text-card-foreground"
               }`} style={msg.role === "user" ? { backgroundColor: accentColor } : undefined}>
                 {msg.content.split("\n").map((line, j) => (

@@ -321,3 +321,12 @@
 - [x] X1: Corregir caracteres Unicode escapados en textos visibles
 - [x] X2: Corregir botón "Cerrar sesión" con formato legible
 - [x] X3: Revisar todos los textos con caracteres Unicode escapados en todas las páginas
+
+## Y: Cambiar toda la app a fondos blancos y letras negras
+- [x] Y1: Modificar variables CSS del tema dark a fondo blanco y texto negro
+- [x] Y2: Cambiar sidebar del entrenador a fondo blanco con texto negro
+- [x] Y3: Cambiar header móvil a fondo blanco
+- [x] Y4: Cambiar portal del cliente a fondo blanco con texto negro
+- [x] Y5: Corregir todos los colores hardcodeados en componentes
+- [x] Y6: Verificar legibilidad en todas las pantallas
+- [x] Y7: Asegurar que tarjetas, modales y dropdowns mantienen coherencia

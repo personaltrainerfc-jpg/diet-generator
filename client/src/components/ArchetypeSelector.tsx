@@ -13,7 +13,7 @@ export default function ArchetypeSelector({ onSelect, isPending, clientName }: A
   const [selected, setSelected] = useState<ArchetypeId | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#0B0D18] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Header */}
       <div className="text-center mb-8 max-w-md">
         <img
@@ -21,10 +21,10 @@ export default function ArchetypeSelector({ onSelect, isPending, clientName }: A
           alt="NutriFlow"
           className="h-16 object-contain mx-auto mb-6"
         />
-        <h1 className="text-2xl font-bold text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">
           ¡Hola, {clientName}!
         </h1>
-        <p className="text-[15px] text-gray-400 mt-2 leading-relaxed">
+        <p className="text-[15px] text-muted-foreground mt-2 leading-relaxed">
           Elige tu personaje NutriFlow. Te acompañará en todo tu camino.
         </p>
       </div>
@@ -48,8 +48,8 @@ export default function ArchetypeSelector({ onSelect, isPending, clientName }: A
               onClick={() => setSelected(arch.id)}
               className="relative rounded-2xl border-2 p-4 transition-all duration-300 text-left overflow-hidden group"
               style={{
-                borderColor: isSelected ? arch.accentColor : "rgba(255,255,255,0.08)",
-                backgroundColor: isSelected ? `${arch.accentColor}15` : "rgba(255,255,255,0.03)",
+                borderColor: isSelected ? arch.accentColor : "var(--border)",
+                backgroundColor: isSelected ? `${arch.accentColor}15` : "var(--card)",
                 boxShadow: isSelected ? `0 0 30px ${arch.accentColor}20` : "none",
               }}
             >
@@ -71,14 +71,14 @@ export default function ArchetypeSelector({ onSelect, isPending, clientName }: A
                 />
                 <h3
                   className="text-[15px] font-bold text-center tracking-wider"
-                  style={{ color: isSelected ? arch.accentColor : "#fff" }}
+                  style={{ color: isSelected ? arch.accentColor : "var(--foreground)" }}
                 >
                   {arch.name}
                 </h3>
-                <p className="text-[11px] text-center mt-1 leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <p className="text-[11px] text-center mt-1 leading-relaxed text-muted-foreground">
                   {arch.animal}
                 </p>
-                <p className="text-[11px] text-center mt-1.5 leading-relaxed" style={{ color: "rgba(255,255,255,0.4)" }}>
+                <p className="text-[11px] text-center mt-1.5 leading-relaxed text-muted-foreground">
                   {arch.description}
                 </p>
               </div>
@@ -106,7 +106,7 @@ export default function ArchetypeSelector({ onSelect, isPending, clientName }: A
         {selected ? `SOY ${ARCHETYPES.find((a) => a.id === selected)?.name}` : "ELIGE TU PERSONAJE"}
       </Button>
 
-      <p className="text-[11px] text-gray-500 mt-4 text-center">
+      <p className="text-[11px] text-muted-foreground mt-4 text-center">
         Podrás cambiar tu personaje más adelante
       </p>
     </div>

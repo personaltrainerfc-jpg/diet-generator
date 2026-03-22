@@ -69,7 +69,7 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-10 max-w-sm w-full">
           <div className="flex flex-col items-center gap-6">
             <img
@@ -77,7 +77,7 @@ export default function DashboardLayout({
               alt="NutriFlow"
               className="h-24 object-contain"
             />
-            <p className="text-[15px] text-gray-400 text-center leading-relaxed">
+            <p className="text-[15px] text-muted-foreground text-center leading-relaxed">
               Crea planes nutricionales personalizados con inteligencia artificial.
             </p>
           </div>
@@ -86,7 +86,7 @@ export default function DashboardLayout({
               window.location.href = getLoginUrl();
             }}
             size="lg"
-            className="w-full rounded-full h-12 text-[15px] font-semibold bg-[#6BCB77] hover:bg-[#5ab868] text-white"
+            className="w-full rounded-full h-12 text-[15px] font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             Iniciar sesion
           </Button>
@@ -298,7 +298,7 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b border-border/50 h-12 items-center justify-between px-3 backdrop-blur-xl sticky top-0 z-40" style={{ backgroundColor: "#404040" }}>
+          <div className="flex border-b border-border/50 h-12 items-center justify-between px-3 backdrop-blur-xl sticky top-0 z-40 bg-background/95">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-8 w-8 rounded-lg" />
               <img
@@ -325,10 +325,10 @@ function DashboardLayoutContent({
                   className="flex flex-col items-center gap-0.5 py-1.5 px-3 min-w-[48px] min-h-[48px] justify-center transition-colors duration-200"
                 >
                   <item.icon
-                    className={`h-5 w-5 ${isActive ? "text-[#6BCB77]" : "text-muted-foreground"}`}
+                    className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`}
                     strokeWidth={isActive ? 2 : 1.5}
                   />
-                  <span className={`text-[10px] ${isActive ? "text-[#6BCB77] font-medium" : "text-muted-foreground"}`}>
+                  <span className={`text-[10px] ${isActive ? "text-primary font-medium" : "text-muted-foreground"}`}>
                     {item.label}
                   </span>
                 </button>
