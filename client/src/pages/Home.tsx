@@ -223,7 +223,7 @@ export default function Home() {
       {/* Header */}
       <div className="pt-2">
         <h1 className="text-[28px] font-bold tracking-tight text-foreground uppercase">NUEVA DIETA</h1>
-        <p className="text-[13px] text-muted-foreground mt-1 uppercase tracking-wide">CONFIGURA LOS PARÁMETROS PARA CREAR EL PLAN NUTRICIONAL</p>
+        <p className="text-[13px] mt-1 uppercase tracking-wide" style={{ color: "#ffffff" }}>CONFIGURA LOS PARÁMETROS PARA CREAR EL PLAN NUTRICIONAL</p>
       </div>
 
       {/* Quick templates */}

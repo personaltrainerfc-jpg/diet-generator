@@ -298,7 +298,7 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b border-border/50 h-12 items-center justify-between px-3 backdrop-blur-xl sticky top-0 z-40" style={{ backgroundColor: "#000000" }}>
+          <div className="flex border-b border-border/50 h-12 items-center justify-between px-3 backdrop-blur-xl sticky top-0 z-40" style={{ backgroundColor: "#404040" }}>
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-8 w-8 rounded-lg" />
               <img
