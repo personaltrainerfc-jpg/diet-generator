@@ -95,11 +95,10 @@ describe("System Recipes (isSystem)", () => {
 });
 
 describe("Typography and Legibility", () => {
-  it("should have Plus Jakarta Sans configured", async () => {
+  it("should have Glacial Indifference configured", async () => {
     const fs = await import("fs");
     const indexHtml = fs.readFileSync("/home/ubuntu/diet-generator/client/index.html", "utf-8");
-    expect(indexHtml).toContain("Plus+Jakarta+Sans");
-    expect(indexHtml).toContain("800"); // ExtraBold weight
+    expect(indexHtml).toContain("glacial-indifference");
   });
 
   it("should have WCAG AA minimum font size rules in CSS", async () => {

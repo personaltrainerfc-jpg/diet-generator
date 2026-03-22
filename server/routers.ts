@@ -382,7 +382,7 @@ export const appRouter = router({
 
         const content = llmResponse.choices[0]?.message?.content;
         if (!content || typeof content !== "string") {
-          throw new Error("No se pudo generar la dieta. Int\u00e9ntalo de nuevo.");
+          throw new Error("No se pudo generar la dieta. Inténtalo de nuevo.");
         }
 
         let generatedDiet: GeneratedDiet;
@@ -473,7 +473,7 @@ export const appRouter = router({
         try {
           await notifyOwner({
             title: "Nueva dieta generada",
-            content: `El usuario ${ctx.user.name || ctx.user.email || "An\u00f3nimo"} ha generado una nueva dieta "${input.name}" con ${input.totalCalories} kcal, ${input.totalMenus} men\u00fa(s) y ${input.mealsPerDay} comida(s)/d\u00eda.`,
+            content: `El usuario ${ctx.user.name || ctx.user.email || "Anónimo"} ha generado una nueva dieta "${input.name}" con ${input.totalCalories} kcal, ${input.totalMenus} menú(s) y ${input.mealsPerDay} comida(s)/día.`,
           });
         } catch (e) {
           console.warn("Failed to notify owner:", e);
@@ -1317,7 +1317,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
 
         const llmResponse = await invokeLLM({
           messages: [
-            { role: "system", content: "Eres un nutricionista profesional experto en planificaci\u00f3n de dietas. Responde siempre en espa\u00f1ol. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente l\u00f3gicos que representen recetas reales de la gastronom\u00eda cotidiana espa\u00f1ola/mediterr\u00e1nea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos seg\u00fan las cantidades." },
+            { role: "system", content: "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente lógicos que representen recetas reales de la gastronomía cotidiana española/mediterránea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
             { role: "user", content: prompt },
           ],
           response_format: {
@@ -1328,7 +1328,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
 
         const content = llmResponse.choices[0]?.message?.content;
         if (!content || typeof content !== "string") {
-          throw new Error("No se pudo regenerar la dieta. Int\u00e9ntalo de nuevo.");
+          throw new Error("No se pudo regenerar la dieta. Inténtalo de nuevo.");
         }
 
         let generatedDiet: GeneratedDiet;

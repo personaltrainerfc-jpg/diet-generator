@@ -516,7 +516,7 @@ export default function ClientDetail() {
                 </div>
                 <div className="flex gap-4 text-[13px] text-muted-foreground">
                   <span>{activeDietQ.data.totalCalories} kcal</span>
-                  <span>{activeDietQ.data.mealsPerDay} comidas/d\u00eda</span>
+                  <span>{activeDietQ.data.mealsPerDay} comidas/día</span>
                   <span className="capitalize">{activeDietQ.data.dietType}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">Asignada el {new Date(activeDietQ.data.assignedAt).toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}</p>
@@ -557,7 +557,7 @@ export default function ClientDetail() {
                     <p className="text-[16px] font-semibold">{activeDietQ.data.name}</p>
                     <div className="flex gap-4 mt-1 text-[13px] text-muted-foreground">
                       <span>{activeDietQ.data.totalCalories} kcal</span>
-                      <span>{activeDietQ.data.mealsPerDay} comidas/d\u00eda</span>
+                      <span>{activeDietQ.data.mealsPerDay} comidas/día</span>
                       <span className="capitalize">{activeDietQ.data.dietType}</span>
                     </div>
                   </div>
@@ -569,22 +569,22 @@ export default function ClientDetail() {
                 {/* Show menus summary */}
                 {activeDietQ.data.menus && activeDietQ.data.menus.length > 0 && (
                   <div className="space-y-2 pt-2 border-t border-border/30">
-                    <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">{activeDietQ.data.menus.length} men\u00fa{activeDietQ.data.menus.length > 1 ? "s" : ""}</p>
+                    <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">{activeDietQ.data.menus.length} menú{activeDietQ.data.menus.length > 1 ? "s" : ""}</p>
                     {activeDietQ.data.menus.slice(0, 3).map((menu: any, i: number) => (
                       <div key={i} className="bg-background/50 rounded-lg p-3">
                         <div className="flex justify-between text-[13px]">
-                          <span className="font-medium">D\u00eda {menu.menuNumber}</span>
+                          <span className="font-medium">Día {menu.menuNumber}</span>
                           <span className="text-muted-foreground">{menu.totalCalories} kcal</span>
                         </div>
                         <div className="mt-1 space-y-0.5">
                           {menu.meals?.slice(0, 4).map((meal: any, mi: number) => (
                             <p key={mi} className="text-[12px] text-muted-foreground">{meal.mealName} \u2022 {meal.totalCalories} kcal</p>
                           ))}
-                          {menu.meals && menu.meals.length > 4 && <p className="text-[11px] text-muted-foreground">+{menu.meals.length - 4} m\u00e1s...</p>}
+                          {menu.meals && menu.meals.length > 4 && <p className="text-[11px] text-muted-foreground">+{menu.meals.length - 4} más...</p>}
                         </div>
                       </div>
                     ))}
-                    {activeDietQ.data.menus.length > 3 && <p className="text-[11px] text-muted-foreground text-center">+{activeDietQ.data.menus.length - 3} men\u00fas m\u00e1s</p>}
+                    {activeDietQ.data.menus.length > 3 && <p className="text-[11px] text-muted-foreground text-center">+{activeDietQ.data.menus.length - 3} menús más</p>}
                   </div>
                 )}
               </div>
@@ -840,7 +840,7 @@ export default function ClientDetail() {
           {(photosQ.data || []).length === 0 ? (
             <div className="bg-card rounded-2xl border border-dashed border-border/50 flex flex-col items-center justify-center py-12 text-center">
               <Camera className="h-8 w-8 text-muted-foreground/30 mb-3" />
-              <p className="text-[13px] text-muted-foreground">El cliente a\u00fan no ha subido fotos de progreso</p>
+              <p className="text-[13px] text-muted-foreground">El cliente aún no ha subido fotos de progreso</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -1010,8 +1010,8 @@ export default function ClientDetail() {
                     <div class="stat"><div class="stat-label">Adherencia media</div><div class="stat-value">${avgAdherence}/5</div></div>
                     <div class="stat"><div class="stat-label">Check-ins</div><div class="stat-value">${cis.length}</div></div>
                   </div>
-                  ${lastCi ? '<h2>\u00daltimo Check-in</h2><div class="note">Energ\u00eda: ' + (lastCi.energyLevel || '—') + '/5 · Sue\u00f1o: ' + (lastCi.sleepQuality || '—') + '/5 · Adherencia: ' + (lastCi.adherenceRating || '—') + '/5' + (lastCi.notes ? '<br/>' + lastCi.notes : '') + '</div>' : ''}
-                  ${lastM ? '<h2>\u00daltimas Medidas</h2><div class="note">Peso: ' + (lastM.weight ? (lastM.weight/1000).toFixed(1) + ' kg' : '—') + ' · Cintura: ' + (lastM.waist ? (lastM.waist/10).toFixed(1) + ' cm' : '—') + ' · Pecho: ' + (lastM.chest ? (lastM.chest/10).toFixed(1) + ' cm' : '—') + '</div>' : ''}
+                  ${lastCi ? '<h2>Último Check-in</h2><div class="note">Energía: ' + (lastCi.energyLevel || '—') + '/5 · Sueño: ' + (lastCi.sleepQuality || '—') + '/5 · Adherencia: ' + (lastCi.adherenceRating || '—') + '/5' + (lastCi.notes ? '<br/>' + lastCi.notes : '') + '</div>' : ''}
+                  ${lastM ? '<h2>Últimas Medidas</h2><div class="note">Peso: ' + (lastM.weight ? (lastM.weight/1000).toFixed(1) + ' kg' : '—') + ' · Cintura: ' + (lastM.waist ? (lastM.waist/10).toFixed(1) + ' cm' : '—') + ' · Pecho: ' + (lastM.chest ? (lastM.chest/10).toFixed(1) + ' cm' : '—') + '</div>' : ''}
                   ${activeDietQ.data ? '<h2>Plan Activo</h2><div class="note">' + activeDietQ.data.name + ' — ' + activeDietQ.data.totalCalories + ' kcal</div>' : ''}
                 </body></html>`;
                 const blob = new Blob([html], { type: 'text/html' });
@@ -1223,7 +1223,7 @@ export default function ClientDetail() {
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader><DialogTitle className="text-[17px]">Asignar Dieta al Cliente</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <p className="text-[13px] text-muted-foreground">Selecciona una dieta de tu biblioteca para asignarla a {client.name}. La dieta activa anterior se desactivar\u00e1 autom\u00e1ticamente.</p>
+            <p className="text-[13px] text-muted-foreground">Selecciona una dieta de tu biblioteca para asignarla a {client.name}. La dieta activa anterior se desactivará automáticamente.</p>
             {trainerDietsQ.isLoading ? (
               <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : (trainerDietsQ.data || []).length === 0 ? (

@@ -295,3 +295,29 @@
 - [x] T2: 12 recetas de comidas principales
 - [x] T3: 10 recetas de cenas
 - [x] T4: 10 recetas de snacks y tentempiés
+
+## U: Tipografía Glacial Indifference
+- [x] U1: Sustituir Plus Jakarta Sans por Glacial Indifference en index.html (Google Fonts o fontsquirrel)
+- [x] U2: Actualizar font-family global en index.css
+- [x] U3: Jerarquía: títulos Bold 28-32px, subtítulos Bold 17-20px, cuerpo Regular 15-17px, etiquetas Regular 13px gris, botones Bold 15px mayúsculas
+- [x] U4: Verificar que absolutamente todos los textos usan Glacial Indifference
+
+## V: Revisión completa de legibilidad
+- [x] V1: Sobre fondos claros (#F5F5F7, blanco): textos en negro/gris oscuro (#1D1D1F o #3A3A3A)
+- [x] V2: Sobre fondos oscuros (azul-negro): textos en blanco puro o gris claro (#FFFFFF o #F5F5F7)
+- [x] V3: Contraste mínimo WCAG AA (4.5:1) en todas las combinaciones
+- [x] V4: Revisar tarjetas blancas, métricas, barras de progreso, modales, desplegables
+- [x] V5: Revisar portal cliente: inicio, adherencia, sueño, mi dieta
+- [x] V6: Revisar app entrenador: todas las pantallas
+
+## W: Corrección cabecera app del cliente
+- [x] W1: Limpiar zona debajo de cabecera: resumen diario limpio y claro
+- [x] W2: Calorías del día y macros en barras de progreso con valores visibles
+- [x] W3: Saludo personalizado con nombre del cliente bien alineado
+- [x] W4: Tipografía Glacial Indifference en toda la cabecera
+- [x] W5: Corregir carga de datos si hay problemas
+
+## X: Textos escapados y cerrar sesión
+- [x] X1: Corregir caracteres Unicode escapados en textos visibles
+- [x] X2: Corregir botón "Cerrar sesión" con formato legible
+- [x] X3: Revisar todos los textos con caracteres Unicode escapados en todas las páginas

@@ -1040,7 +1040,7 @@ export const clientPortalRouter = router({
       // Notify trainer
       try {
         const { notifyOwner } = await import("./_core/notification");
-        await notifyOwner({ title: `${client.name} registr\u00f3 nuevas m\u00e9tricas`, content: `Peso: ${input.weight ? (input.weight / 1000).toFixed(1) + "kg" : "--"}, Cintura: ${input.waist ? (input.waist / 10).toFixed(1) + "cm" : "--"}` });
+        await notifyOwner({ title: `${client.name} registró nuevas métricas`, content: `Peso: ${input.weight ? (input.weight / 1000).toFixed(1) + "kg" : "--"}, Cintura: ${input.waist ? (input.waist / 10).toFixed(1) + "cm" : "--"}` });
       } catch {}
       return { id };
     }),
@@ -1078,7 +1078,7 @@ export const clientPortalRouter = router({
       // Notify trainer
       try {
         const { notifyOwner } = await import("./_core/notification");
-        await notifyOwner({ title: `${client.name} subi\u00f3 una foto de progreso`, content: `Tipo: ${input.photoType}, Fecha: ${input.date}` });
+        await notifyOwner({ title: `${client.name} subió una foto de progreso`, content: `Tipo: ${input.photoType}, Fecha: ${input.date}` });
       } catch {}
       return { id, url };
     }),

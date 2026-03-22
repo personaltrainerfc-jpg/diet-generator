@@ -37,7 +37,7 @@ export default function ClientPortal() {
         const updated = { ...session, archetype: data.archetype };
         setSession(updated);
         localStorage.setItem("clientPortalSession", JSON.stringify(updated));
-        toast.success("\u00a1Personaje seleccionado!");
+        toast.success("¡Personaje seleccionado!");
       }
     },
     onError: (e) => toast.error(e.message),
@@ -61,7 +61,7 @@ export default function ClientPortal() {
           <div className="text-center mb-8">
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-20 object-contain mx-auto mb-4" />
             <h1 className="text-2xl font-bold tracking-tight uppercase">Portal del Cliente</h1>
-            <p className="text-muted-foreground text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
+            <p className="text-white/60 text-sm mt-2">Introduce tu código de acceso para ver tu plan nutricional</p>
           </div>
           <div className="space-y-3">
             <Input
@@ -80,7 +80,7 @@ export default function ClientPortal() {
               Acceder
             </Button>
           </div>
-          <p className="text-center text-xs text-muted-foreground mt-6">
+          <p className="text-center text-[13px] text-white/50 mt-6">
             Tu entrenador te proporcionará el código de acceso
           </p>
         </div>
@@ -113,13 +113,13 @@ export default function ClientPortal() {
 function getGreeting(name: string, archetype?: ArchetypeId): string {
   const hour = new Date().getHours();
   const greetings: Record<string, Record<string, string>> = {
-    agil: { morning: `\u00a1Buenos d\u00edas, ${name}! Hoy es un gran d\u00eda para superarte.`, afternoon: `\u00a1Buenas tardes, ${name}! Sigue con esa energ\u00eda.`, evening: `Buenas noches, ${name}. Descansa bien para ma\u00f1ana.` },
-    flora: { morning: `\u00a1Buenos d\u00edas, ${name}! Empieza el d\u00eda con equilibrio.`, afternoon: `\u00a1Buenas tardes, ${name}! \u00bfC\u00f3mo va tu d\u00eda?`, evening: `Buenas noches, ${name}. Cu\u00eddate mucho.` },
-    bruto: { morning: `\u00a1Arriba, ${name}! Hoy toca darlo todo.`, afternoon: `\u00a1${name}! La fuerza no descansa.`, evening: `Buenas noches, ${name}. Los m\u00fasculos crecen descansando.` },
-    roca: { morning: `\u00a1Buenos d\u00edas, ${name}! Otro d\u00eda m\u00e1s sin rendirse.`, afternoon: `\u00a1Sigue as\u00ed, ${name}! La constancia es tu arma.`, evening: `Buenas noches, ${name}. Ma\u00f1ana m\u00e1s y mejor.` },
+    agil: { morning: `¡Buenos días, ${name}! Hoy es un gran día para superarte.`, afternoon: `¡Buenas tardes, ${name}! Sigue con esa energía.`, evening: `Buenas noches, ${name}. Descansa bien para mañana.` },
+    flora: { morning: `¡Buenos días, ${name}! Empieza el día con equilibrio.`, afternoon: `¡Buenas tardes, ${name}! ¿Cómo va tu día?`, evening: `Buenas noches, ${name}. Cuídate mucho.` },
+    bruto: { morning: `¡Arriba, ${name}! Hoy toca darlo todo.`, afternoon: `¡${name}! La fuerza no descansa.`, evening: `Buenas noches, ${name}. Los músculos crecen descansando.` },
+    roca: { morning: `¡Buenos días, ${name}! Otro día más sin rendirse.`, afternoon: `¡Sigue así, ${name}! La constancia es tu arma.`, evening: `Buenas noches, ${name}. Mañana más y mejor.` },
   };
   const timeKey = hour < 12 ? "morning" : hour < 20 ? "afternoon" : "evening";
-  return archetype && greetings[archetype] ? greetings[archetype][timeKey] : `\u00a1Hola, ${name}!`;
+  return archetype && greetings[archetype] ? greetings[archetype][timeKey] : `¡Hola, ${name}!`;
 }
 
 function ClientDashboard({ session, onLogout }: { session: { clientId: number; name: string; accessCode: string; archetype?: string | null }; onLogout: () => void }) {
@@ -156,11 +156,11 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
             )}
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight uppercase" style={{ color: accentColor }}>{session.name}</h1>
-              {profileQ.data?.goal && <p className="text-[12px] text-muted-foreground">{profileQ.data.goal}</p>}
+              {profileQ.data?.goal && <p className="text-[13px] text-white/60">{profileQ.data.goal}</p>}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-muted-foreground">
-            Cerrar sesi\u00f3n
+          <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-white/70 hover:text-white hover:bg-white/10">
+            Cerrar sesión
           </Button>
         </div>
       </div>
@@ -173,7 +173,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
               <img src={archetypeData.image} alt={archetypeData.name} className="h-16 w-16 object-contain drop-shadow-lg flex-shrink-0" />
               <div>
                 <p className="text-[15px] font-semibold text-foreground">{getGreeting(session.name, archetype)}</p>
-                <p className="text-[12px] text-muted-foreground mt-0.5">Tu compa\u00f1ero <span style={{ color: accentColor }} className="font-semibold">{archetypeData.name}</span> te acompa\u00f1a</p>
+                <p className="text-[13px] text-white/60 mt-0.5">Tu compañero <span style={{ color: accentColor }} className="font-semibold">{archetypeData.name}</span> te acompaña</p>
               </div>
             </div>
           </div>
@@ -245,7 +245,7 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
   const toggleMeal = (key: string) => setExpandedMeals(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   if (dietQ.isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!dietQ.data) {
-    const emptyMsg = archetype && EMPTY_STATE_MESSAGES[archetype] ? EMPTY_STATE_MESSAGES[archetype].diet : "Tu entrenador a\u00fan no te ha asignado un plan nutricional";
+    const emptyMsg = archetype && EMPTY_STATE_MESSAGES[archetype] ? EMPTY_STATE_MESSAGES[archetype].diet : "Tu entrenador aún no te ha asignado un plan nutricional";
     const mascotImg = archetype ? ARCHETYPES.find(a => a.id === archetype)?.image : null;
     return (
       <div className="text-center py-16">
@@ -263,12 +263,20 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
   const diet = dietQ.data;
   return (
     <div className="space-y-4">
-      <div className="bg-card rounded-2xl border border-border/50 p-4">
-        <h2 className="text-[17px] font-semibold">{diet.name}</h2>
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 p-4 shadow-sm">
+        <h2 className="text-[17px] font-bold text-card-foreground">{diet.name}</h2>
         <div className="flex gap-4 mt-2 text-[13px] text-muted-foreground">
-          <span>{diet.totalCalories} kcal</span>
+          <span className="font-medium">{diet.totalCalories} kcal</span>
           <span>{diet.mealsPerDay} comidas/día</span>
+          <span>{diet.menus?.length || 0} días</span>
         </div>
+        {diet.macros && (
+          <div className="flex gap-3 mt-3 text-[12px]">
+            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">P: {diet.macros.protein}g</span>
+            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">C: {diet.macros.carbs}g</span>
+            <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-medium">G: {diet.macros.fat}g</span>
+          </div>
+        )}
       </div>
 
       {diet.menus?.map((menu: any, mi: number) => {
@@ -551,7 +559,7 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
   const measurementsQ = trpc.clientPortal.getMeasurements.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
   const photosQ = trpc.clientPortal.getPhotos.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
   const addMetricMut = trpc.clientPortal.addMeasurement.useMutation({
-    onSuccess: () => { toast.success("M\u00e9tricas registradas"); measurementsQ.refetch(); setShowAddMetric(false); setMetricForm({ date: new Date().toISOString().split("T")[0], weight: "", waist: "", hips: "", chest: "", arms: "" }); },
+    onSuccess: () => { toast.success("Métricas registradas"); measurementsQ.refetch(); setShowAddMetric(false); setMetricForm({ date: new Date().toISOString().split("T")[0], weight: "", waist: "", hips: "", chest: "", arms: "" }); },
     onError: (e) => toast.error(e.message),
   });
   const uploadPhotoMut = trpc.clientPortal.uploadPhoto.useMutation({
@@ -596,7 +604,7 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
       {/* Sub-tabs */}
       <div className="flex gap-2">
         <button onClick={() => setSubTab("metrics")} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${subTab === "metrics" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
-          <TrendingUp className="h-3.5 w-3.5" />M\u00e9tricas
+          <TrendingUp className="h-3.5 w-3.5" />Métricas
         </button>
         <button onClick={() => setSubTab("photos")} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium transition-colors ${subTab === "photos" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
           <Camera className="h-3.5 w-3.5" />Fotos
@@ -624,8 +632,8 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
           ) : (
             <div className="text-center py-12">
               <TrendingUp className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-[15px] font-medium">Sin registros a\u00fan</p>
-              <p className="text-[13px] text-muted-foreground mt-1">Registra tus medidas para ver tu evoluci\u00f3n</p>
+              <p className="text-[15px] font-medium">Sin registros aún</p>
+              <p className="text-[13px] text-muted-foreground mt-1">Registra tus medidas para ver tu evolución</p>
             </div>
           )}
 
@@ -690,8 +698,8 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
           ) : (
             <div className="text-center py-12">
               <ImageIcon className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-[15px] font-medium">Sin fotos a\u00fan</p>
-              <p className="text-[13px] text-muted-foreground mt-1">Sube fotos de seguimiento para ver tu transformaci\u00f3n</p>
+              <p className="text-[15px] font-medium">Sin fotos aún</p>
+              <p className="text-[13px] text-muted-foreground mt-1">Sube fotos de seguimiento para ver tu transformación</p>
             </div>
           )}
         </div>
@@ -700,7 +708,7 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
       {/* Add Metric Dialog */}
       <Dialog open={showAddMetric} onOpenChange={setShowAddMetric}>
         <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader><DialogTitle className="text-[17px]">Registrar M\u00e9tricas</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-[17px]">Registrar Métricas</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5"><Label className="text-[13px]">Fecha</Label><Input type="date" value={metricForm.date} onChange={(e) => setMetricForm(f => ({ ...f, date: e.target.value }))} className="rounded-xl" /></div>
             <div className="grid grid-cols-2 gap-3">
@@ -726,7 +734,7 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
               className="w-full rounded-xl h-11"
             >
               {addMetricMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Guardar M\u00e9tricas
+              Guardar Métricas
             </Button>
           </div>
         </DialogContent>
@@ -757,7 +765,7 @@ function ProgressTab({ session }: { session: { clientId: number; name: string; a
                 accept="image/*"
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
-                  if (file && file.size > 5 * 1024 * 1024) { toast.error("M\u00e1ximo 5MB"); return; }
+                  if (file && file.size > 5 * 1024 * 1024) { toast.error("Máximo 5MB"); return; }
                   setPhotoForm(f => ({ ...f, file }));
                 }}
                 className="rounded-xl"
@@ -1356,7 +1364,7 @@ function FastingTimer() {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[22px] font-bold tabular-nums">{startTime ? formatTime(remaining) : formatTime(fastMs)}</span>
-            <span className="text-[11px] text-muted-foreground">{startTime ? (isComplete ? "Completado" : "Restante") : "Duraci\u00f3n"}</span>
+            <span className="text-[11px] text-muted-foreground">{startTime ? (isComplete ? "Completado" : "Restante") : "Duración"}</span>
           </div>
         </div>
 
@@ -1396,7 +1404,7 @@ function FastingTimer() {
       {/* Info */}
       <div className="bg-secondary/50 rounded-xl p-3">
         <p className="text-[12px] text-muted-foreground">
-          <strong>Protocolo {protocol}:</strong> {p.fast}h de ayuno + {p.eat}h ventana de alimentaci\u00f3n. 
+          <strong>Protocolo {protocol}:</strong> {p.fast}h de ayuno + {p.eat}h ventana de alimentación. 
           {protocol === "16/8" && " Ideal para principiantes. Ej: comer de 12:00 a 20:00."}
           {protocol === "18/6" && " Intermedio. Ej: comer de 13:00 a 19:00."}
           {protocol === "20/4" && " Avanzado (Warrior Diet). Ej: comer de 16:00 a 20:00."}
@@ -1671,10 +1679,10 @@ function AssistantTab({ session, archetype, accentColor }: { session: { clientId
   };
 
   const suggestedPrompts = [
-    "\u00bfQu\u00e9 puedo comer como snack saludable?",
-    "\u00bfC\u00f3mo puedo mejorar mi adherencia?",
-    "Tengo hambre entre comidas, \u00bfqu\u00e9 hago?",
-    "\u00bfPuedo sustituir alg\u00fan alimento de mi dieta?",
+    "¿Qué puedo comer como snack saludable?",
+    "¿Cómo puedo mejorar mi adherencia?",
+    "Tengo hambre entre comidas, ¿qué hago?",
+    "¿Puedo sustituir algún alimento de mi dieta?",
   ];
 
   return (
@@ -1700,7 +1708,7 @@ function AssistantTab({ session, archetype, accentColor }: { session: { clientId
               {archetypeData && (
                 <img src={archetypeData.image} alt={archetypeData.name} className="h-20 w-20 object-contain opacity-60" />
               )}
-              <p className="text-muted-foreground text-sm">\u00a1Hola {session.name}! Soy tu asistente. Preg\u00fantame lo que necesites.</p>
+              <p className="text-muted-foreground text-sm">¡Hola {session.name}! Soy tu asistente. Pregúntame lo que necesites.</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {suggestedPrompts.map((prompt, i) => (
                   <button
@@ -1809,7 +1817,7 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
         });
       }
       if (data.streak && data.streak.currentStreak > 1) {
-        toast.info(`\uD83D\uDD25 Racha: ${data.streak.currentStreak} d\u00edas consecutivos`);
+        toast.info(`\uD83D\uDD25 Racha: ${data.streak.currentStreak} días consecutivos`);
       }
     },
     onError: (e) => toast.error(e.message),
@@ -1865,9 +1873,9 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
 
       {/* Weekly chart */}
       <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
-        <h3 className="font-semibold text-[15px] mb-3">Pasos \u00faltimos 7 d\u00edas</h3>
+        <h3 className="font-semibold text-[15px] mb-3">Pasos últimos 7 días</h3>
         {weekData.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-6">Sin datos de actividad a\u00fan</p>
+          <p className="text-muted-foreground text-sm text-center py-6">Sin datos de actividad aún</p>
         ) : (
           <div className="flex items-end gap-1 h-32">
             {weekData.map((d, i) => (
@@ -1920,12 +1928,12 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
       {/* Wearable connections placeholder */}
       <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
         <h3 className="font-semibold text-[15px] mb-2">Dispositivos</h3>
-        <p className="text-[12px] text-muted-foreground mb-3">Conecta tu wearable para sincronizar datos autom\u00e1ticamente.</p>
+        <p className="text-[12px] text-muted-foreground mb-3">Conecta tu wearable para sincronizar datos automáticamente.</p>
         <div className="grid grid-cols-2 gap-2">
           {["Fitbit", "Garmin", "Apple Health", "Google Fit"].map((provider) => (
             <button
               key={provider}
-              onClick={() => toast.info("Integraci\u00f3n con " + provider + " pr\u00f3ximamente")}
+              onClick={() => toast.info("Integración con " + provider + " próximamente")}
               className="flex items-center gap-2 p-3 rounded-xl border border-border/50 text-[12px] text-muted-foreground hover:border-foreground/30 transition-colors"
             >
               <Activity className="h-4 w-4" />
