@@ -18,7 +18,7 @@ import {
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
   Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
   TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink,
-  Tag, Heart, Copy, Search
+  Tag, Heart, Copy, Search, Bot
 } from "lucide-react";
 import { ARCHETYPES } from "@shared/constants";
 
@@ -362,6 +362,7 @@ export default function ClientDetail() {
             <TabsTrigger value="ai" className="rounded-lg text-[13px] gap-1.5 px-3"><Brain className="h-3.5 w-3.5" />IA</TabsTrigger>
             <TabsTrigger value="personalization" className="rounded-lg text-[13px] gap-1.5 px-3"><Sparkles className="h-3.5 w-3.5" />Perfil</TabsTrigger>
             <TabsTrigger value="activity" className="rounded-lg text-[13px] gap-1.5 px-3"><Activity className="h-3.5 w-3.5" />Actividad</TabsTrigger>
+            <TabsTrigger value="conversations" className="rounded-lg text-[13px] gap-1.5 px-3"><MessageCircle className="h-3.5 w-3.5" />Conv. IA</TabsTrigger>
           </TabsList>
         </div>
 
@@ -1054,6 +1055,11 @@ export default function ClientDetail() {
         <TabsContent value="activity" className="space-y-4 mt-4">
           <ActivityPanel clientId={clientId} />
         </TabsContent>
+
+        {/* Conversations Tab */}
+        <TabsContent value="conversations" className="space-y-4 mt-4">
+          <ConversationsPanel clientId={clientId} />
+        </TabsContent>
       </Tabs>
 
       {/* Check-in Dialog */}
@@ -1502,6 +1508,9 @@ function ActivityPanel({ clientId }: { clientId: number }) {
         </div>
       )}
 
+      {/* Badges */}
+      <TrainerBadgesView clientId={clientId} />
+
       {/* History */}
       <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
         <h3 className="text-[15px] font-semibold mb-3">Historial de Actividad</h3>
@@ -1528,5 +1537,221 @@ function ActivityPanel({ clientId }: { clientId: number }) {
         )}
       </div>
     </>
+  );
+}
+
+// ── Conversations Panel (Trainer view of AI chats) ──
+function ConversationsPanel({ clientId }: { clientId: number }) {
+  const convsQ = trpc.clientMgmt.getClientConversations.useQuery({ clientId });
+  const summarizeMut = trpc.clientMgmt.summarizeConversation.useMutation();
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [summaries, setSummaries] = useState<Record<number, string>>({});
+
+  const handleSummarize = async (convId: number) => {
+    if (summaries[convId]) return;
+    const result = await summarizeMut.mutateAsync({ conversationId: convId });
+    setSummaries(prev => ({ ...prev, [convId]: String(result.summary) }));
+  };
+
+  return (
+    <>
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+        <h3 className="text-[15px] font-semibold mb-3 flex items-center gap-2">
+          <MessageCircle className="h-4 w-4 text-primary" />
+          Conversaciones con el Asistente IA
+        </h3>
+        <p className="text-[12px] text-muted-foreground mb-4">
+          Historial de todas las conversaciones del cliente con el asistente IA. Puedes generar resúmenes automáticos de cada conversación.
+        </p>
+
+        {convsQ.isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : (convsQ.data?.length || 0) === 0 ? (
+          <div className="text-center py-8">
+            <MessageCircle className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm">Sin conversaciones IA aún</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {convsQ.data?.map((conv) => (
+              <div key={conv.id} className="rounded-xl border border-border/40 overflow-hidden">
+                {/* Header */}
+                <button
+                  onClick={() => setExpanded(expanded === conv.id ? null : conv.id)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-left"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-[13px] font-medium">{conv.messageCount} mensajes</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(conv.updatedAt || conv.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {conv.lastMessage && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[400px]">
+                        "{conv.lastMessage}"
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); handleSummarize(conv.id); }}
+                      disabled={summarizeMut.isPending}
+                      className="text-[11px] h-7 rounded-lg gap-1"
+                    >
+                      {summarizeMut.isPending && summarizeMut.variables?.conversationId === conv.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      Resumen
+                    </Button>
+                    <span className="text-muted-foreground text-[11px]">{expanded === conv.id ? "▲" : "▼"}</span>
+                  </div>
+                </button>
+
+                {/* Summary */}
+                {summaries[conv.id] && (
+                  <div className="px-3 pb-2">
+                    <div className="bg-primary/5 rounded-lg p-2.5 border border-primary/10">
+                      <p className="text-[11px] font-semibold text-primary mb-1 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />Resumen IA
+                      </p>
+                      <p className="text-[12px] text-card-foreground leading-relaxed">{summaries[conv.id]}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expanded messages */}
+                {expanded === conv.id && (
+                  <div className="border-t border-border/30 p-3 space-y-2 max-h-[400px] overflow-y-auto bg-muted/10">
+                    {conv.messages.map((msg: any, i: number) => (
+                      <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-xl px-3 py-2 text-[12px] ${
+                          msg.role === "user"
+                            ? "bg-primary/10 text-card-foreground"
+                            : "bg-muted/50 text-card-foreground"
+                        }`}>
+                          <p className="text-[9px] font-semibold uppercase tracking-wider mb-0.5 opacity-50">
+                            {msg.role === "user" ? "Cliente" : "Asistente"}
+                          </p>
+                          <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── Trainer Badges View ──
+const TIER_COLORS: Record<string, string> = {
+  bronze: "#CD7F32",
+  silver: "#C0C0C0",
+  gold: "#FFD700",
+  diamond: "#B9F2FF",
+};
+
+const TIER_BG: Record<string, string> = {
+  bronze: "rgba(205,127,50,0.12)",
+  silver: "rgba(192,192,192,0.12)",
+  gold: "rgba(255,215,0,0.12)",
+  diamond: "rgba(185,242,255,0.12)",
+};
+
+function TrainerBadgesView({ clientId }: { clientId: number }) {
+  const badgesQ = trpc.clientMgmt.getClientBadges.useQuery({ clientId });
+  const data = badgesQ.data;
+
+  if (badgesQ.isLoading) {
+    return (
+      <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+        <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const categories = ["steps", "active_minutes", "streak", "calories"];
+  const categoryLabels: Record<string, string> = {
+    steps: "Pasos",
+    active_minutes: "Minutos Activos",
+    streak: "Rachas",
+    calories: "Calorías Quemadas",
+  };
+
+  return (
+    <div className="bg-card text-card-foreground rounded-2xl border border-border/50 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[15px] font-semibold flex items-center gap-2">
+          <Trophy className="h-4 w-4 text-primary" />
+          Logros de Actividad
+        </h3>
+        <div className="flex items-center gap-3">
+          {data.streak && (
+            <span className="text-[12px] text-muted-foreground flex items-center gap-1">
+              🔥 Racha: <span className="font-semibold text-primary">{data.streak.currentStreak}</span> días
+              {data.streak.longestStreak > 0 && <span className="text-[10px]">(mejor: {data.streak.longestStreak})</span>}
+            </span>
+          )}
+          <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+            {data.unlockedCount}/{data.totalCount}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="w-full h-2 bg-muted rounded-full mb-4 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-500"
+          style={{ width: `${data.totalCount > 0 ? (data.unlockedCount / data.totalCount) * 100 : 0}%` }}
+        />
+      </div>
+
+      <div className="space-y-3">
+        {categories.map(cat => {
+          const catBadges = data.badges.filter(b => b.category === cat);
+          if (catBadges.length === 0) return null;
+          return (
+            <div key={cat}>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{categoryLabels[cat]}</p>
+              <div className="flex gap-2 flex-wrap">
+                {catBadges.map(badge => (
+                  <div
+                    key={badge.id}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12px] transition-all ${
+                      badge.unlocked
+                        ? "shadow-sm"
+                        : "border-border/30 opacity-40 grayscale"
+                    }`}
+                    style={badge.unlocked ? {
+                      backgroundColor: TIER_BG[badge.tier],
+                      borderColor: TIER_COLORS[badge.tier] + "40",
+                    } : {}}
+                    title={badge.description}
+                  >
+                    <span>{badge.icon}</span>
+                    <span className="font-medium">{badge.name}</span>
+                    {badge.unlocked && (
+                      <CheckCircle2 className="h-3 w-3" style={{ color: TIER_COLORS[badge.tier] }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

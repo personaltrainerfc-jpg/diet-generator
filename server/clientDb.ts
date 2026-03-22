@@ -3,7 +3,8 @@ import { getDb } from "./db";
 import {
   clients, clientDiets, adherenceLogs, progressPhotos,
   weeklyCheckIns, chatMessages, achievements, clientAchievements,
-  bodyMeasurements, initialAssessments, diets
+  bodyMeasurements, initialAssessments, diets,
+  activityBadges, clientActivityBadges, activityStreaks
 } from "../drizzle/schema";
 import { getFullDiet } from "./db";
 
@@ -871,4 +872,138 @@ export async function upsertWearableConnection(clientId: number, data: {
 export async function disconnectWearable(id: number) {
   const db = await getDb(); assertDb(db);
   await db.update(wearableConnections).set({ status: "disconnected" as any }).where(eq(wearableConnections.id, id));
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE I: Gamificación de Actividad
+// ═══════════════════════════════════════════════════════
+
+export async function getAllActivityBadges() {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(activityBadges).orderBy(asc(activityBadges.category), asc(activityBadges.threshold));
+}
+
+export async function getClientActivityBadges(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  const badges = await db.select({
+    id: clientActivityBadges.id,
+    badgeId: clientActivityBadges.badgeId,
+    unlockedAt: clientActivityBadges.unlockedAt,
+    value: clientActivityBadges.value,
+    code: activityBadges.code,
+    name: activityBadges.name,
+    description: activityBadges.description,
+    icon: activityBadges.icon,
+    category: activityBadges.category,
+    threshold: activityBadges.threshold,
+    tier: activityBadges.tier,
+  })
+    .from(clientActivityBadges)
+    .innerJoin(activityBadges, eq(clientActivityBadges.badgeId, activityBadges.id))
+    .where(eq(clientActivityBadges.clientId, clientId))
+    .orderBy(desc(clientActivityBadges.unlockedAt));
+  return badges;
+}
+
+export async function unlockActivityBadge(clientId: number, badgeId: number, value?: number) {
+  const db = await getDb(); assertDb(db);
+  // Check if already unlocked
+  const existing = await db.select().from(clientActivityBadges)
+    .where(and(eq(clientActivityBadges.clientId, clientId), eq(clientActivityBadges.badgeId, badgeId)));
+  if (existing.length > 0) return null;
+  const [result] = await db.insert(clientActivityBadges).values({ clientId, badgeId, value });
+  return result.insertId;
+}
+
+export async function getOrCreateStreak(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  const existing = await db.select().from(activityStreaks).where(eq(activityStreaks.clientId, clientId));
+  if (existing.length > 0) return existing[0];
+  await db.insert(activityStreaks).values({ clientId });
+  const created = await db.select().from(activityStreaks).where(eq(activityStreaks.clientId, clientId));
+  return created[0];
+}
+
+export async function updateStreak(clientId: number, date: string) {
+  const db = await getDb(); assertDb(db);
+  const streak = await getOrCreateStreak(clientId);
+  
+  // Calculate if this is a consecutive day
+  const lastDate = streak.lastActiveDate;
+  let newStreak = 1;
+  
+  if (lastDate) {
+    const last = new Date(lastDate);
+    const current = new Date(date);
+    const diffDays = Math.round((current.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 1) {
+      // Consecutive day
+      newStreak = streak.currentStreak + 1;
+    } else if (diffDays === 0) {
+      // Same day, no change
+      newStreak = streak.currentStreak;
+    } else {
+      // Streak broken
+      newStreak = 1;
+    }
+  }
+  
+  const longestStreak = Math.max(streak.longestStreak, newStreak);
+  
+  await db.update(activityStreaks)
+    .set({ currentStreak: newStreak, longestStreak, lastActiveDate: date })
+    .where(eq(activityStreaks.clientId, clientId));
+  
+  return { currentStreak: newStreak, longestStreak };
+}
+
+export async function evaluateBadges(clientId: number, activityData: { steps?: number; activeMinutes?: number; caloriesBurned?: number }, streakData: { currentStreak: number }) {
+  const db = await getDb(); assertDb(db);
+  const allBadges = await getAllActivityBadges();
+  const unlockedBadges = await getClientActivityBadges(clientId);
+  const unlockedIds = new Set(unlockedBadges.map(b => b.badgeId));
+  
+  const newlyUnlocked: Array<{ badgeId: number; name: string; icon: string; tier: string; description: string }> = [];
+  
+  for (const badge of allBadges) {
+    if (unlockedIds.has(badge.id)) continue;
+    
+    let qualifies = false;
+    let value = 0;
+    
+    switch (badge.category) {
+      case "steps":
+        if (activityData.steps && activityData.steps >= badge.threshold) {
+          qualifies = true;
+          value = activityData.steps;
+        }
+        break;
+      case "active_minutes":
+        if (activityData.activeMinutes && activityData.activeMinutes >= badge.threshold) {
+          qualifies = true;
+          value = activityData.activeMinutes;
+        }
+        break;
+      case "calories":
+        if (activityData.caloriesBurned && activityData.caloriesBurned >= badge.threshold) {
+          qualifies = true;
+          value = activityData.caloriesBurned;
+        }
+        break;
+      case "streak":
+        if (streakData.currentStreak >= badge.threshold) {
+          qualifies = true;
+          value = streakData.currentStreak;
+        }
+        break;
+    }
+    
+    if (qualifies) {
+      await unlockActivityBadge(clientId, badge.id, value);
+      newlyUnlocked.push({ badgeId: badge.id, name: badge.name, icon: badge.icon, tier: badge.tier, description: badge.description });
+    }
+  }
+  
+  return newlyUnlocked;
 }

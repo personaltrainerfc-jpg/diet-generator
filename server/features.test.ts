@@ -91,6 +91,19 @@ vi.mock("./clientDb", () => ({
   getWearableConnection: vi.fn().mockResolvedValue([]),
   upsertWearableConnection: vi.fn().mockResolvedValue(1),
   disconnectWearable: vi.fn().mockResolvedValue(undefined),
+  // Gamification
+  getAllActivityBadges: vi.fn().mockResolvedValue([
+    { id: 1, code: "steps_5k", name: "Caminante", description: "5K pasos", icon: "\uD83D\uDEB6", category: "steps", threshold: 5000, tier: "bronze" },
+    { id: 2, code: "steps_10k", name: "Explorador", description: "10K pasos", icon: "\uD83C\uDFC3", category: "steps", threshold: 10000, tier: "silver" },
+    { id: 3, code: "streak_3", name: "Constante", description: "3 d\u00edas", icon: "\uD83D\uDCC5", category: "streak", threshold: 3, tier: "bronze" },
+  ]),
+  getClientActivityBadges: vi.fn().mockResolvedValue([
+    { id: 1, badgeId: 1, unlockedAt: new Date(), value: 6000, code: "steps_5k", name: "Caminante", description: "5K pasos", icon: "\uD83D\uDEB6", category: "steps", threshold: 5000, tier: "bronze" },
+  ]),
+  unlockActivityBadge: vi.fn().mockResolvedValue(1),
+  getOrCreateStreak: vi.fn().mockResolvedValue({ id: 1, clientId: 1, currentStreak: 5, longestStreak: 12, lastActiveDate: "2026-03-21" }),
+  updateStreak: vi.fn().mockResolvedValue({ currentStreak: 6, longestStreak: 12 }),
+  evaluateBadges: vi.fn().mockResolvedValue([{ badgeId: 2, name: "Explorador", icon: "\uD83C\uDFC3", tier: "silver", description: "10K pasos" }]),
 }));
 
 // Mock LLM
@@ -282,6 +295,98 @@ describe("Activity / Wearables", () => {
         caller.clientMgmt.getClientActivity({ clientId: 1 })
       ).rejects.toThrow("No tienes acceso");
     });
+  });
+});
+
+describe("Gamification", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  describe("Client Portal - Badges", () => {
+    it("should get all badges with unlock status", async () => {
+      const caller = createCaller();
+      const result = await caller.clientPortal.getAllBadges({
+        clientId: 1,
+        accessCode: "ABC123",
+      });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(3);
+      expect(result[0]).toHaveProperty("unlocked");
+    });
+
+    it("should get my unlocked badges", async () => {
+      const caller = createCaller();
+      const result = await caller.clientPortal.getMyBadges({
+        clientId: 1,
+        accessCode: "ABC123",
+      });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result[0].code).toBe("steps_5k");
+    });
+
+    it("should get my streak", async () => {
+      const caller = createCaller();
+      const result = await caller.clientPortal.getMyStreak({
+        clientId: 1,
+        accessCode: "ABC123",
+      });
+      expect(result.currentStreak).toBe(5);
+      expect(result.longestStreak).toBe(12);
+    });
+
+    it("should evaluate and return new badges on logActivity", async () => {
+      const caller = createCaller();
+      const result = await caller.clientPortal.logActivity({
+        clientId: 1,
+        accessCode: "ABC123",
+        date: "2026-03-22",
+        steps: 12000,
+        activeMinutes: 60,
+        source: "manual",
+      });
+      expect(result).toHaveProperty("newBadges");
+      expect(result.newBadges.length).toBe(1);
+      expect(result.newBadges[0].name).toBe("Explorador");
+      expect(result).toHaveProperty("streak");
+      expect(result.streak.currentStreak).toBe(6);
+    });
+  });
+
+  describe("Trainer - Client Badges", () => {
+    it("should get client badges with streak", async () => {
+      const caller = createCaller();
+      const result = await caller.clientMgmt.getClientBadges({ clientId: 1 });
+      expect(result).toHaveProperty("badges");
+      expect(result).toHaveProperty("unlockedCount");
+      expect(result).toHaveProperty("totalCount");
+      expect(result).toHaveProperty("streak");
+      expect(result.unlockedCount).toBe(1);
+      expect(result.totalCount).toBe(3);
+      expect(result.streak.currentStreak).toBe(5);
+    });
+  });
+});
+
+describe("Trainer Conversations", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("should get client conversations", async () => {
+    const caller = createCaller();
+    const result = await caller.clientMgmt.getClientConversations({ clientId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("should summarize a conversation", async () => {
+    const { getConversationById } = await import("./clientDb");
+    (getConversationById as any).mockResolvedValueOnce({
+      id: 1, clientId: 1,
+      messages: [
+        { role: "user", content: "Hola", timestamp: Date.now() },
+        { role: "assistant", content: "Hola, \u00bfc\u00f3mo te puedo ayudar?", timestamp: Date.now() },
+      ],
+    });
+    const caller = createCaller();
+    const result = await caller.clientMgmt.summarizeConversation({ conversationId: 1 });
+    expect(result).toHaveProperty("summary");
   });
 });
 

@@ -237,3 +237,25 @@
 - [x] L7: Frontend cliente: configuración de conexión de wearables
 - [x] L8: Frontend entrenador: vista de actividad y sueño en perfil del cliente
 - [x] L9: Alertas al entrenador por actividad baja o sueño insuficiente
+
+## M: Notificaciones push al entrenador por escalado IA
+- [x] M1: Backend: integrar notifyOwner cuando se crea una alerta de escalado
+- [x] M2: Backend: incluir nombre del cliente, razón y fragmento del mensaje en la notificación
+- [x] M3: Frontend: badge de notificación en sidebar del entrenador (Asistente IA)
+- [x] M4: Frontend: toast en tiempo real cuando llega una alerta nueva
+
+## N: Historial de conversaciones IA para el entrenador
+- [x] N1: Backend: endpoint para obtener todas las conversaciones de un cliente
+- [x] N2: Backend: generar resumen automático de cada conversación con LLM
+- [x] N3: Frontend: pestaña "Conversaciones IA" en detalle del cliente
+- [x] N4: Frontend: lista de conversaciones con resumen, fecha y estado
+- [x] N5: Frontend: vista expandida de conversación completa
+
+## O: Gamificación de actividad
+- [x] O1: Schema DB: tabla activity_badges (definición de badges disponibles)
+- [x] O2: Schema DB: tabla client_badges (badges desbloqueados por cliente)
+- [x] O3: Backend: lógica de evaluación automática de badges tras logActivity
+- [x] O4: Backend: badges de pasos (5K, 10K, 15K), minutos activos (30, 60, 90), rachas (3, 7, 14, 30 días)
+- [x] O5: Frontend cliente: sección "Mis Logros de Actividad" con badges
+- [x] O6: Frontend cliente: animación de desbloqueo de badge
+- [x] O7: Frontend entrenador: vista de badges del cliente en detalle

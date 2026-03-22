@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays, Bot } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CSSProperties, useEffect, useRef, useState } from "react";
+import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
@@ -152,6 +153,13 @@ function DashboardLayoutContent({
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
+  // Fetch pending escalation alerts for badge
+  const alertsQ = trpc.clientMgmt.getEscalationAlerts.useQuery(
+    { resolved: false },
+    { refetchInterval: 30000 } // Refresh every 30s
+  );
+  const alertCount = alertsQ.data?.length || 0;
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
@@ -225,10 +233,17 @@ function DashboardLayoutContent({
                           : "hover:bg-sidebar-accent"
                       }`}
                     >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-[#6BCB77]" : "text-sidebar-foreground/60"}`}
-                        strokeWidth={isActive ? 2 : 1.5}
-                      />
+                      <div className="relative">
+                        <item.icon
+                          className={`h-4 w-4 ${isActive ? "text-[#6BCB77]" : "text-sidebar-foreground/60"}`}
+                          strokeWidth={isActive ? 2 : 1.5}
+                        />
+                        {item.path === "/ai-config" && alertCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center animate-pulse">
+                            {alertCount > 9 ? "9+" : alertCount}
+                          </span>
+                        )}
+                      </div>
                       <span className={isActive ? "font-medium text-[#6BCB77]" : "text-sidebar-foreground/80"}>
                         {item.label}
                       </span>

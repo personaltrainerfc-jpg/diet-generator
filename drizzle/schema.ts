@@ -642,3 +642,47 @@ export const wearableConnections = mysqlTable("wearable_connections", {
 
 export type WearableConnection = typeof wearableConnections.$inferSelect;
 export type InsertWearableConnection = typeof wearableConnections.$inferInsert;
+
+// ═══════════════════════════════════════════════════════
+// BLOQUE I: Gamificación de Actividad
+// ═══════════════════════════════════════════════════════
+
+// ── Activity Badges (definición de badges disponibles) ──
+export const activityBadges = mysqlTable("activity_badges", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // steps_5k, steps_10k, active_30, streak_7, etc.
+  name: varchar("name", { length: 100 }).notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  icon: varchar("icon", { length: 50 }).notNull(), // emoji or icon name
+  category: varchar("category", { length: 30 }).notNull(), // steps, active_minutes, streak, calories
+  threshold: int("threshold").notNull(), // valor para desbloquear
+  tier: mysqlEnum("tier", ["bronze", "silver", "gold", "diamond"]).default("bronze").notNull(),
+});
+
+export type ActivityBadge = typeof activityBadges.$inferSelect;
+export type InsertActivityBadge = typeof activityBadges.$inferInsert;
+
+// ── Client Activity Badges (badges desbloqueados por cliente) ──
+export const clientActivityBadges = mysqlTable("client_activity_badges", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  badgeId: int("badgeId").notNull(),
+  unlockedAt: timestamp("unlockedAt").defaultNow().notNull(),
+  value: int("value"), // valor alcanzado cuando se desbloqueó
+});
+
+export type ClientActivityBadge = typeof clientActivityBadges.$inferSelect;
+export type InsertClientActivityBadge = typeof clientActivityBadges.$inferInsert;
+
+// ── Activity Streaks (rachas de actividad) ──
+export const activityStreaks = mysqlTable("activity_streaks", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  currentStreak: int("currentStreak").default(0).notNull(),
+  longestStreak: int("longestStreak").default(0).notNull(),
+  lastActiveDate: varchar("lastActiveDate", { length: 10 }), // YYYY-MM-DD
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ActivityStreak = typeof activityStreaks.$inferSelect;
+export type InsertActivityStreak = typeof activityStreaks.$inferInsert;

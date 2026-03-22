@@ -1793,10 +1793,24 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
   );
 
   const logMut = trpc.clientPortal.logActivity.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Actividad registrada");
       activityQ.refetch();
       setSteps(""); setActiveMinutes(""); setCaloriesBurned("");
+      // Show badge unlock toasts
+      if (data.newBadges && data.newBadges.length > 0) {
+        data.newBadges.forEach((badge) => {
+          setTimeout(() => {
+            toast.success(`${badge.icon} Badge desbloqueado: ${badge.name}`, {
+              description: badge.description,
+              duration: 5000,
+            });
+          }, 500);
+        });
+      }
+      if (data.streak && data.streak.currentStreak > 1) {
+        toast.info(`\uD83D\uDD25 Racha: ${data.streak.currentStreak} d\u00edas consecutivos`);
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1900,6 +1914,9 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
         )}
       </div>
 
+      {/* Badges & Streak */}
+      <BadgesSection session={session} accentColor={accentColor} />
+
       {/* Wearable connections placeholder */}
       <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
         <h3 className="font-semibold text-[15px] mb-2">Dispositivos</h3>
@@ -1918,5 +1935,128 @@ function ActivityTab({ session, accentColor }: { session: { clientId: number; na
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Badges & Streak Section ──
+const TIER_COLORS: Record<string, string> = {
+  bronze: "#CD7F32",
+  silver: "#C0C0C0",
+  gold: "#FFD700",
+  diamond: "#B9F2FF",
+};
+
+const TIER_BG: Record<string, string> = {
+  bronze: "rgba(205,127,50,0.12)",
+  silver: "rgba(192,192,192,0.12)",
+  gold: "rgba(255,215,0,0.12)",
+  diamond: "rgba(185,242,255,0.12)",
+};
+
+function BadgesSection({ session, accentColor }: { session: { clientId: number; accessCode: string }; accentColor: string }) {
+  const badgesQ = trpc.clientPortal.getAllBadges.useQuery(
+    { clientId: session.clientId, accessCode: session.accessCode },
+    { refetchOnWindowFocus: false }
+  );
+  const streakQ = trpc.clientPortal.getMyStreak.useQuery(
+    { clientId: session.clientId, accessCode: session.accessCode },
+    { refetchOnWindowFocus: false }
+  );
+
+  const badges = badgesQ.data || [];
+  const streak = streakQ.data;
+  const unlockedCount = badges.filter(b => b.unlocked).length;
+  const categories = ["steps", "active_minutes", "streak", "calories"];
+  const categoryLabels: Record<string, string> = {
+    steps: "Pasos",
+    active_minutes: "Minutos Activos",
+    streak: "Rachas",
+    calories: "Calorías Quemadas",
+  };
+
+  return (
+    <>
+      {/* Streak card */}
+      {streak && (
+        <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-[15px] flex items-center gap-2">
+                <span className="text-xl">🔥</span> Racha de Actividad
+              </h3>
+              <p className="text-[12px] text-muted-foreground mt-0.5">Días consecutivos con actividad registrada</p>
+            </div>
+            <div className="text-center">
+              <p className="text-3xl font-bold" style={{ color: accentColor }}>{streak.currentStreak}</p>
+              <p className="text-[10px] text-muted-foreground">días</p>
+            </div>
+          </div>
+          {streak.longestStreak > 0 && (
+            <p className="text-[11px] text-muted-foreground mt-2 text-right">
+              Mejor racha: <span className="font-semibold" style={{ color: accentColor }}>{streak.longestStreak}</span> días
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Badges */}
+      <div className="bg-card text-card-foreground rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-[15px] flex items-center gap-2">
+            <Trophy className="h-4 w-4" style={{ color: accentColor }} />
+            Mis Logros de Actividad
+          </h3>
+          <span className="text-[12px] text-muted-foreground">
+            {unlockedCount}/{badges.length} desbloqueados
+          </span>
+        </div>
+
+        {badgesQ.isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : badges.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">No hay badges disponibles</p>
+        ) : (
+          <div className="space-y-4">
+            {categories.map(cat => {
+              const catBadges = badges.filter(b => b.category === cat);
+              if (catBadges.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{categoryLabels[cat]}</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {catBadges.map(badge => (
+                      <div
+                        key={badge.id}
+                        className={`relative flex flex-col items-center p-2 rounded-xl border transition-all duration-300 ${
+                          badge.unlocked
+                            ? "border-transparent shadow-md"
+                            : "border-border/30 opacity-40 grayscale"
+                        }`}
+                        style={badge.unlocked ? {
+                          backgroundColor: TIER_BG[badge.tier],
+                          borderColor: TIER_COLORS[badge.tier] + "40",
+                        } : {}}
+                      >
+                        <span className="text-2xl mb-0.5">{badge.icon}</span>
+                        <p className="text-[10px] font-semibold text-center leading-tight">{badge.name}</p>
+                        <p className="text-[8px] text-muted-foreground text-center mt-0.5">{badge.description}</p>
+                        {badge.unlocked && (
+                          <div
+                            className="absolute -top-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center text-[8px]"
+                            style={{ backgroundColor: TIER_COLORS[badge.tier], color: badge.tier === "diamond" ? "#000" : "#fff" }}
+                          >
+                            ✓
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

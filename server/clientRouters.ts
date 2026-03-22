@@ -38,6 +38,8 @@ import {
   // Bloque H: Wearables
   logActivity, getActivityLogs,
   getWearableConnection, upsertWearableConnection, disconnectWearable,
+  // Bloque I: Gamificación
+  getAllActivityBadges, getClientActivityBadges, updateStreak, evaluateBadges, getOrCreateStreak,
 } from "./clientDb";
 import { storagePut } from "./storage";
 import { getFullDiet } from "./db";
@@ -795,6 +797,24 @@ ${assessment ? `Condiciones médicas: ${assessment.medicalConditions || "ninguna
       return getActivityLogs(input.clientId, input.startDate, input.endDate);
     }),
 
+  // ═══ Client Activity Badges (Trainer view) ═══
+  getClientBadges: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      const all = await getAllActivityBadges();
+      const unlocked = await getClientActivityBadges(input.clientId);
+      const streak = await getOrCreateStreak(input.clientId);
+      const unlockedIds = new Set(unlocked.map(b => b.badgeId));
+      return {
+        badges: all.map(b => ({ ...b, unlocked: unlockedIds.has(b.id) })),
+        unlockedCount: unlocked.length,
+        totalCount: all.length,
+        streak,
+      };
+    }),
+
   // ═══ Client Personalization Profile (Trainer view) ═══
   getClientPersonalization: protectedProcedure
     .input(z.object({ clientId: z.number() }))
@@ -880,6 +900,46 @@ Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes 
       const profileData = JSON.parse(content);
       await upsertPersonalizationProfile(input.clientId, profileData);
       return { profileData };
+    }),
+
+  // ── Historial de Conversaciones IA (Trainer view) ──
+  getClientConversations: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      const conversations = await getRecentConversations(input.clientId, 20);
+      return conversations.map((c: any) => {
+        const msgs = (typeof c.messages === 'string' ? JSON.parse(c.messages) : c.messages) || [];
+        const userMsgs = msgs.filter((m: any) => m.role === 'user');
+        const lastMsg = userMsgs[userMsgs.length - 1]?.content || '';
+        return {
+          id: c.id,
+          messageCount: msgs.length,
+          lastMessage: lastMsg.slice(0, 120),
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          messages: msgs,
+        };
+      });
+    }),
+
+  summarizeConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const conv = await getConversationById(input.conversationId);
+      if (!conv) throw new Error("Conversación no encontrada");
+      const client = await getClientById(conv.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso");
+      const msgs = (typeof conv.messages === 'string' ? JSON.parse(conv.messages) : conv.messages) || [];
+      if (msgs.length === 0) return { summary: "Sin mensajes" };
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "Resume esta conversación entre un cliente y un asistente nutricional en 2-3 frases. Destaca los temas principales, preocupaciones del cliente y recomendaciones dadas. Responde en español." },
+          { role: "user", content: msgs.map((m: any) => `${m.role}: ${m.content}`).join('\n') },
+        ],
+      });
+      return { summary: response.choices[0]?.message?.content || "No se pudo generar resumen" };
     }),
 });
 
@@ -1501,7 +1561,16 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
       const { accessCode, ...data } = input;
       const id = await logActivity(data);
-      return { id };
+      
+      // Update streak and evaluate badges
+      const streakData = await updateStreak(input.clientId, input.date);
+      const newBadges = await evaluateBadges(
+        input.clientId,
+        { steps: input.steps, activeMinutes: input.activeMinutes, caloriesBurned: input.caloriesBurned },
+        streakData
+      );
+      
+      return { id, newBadges, streak: streakData };
     }),
 
   getActivityLogs: publicProcedure
@@ -1527,6 +1596,37 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
       return (Array.isArray(connections) ? connections : [connections].filter(Boolean)).map((c: any) => ({
         id: c.id, provider: c.provider, status: c.status, lastSyncAt: c.lastSyncAt,
       }));
+    }),
+
+  // ═══════════════════════════════════════════════════════
+  // BLOQUE I: Gamificación de Actividad
+  // ═══════════════════════════════════════════════════════
+
+  getMyBadges: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getClientActivityBadges(input.clientId);
+    }),
+
+  getAllBadges: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const all = await getAllActivityBadges();
+      const unlocked = await getClientActivityBadges(input.clientId);
+      const unlockedIds = new Set(unlocked.map(b => b.badgeId));
+      return all.map(b => ({ ...b, unlocked: unlockedIds.has(b.id) }));
+    }),
+
+  getMyStreak: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getOrCreateStreak(input.clientId);
     }),
 
   // ═══════════════════════════════════════════════════════

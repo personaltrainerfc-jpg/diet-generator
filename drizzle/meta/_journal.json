@@ -43,6 +43,13 @@
       "when": 1774173890608,
       "tag": "0005_flaky_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1774174969544,
+      "tag": "0006_rapid_hammerhead",
+      "breakpoints": true
     }
   ]
 }
