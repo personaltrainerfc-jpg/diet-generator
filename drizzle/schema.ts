@@ -1,4 +1,4 @@
-import { int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, json, mysqlEnum, mysqlTable, text, timestamp, tinyint, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -103,6 +103,8 @@ export const recipes = mysqlTable("recipes", {
   totalProtein: int("totalProtein").default(0).notNull(),
   totalCarbs: int("totalCarbs").default(0).notNull(),
   totalFats: int("totalFats").default(0).notNull(),
+  category: varchar("category", { length: 50 }).default("otro"),
+  isSystem: tinyint("isSystem").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

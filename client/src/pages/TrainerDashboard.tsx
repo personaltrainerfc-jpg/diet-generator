@@ -28,7 +28,7 @@ export default function TrainerDashboard() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">Panel de Control</h1>
         <p className="text-[14px] text-muted-foreground mt-1">Resumen de tu actividad como entrenador.</p>
       </div>
 

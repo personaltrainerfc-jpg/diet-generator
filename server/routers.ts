@@ -206,6 +206,26 @@ REGLAS IMPORTANTES:
 11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
 12. SIN REPETICIÓN ENTRE DÍAS: No repitas el mismo alimento principal (proteína, verdura o carbohidrato principal) en dos días/menús distintos del plan. Distribuye verduras, proteínas y carbohidratos de forma variada a lo largo de todos los días del menú. Si un día usas pechuga de pollo, otro día usa lomo de cerdo o merluza. Si un día usas brócoli, otro día usa judías verdes o calabacín. Maximiza la variedad.
 
+CANTIDADES REALISTAS (OBLIGATORIO - MUY IMPORTANTE):
+- Proteínas (carne, pescado): entre 100g y 200g por ración. Ejemplo: 150g pechuga de pollo, 120g salmón, 180g merluza. NUNCA poner 30g de carne ni 400g.
+- Verduras y hortalizas: entre 150g y 300g por ración. Ejemplo: 200g judías verdes, 150g brócoli, 250g ensalada mixta. NUNCA poner 50g de verdura.
+- Carbohidratos (arroz, pasta, patata): entre 60g y 150g en crudo. Ejemplo: 80g arroz, 100g pasta, 200g patata. NUNCA poner 30g de arroz ni 300g.
+- Legumbres cocidas: entre 150g y 250g. Ejemplo: 200g garbanzos cocidos, 180g lentejas.
+- Pan: entre 40g y 80g por toma. Ejemplo: 50g pan integral (2 rebanadas), 60g pan de molde.
+- Huevos: 1-3 unidades (55-60g cada uno). Ejemplo: 2 huevos (120g).
+- Fruta: 1 pieza mediana (120-200g). Ejemplo: 150g manzana, 120g kiwi, 130g naranja.
+- Yogur: 125-150g por unidad. Ejemplo: 125g yogur griego, 120g yogur proteínas.
+- Frutos secos: entre 15g y 30g. Ejemplo: 20g almendras, 25g nueces.
+- Aceite de oliva: entre 5g y 15g (1-3 cucharaditas). Ejemplo: 10g aceite de oliva.
+- Queso fresco/batido: entre 60g y 150g. Ejemplo: 100g queso fresco batido 0%.
+- Avena: entre 30g y 60g. Ejemplo: 40g avena en copos.
+
+PLATOS RECONOCIBLES (OBLIGATORIO):
+- Cada comida principal y cena debe ser un PLATO RECONOCIBLE de la cocina cotidiana, no una combinación aleatoria de ingredientes.
+- Ejemplos de platos correctos: "Lentejas estofadas con verduras", "Salmón al horno con patatas y espinacas", "Poke de arroz con pollo y aguacate", "Tortilla francesa con ensalada mixta", "Pasta boloñesa con carne picada".
+- Ejemplos de platos INCORRECTOS: "Pollo 150g + arroz 80g + brócoli 200g" (esto es un listado, no un plato). Siempre describe el método de cocción y la combinación.
+- Los alimentos dentro de cada comida deben formar parte del MISMO PLATO o ser un acompañamiento lógico (ej: ensalada + plato principal, no 5 ingredientes sueltos sin relación).
+
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
 
@@ -351,7 +371,7 @@ export const appRouter = router({
 
         const llmResponse = await invokeLLM({
           messages: [
-            { role: "system", content: "Eres un nutricionista profesional experto en planificaci\u00f3n de dietas. Responde siempre en espa\u00f1ol. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente l\u00f3gicos que representen recetas reales de la gastronom\u00eda cotidiana espa\u00f1ola/mediterr\u00e1nea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos seg\u00fan las cantidades." },
+            { role: "system", content: "Eres un nutricionista profesional con 15 años de experiencia en planificación de dietas para deportistas y personas activas en España. Responde siempre en español. Genera dietas con CANTIDADES REALISTAS (150g de proteína, 200g de verdura, 80g de arroz crudo, etc.), PLATOS RECONOCIBLES de la cocina cotidiana española/mediterránea (no listados de ingredientes sueltos), y COMBINACIONES CULINARIAS COHERENTES. Cada comida debe ser un plato que alguien cocinaría en su casa. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
             { role: "user", content: prompt },
           ],
           response_format: {

@@ -37,7 +37,7 @@ const menuItems = [
   { icon: BookOpen, label: "Mis Recetas", path: "/recipes" },
   { icon: Apple, label: "Alimentos", path: "/custom-foods" },
   { icon: Users, label: "Clientes", path: "/clients" },
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: LayoutDashboard, label: "Panel", path: "/dashboard" },
   { icon: FileStack, label: "Plantillas", path: "/templates" },
   { icon: CalendarDays, label: "Calendario", path: "/calendar" },
   { icon: Bot, label: "Asistente IA", path: "/ai-config" },

@@ -31,11 +31,11 @@ const SUPERMARKETS = [
   { value: "Lidl", label: "Lidl" },
   { value: "Aldi", label: "Aldi" },
   { value: "Carrefour", label: "Carrefour" },
-  { value: "Dia", label: "Dia" },
+  { value: "Día", label: "Día" },
   { value: "Eroski", label: "Eroski" },
 ];
 
-const DAY_NAMES = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 /* ─── Section wrapper ─── */
 function Section({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -228,8 +228,8 @@ export default function Home() {
 
       {/* Quick templates */}
       <Section>
-        <SectionTitle icon={Sparkles} color="text-primary">Plantillas Rapidas</SectionTitle>
-        <SectionDesc>Selecciona una plantilla para rellenar automaticamente.</SectionDesc>
+        <SectionTitle icon={Sparkles} color="text-primary">Plantillas Rápidas</SectionTitle>
+        <SectionDesc>Selecciona una plantilla para rellenar automáticamente.</SectionDesc>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {QUICK_TEMPLATES.map(template => (
             <button
@@ -254,7 +254,7 @@ export default function Home() {
             <Input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="Ej: Dieta de definicion"
+              placeholder="Ej: Dieta de definición"
               className="rounded-xl h-11 text-[15px]"
               required
             />
@@ -264,7 +264,7 @@ export default function Home() {
         {/* Diet type */}
         <Section>
           <SectionTitle icon={Salad} color="text-primary">Tipo de Dieta</SectionTitle>
-          <SectionDesc>Selecciona el estilo de alimentacion. Los macros se ajustan automaticamente.</SectionDesc>
+          <SectionDesc>Selecciona el estilo de alimentación. Los macros se ajustan automáticamente.</SectionDesc>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {DIET_TYPES.map(dt => (
               <button
@@ -313,8 +313,8 @@ export default function Home() {
 
         {/* Calories */}
         <Section>
-          <SectionTitle icon={Flame} color="text-orange-500">Calorias Diarias</SectionTitle>
-          <SectionDesc>Define el objetivo calorico total para cada dia.</SectionDesc>
+          <SectionTitle icon={Flame} color="text-orange-500">Calorías Diarias</SectionTitle>
+          <SectionDesc>Define el objetivo calórico total para cada día.</SectionDesc>
           <div className="flex items-center gap-3 mb-4">
             <Input
               type="number"
@@ -416,7 +416,7 @@ export default function Home() {
           <SectionTitle icon={UtensilsCrossed} color="text-primary">Estructura del Plan</SectionTitle>
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="space-y-2">
-              <Label className="text-[13px] font-medium">Comidas por dia</Label>
+              <Label className="text-[13px] font-medium">Comidas por día</Label>
               <Input
                 type="number"
                 value={mealsPerDay}
@@ -427,7 +427,7 @@ export default function Home() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-[13px] font-medium">Menus a generar</Label>
+              <Label className="text-[13px] font-medium">Menús a generar</Label>
               <Input
                 type="number"
                 value={totalMenus}
@@ -533,11 +533,11 @@ export default function Home() {
         {/* Preferences */}
         <Section>
           <SectionTitle icon={MessageSquare} color="text-violet-500">Preferencias</SectionTitle>
-          <SectionDesc>Escribe ideas o preferencias para personalizar los menus. Se respetaran de forma obligatoria.</SectionDesc>
+          <SectionDesc>Escribe ideas o preferencias para personalizar los menús. Se respetarán de forma obligatoria.</SectionDesc>
           <Textarea
             value={preferences}
             onChange={e => setPreferences(e.target.value)}
-            placeholder="Ej: Para comer me gustaria arroz con pollo. Prefiero cenas ligeras con ensalada..."
+            placeholder="Para comer me gustaría arroz con pollo. Prefiero cenas ligeras con ensalada..."
             rows={3}
             className="resize-none rounded-xl text-[14px]"
             maxLength={2000}
@@ -566,7 +566,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[13px] font-medium text-card-foreground">Medidas caseras</p>
-                    <p className="text-[12px] text-muted-foreground">Punados, filetes, tazas en vez de gramos.</p>
+                    <p className="text-[12px] text-muted-foreground">Puñados, filetes, tazas en vez de gramos.</p>
                   </div>
                   <Switch checked={useHomeMeasures} onCheckedChange={setUseHomeMeasures} />
                 </div>
@@ -602,7 +602,7 @@ export default function Home() {
             {/* Fasting */}
             <Section>
               <SectionTitle icon={UtensilsCrossed} color="text-orange-500">Ayuno Intermitente</SectionTitle>
-              <SectionDesc>Las comidas se distribuiran dentro de la ventana de alimentacion.</SectionDesc>
+              <SectionDesc>Las comidas se distribuirán dentro de la ventana de alimentación.</SectionDesc>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   { value: "", label: "Sin ayuno" },
@@ -630,8 +630,8 @@ export default function Home() {
 
             {/* Daily targets */}
             <Section>
-              <SectionTitle icon={CalendarDays} color="text-indigo-500">Calorias por Dia</SectionTitle>
-              <SectionDesc>Define objetivos nutricionales distintos para cada dia (entreno vs descanso).</SectionDesc>
+              <SectionTitle icon={CalendarDays} color="text-indigo-500">Calorías por Día</SectionTitle>
+              <SectionDesc>Define objetivos nutricionales distintos para cada día (entreno vs descanso).</SectionDesc>
               <div className="flex items-center justify-between mb-4">
                 <Label className="text-[13px] font-medium">Activar</Label>
                 <Switch checked={useDailyTargets} onCheckedChange={handleToggleDailyTargets} />
@@ -641,11 +641,11 @@ export default function Home() {
                   {dailyTargets.map((dt, idx) => (
                     <div key={dt.day} className="p-3 rounded-xl bg-accent/30 space-y-2">
                       <p className="text-[13px] font-medium text-card-foreground">
-                        {totalMenus <= 7 ? DAY_NAMES[idx] || `Dia ${dt.day}` : `Menu ${dt.day}`}
+                        {totalMenus <= 7 ? DAY_NAMES[idx] || `Día ${dt.day}` : `Menú ${dt.day}`}
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <div className="space-y-1">
-                          <Label className="text-[11px] text-muted-foreground">Calorias</Label>
+                          <Label className="text-[11px] text-muted-foreground">Calorías</Label>
                           <Input type="number" value={dt.calories} onChange={e => updateDailyTarget(idx, "calories", Number(e.target.value))} min={800} max={10000} step={50} className="h-8 text-[12px] text-center rounded-lg" />
                         </div>
                         <div className="space-y-1">

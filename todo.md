@@ -259,3 +259,39 @@
 - [x] O5: Frontend cliente: sección "Mis Logros de Actividad" con badges
 - [x] O6: Frontend cliente: animación de desbloqueo de badge
 - [x] O7: Frontend entrenador: vista de badges del cliente en detalle
+
+## P: Tipografía Plus Jakarta Sans
+- [x] P1: Añadir Google Font Plus Jakarta Sans en index.html
+- [x] P2: Configurar font-family global en index.css
+- [x] P3: Aplicar jerarquía: títulos 28-32px ExtraBold, subtítulos 17-20px SemiBold, cuerpo 15-17px Regular, etiquetas 13px Regular gris, botones 15px SemiBold mayúsculas
+- [x] P4: Verificar que ningún elemento usa la tipografía anterior
+
+## Q: Revisión de legibilidad WCAG AA
+- [x] Q1: Contraste mínimo 4.5:1 en todos los textos
+- [x] Q2: Interlineado mínimo 1.5 en textos de cuerpo
+- [x] Q3: Tamaño mínimo 13px en cualquier texto visible
+- [x] Q4: Textos en tarjetas claras: negro/gris oscuro (#1D1D1F)
+- [x] Q5: Textos sobre fondo oscuro: blanco puro o gris claro (#F5F5F7)
+- [x] Q6: Placeholders de inputs visibles y legibles
+- [x] Q7: Verificar que ningún texto queda cortado o solapado en móvil
+
+## R: Corrección ortográfica y redacción
+- [x] R1: Corregir faltas de ortografía y tildes en todos los textos
+- [x] R2: Eliminar textos en inglés sin traducir
+- [x] R3: Unificar tono: directo, profesional, sin tecnicismos
+- [x] R4: Botones con verbos en infinitivo/imperativo claro
+- [x] R5: Descripciones de sección concisas (máx 2 líneas)
+
+## S: Prompt de generación de dietas mejorado
+- [x] S1: Cantidades realistas (proteínas 100-200g, verduras 150-250g, carbohidratos 50-150g)
+- [x] S2: Combinaciones culinarias coherentes (platos reconocibles)
+- [x] S3: Distribución de macros precisa (margen 5%)
+- [x] S4: Variedad real entre días (no repetir proteína consecutiva)
+- [x] S5: Métodos de cocción variados y explícitos
+- [x] S6: Gastronomía española y mediterránea como base
+
+## T: Nuevas recetas en la base de datos
+- [x] T1: 10 recetas de desayunos
+- [x] T2: 12 recetas de comidas principales
+- [x] T3: 10 recetas de cenas
+- [x] T4: 10 recetas de snacks y tentempiés

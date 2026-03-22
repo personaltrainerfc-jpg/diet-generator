@@ -1,0 +1,26 @@
+{
+  "query": "SELECT category, COUNT(*) as count FROM recipes WHERE isSystem = 1 GROUP BY category;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3cKE5Q7ZQPRmheK.root --database JuA5L95oAvQY6eqfSgbwUN --execute SELECT category, COUNT(*) as count FROM recipes WHERE isSystem = 1 GROUP BY category;",
+  "rows": [
+    {
+      "category": "desayuno",
+      "count": "10"
+    },
+    {
+      "category": "comida",
+      "count": "12"
+    },
+    {
+      "category": "cena",
+      "count": "10"
+    },
+    {
+      "category": "snack",
+      "count": "10"
+    }
+  ],
+  "messages": [],
+  "stdout": "category\tcount\ndesayuno\t10\ncomida\t12\ncena\t10\nsnack\t10\n",
+  "stderr": "",
+  "execution_time_ms": 368
+}
