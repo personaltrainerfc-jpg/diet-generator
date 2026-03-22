@@ -42,6 +42,7 @@ export async function getClientByAccessCode(code: string) {
 export async function updateClient(id: number, data: Partial<{
   name: string; email: string; phone: string; age: number;
   weight: number; height: number; goal: string; notes: string; status: "active" | "inactive" | "paused";
+  archetype: string;
 }>) {
   const db = await getDb(); assertDb(db);
   await db.update(clients).set(data).where(eq(clients.id, id));

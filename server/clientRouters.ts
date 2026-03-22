@@ -754,7 +754,7 @@ export const clientPortalRouter = router({
       const client = await getClientByAccessCode(input.accessCode);
       if (!client) throw new Error("Código de acceso inválido");
       if (client.status === "inactive") throw new Error("Tu cuenta está desactivada. Contacta con tu entrenador.");
-      return { clientId: client.id, name: client.name, status: client.status };
+      return { clientId: client.id, name: client.name, status: client.status, archetype: client.archetype };
     }),
 
   getProfile: publicProcedure
@@ -762,7 +762,7 @@ export const clientPortalRouter = router({
     .query(async ({ input }) => {
       const client = await getClientByAccessCode(input.accessCode);
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
-      return { id: client.id, name: client.name, email: client.email, phone: client.phone, age: client.age, weight: client.weight, height: client.height, goal: client.goal, status: client.status };
+      return { id: client.id, name: client.name, email: client.email, phone: client.phone, age: client.age, weight: client.weight, height: client.height, goal: client.goal, status: client.status, archetype: client.archetype };
     }),
 
   getActiveDiet: publicProcedure
@@ -1191,5 +1191,19 @@ Sé directo, motivador y personalizado. Usa un tono cercano pero profesional. Ca
       const client = await getClientByAccessCode(input.accessCode);
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
       return getWeekendFeedbackList(input.clientId);
+    }),
+
+  // ── Set Archetype ──
+  setArchetype: publicProcedure
+    .input(z.object({
+      clientId: z.number(),
+      accessCode: z.string(),
+      archetype: z.enum(["agil", "flora", "bruto", "roca"]),
+    }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      await updateClient(input.clientId, { archetype: input.archetype });
+      return { success: true, archetype: input.archetype };
     }),
 });

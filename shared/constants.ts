@@ -109,3 +109,89 @@ export const QUICK_TEMPLATES = [
     cookingLevel: "moderate" as CookingLevel,
   },
 ] as const;
+
+// NutriFlow Mascots / Archetypes
+export const MASCOT_URLS = {
+  agil: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_agil_201aaee4.webp",
+  flora: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_flora_ebca1ee3.webp",
+  bruto: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_bruto_f83c761f.webp",
+  roca: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_roca_ec6d782d.webp",
+  grupo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_grupo_a511224f.webp",
+} as const;
+
+export type ArchetypeId = "agil" | "flora" | "bruto" | "roca";
+
+export const ARCHETYPES = [
+  {
+    id: "agil" as ArchetypeId,
+    name: "ÁGIL",
+    animal: "Gacela",
+    description: "Velocidad, resistencia y agilidad. Para quienes buscan rendimiento y superación constante.",
+    image: MASCOT_URLS.agil,
+    accentColor: "#2563EB",    // azul eléctrico
+    secondaryColor: "#F97316", // naranja
+  },
+  {
+    id: "flora" as ArchetypeId,
+    name: "FLORA",
+    animal: "Vaca Fitness",
+    description: "Equilibrio, bienestar y constancia. Para quienes priorizan la salud y el cuidado personal.",
+    image: MASCOT_URLS.flora,
+    accentColor: "#EC4899",    // rosa
+    secondaryColor: "#000000", // negro
+  },
+  {
+    id: "bruto" as ArchetypeId,
+    name: "BRUTO",
+    animal: "Gorila",
+    description: "Fuerza bruta, potencia y determinación. Para quienes buscan ganar masa y volumen.",
+    image: MASCOT_URLS.bruto,
+    accentColor: "#D4A017",    // dorado
+    secondaryColor: "#1A1A1A", // negro profundo
+  },
+  {
+    id: "roca" as ArchetypeId,
+    name: "ROCA",
+    animal: "Rinoceronte",
+    description: "Resistencia, disciplina y constancia inquebrantable. Para quienes nunca se rinden.",
+    image: MASCOT_URLS.roca,
+    accentColor: "#DC2626",    // rojo
+    secondaryColor: "#6B7280", // gris
+  },
+] as const;
+
+// Empty state messages per archetype
+export const EMPTY_STATE_MESSAGES: Record<ArchetypeId, Record<string, string>> = {
+  agil: {
+    diet: "Aún no tienes un plan. ¡Tu entrenador está preparando algo a tu velocidad!",
+    progress: "Sin datos aún. Cada dato cuenta para mejorar tu rendimiento.",
+    adherence: "Empieza a registrar tu adherencia. ¡Cada día es una carrera ganada!",
+    weekend: "Registra tu fin de semana. ¡Ágil también descansa para rendir más!",
+    wellness: "Registra cómo te sientes. Tu cuerpo es tu mejor herramienta.",
+    shopping: "Tu lista de la compra aparecerá aquí cuando tengas un plan activo.",
+  },
+  flora: {
+    diet: "Aún no tienes un plan. Tu entrenador está en ello.",
+    progress: "Aquí verás tu progreso. ¡Empieza registrando hoy!",
+    adherence: "Registra tu adherencia diaria. ¡La constancia es la clave!",
+    weekend: "Cuéntanos cómo fue tu fin de semana. ¡Flora quiere saber!",
+    wellness: "Registra tu bienestar. El equilibrio es lo más importante.",
+    shopping: "Tu lista de la compra aparecerá aquí cuando tengas un plan activo.",
+  },
+  bruto: {
+    diet: "Aún no tienes un plan. ¡Tu entrenador está diseñando algo bestial!",
+    progress: "Sin datos aún. ¡Bruto necesita ver tus números para crecer!",
+    adherence: "Registra tu adherencia. ¡La disciplina construye monstruos!",
+    weekend: "Registra tu fin de semana. ¡Hasta Bruto necesita recuperarse!",
+    wellness: "Registra cómo te sientes. La fuerza empieza por dentro.",
+    shopping: "Tu lista de la compra aparecerá aquí cuando tengas un plan activo.",
+  },
+  roca: {
+    diet: "Aún no tienes un plan. Tu entrenador está preparando algo sólido.",
+    progress: "Sin datos aún. Cada dato es un paso más hacia tu objetivo.",
+    adherence: "Registra tu adherencia. ¡Roca no falla ni un día!",
+    weekend: "Registra tu fin de semana. ¡La constancia no descansa!",
+    wellness: "Registra tu bienestar. Un cuerpo fuerte necesita una mente fuerte.",
+    shopping: "Tu lista de la compra aparecerá aquí cuando tengas un plan activo.",
+  },
+};

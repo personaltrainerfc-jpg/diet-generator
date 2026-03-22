@@ -20,6 +20,7 @@ import {
   TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink,
   Tag, Heart, Copy, Search
 } from "lucide-react";
+import { ARCHETYPES } from "@shared/constants";
 
 /* ─── Chart.js Evolution Chart ─── */
 function EvolutionChart({ data, labels, color = "#007AFF", unit = "", height = 160 }: { data: number[]; labels: string[]; color?: string; unit?: string; height?: number }) {
@@ -301,6 +302,14 @@ export default function ClientDetail() {
         <button onClick={() => setLocation("/clients")} className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center hover:bg-secondary transition-colors mt-0.5 shrink-0">
           <ArrowLeft className="h-4.5 w-4.5" />
         </button>
+        {(() => {
+          const arch = client.archetype ? ARCHETYPES.find((a: any) => a.id === client.archetype) : null;
+          return arch ? (
+            <div className="h-12 w-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: `${arch.accentColor}15`, border: `1px solid ${arch.accentColor}30` }}>
+              <img src={arch.image} alt={arch.name} className="h-10 w-10 object-contain" />
+            </div>
+          ) : null;
+        })()}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 mb-1">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate uppercase">{client.name}</h1>

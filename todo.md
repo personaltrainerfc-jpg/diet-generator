@@ -174,3 +174,20 @@
 
 - [x] F1: Valoración automática IA al registrar fin de semana (ajustes escritos sobre cómo abordar los siguientes días, sin tocar la dieta)
 - [x] F2: Bug: La adherencia registrada por el cliente no aparece en el panel del entrenador
+
+## Bloque G: Rediseño visual completo con mascotas NutriFlow
+
+- [x] G1: Subir mascotas al CDN (Flora, Roca, Bruto, Ágil, grupo)
+- [x] G2: Tema oscuro global: fondo #0D0F1A, tarjetas #1A1D2E, textos blancos
+- [x] G3: Schema DB: campo arquetipo en tabla clients (agil/flora/bruto/roca)
+- [x] G4: Onboarding cliente: selección de arquetipo con personajes y descripción
+- [x] G5: Portal cliente: personaje en inicio con saludo dinámico, colores del arquetipo
+- [x] G6: Estados vacíos con personaje y mensaje contextual
+- [x] G7: Panel entrenador: mini avatar del personaje en lista de clientes
+- [x] G8: Botones primarios con color del arquetipo (azul Ágil, rosa Flora, dorado Bruto, rojo Roca)
+- [x] G9: Gráficas y barras de progreso con colores del personaje
+- [x] G10: Navegación inferior móvil con acento de color del personaje
+- [x] G11: Rediseñar sidebar entrenador con tema oscuro
+- [ ] G12: Rediseñar Home (generador de dietas) con tema oscuro
+- [ ] G13: Rediseñar todas las páginas secundarias (historial, recetas, plantillas, calendario)
+- [ ] G14: Splash screen con imagen grupal + logo NutriFlow

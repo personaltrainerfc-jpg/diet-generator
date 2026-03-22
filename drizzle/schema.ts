@@ -195,6 +195,7 @@ export const clients = mysqlTable("clients", {
   goal: varchar("goal", { length: 100 }), // pérdida peso, ganancia muscular, mantenimiento
   notes: text("notes"),
   status: mysqlEnum("status", ["active", "inactive", "paused"]).default("active").notNull(),
+  archetype: varchar("archetype", { length: 20 }), // agil, flora, bruto, roca
   accessCode: varchar("accessCode", { length: 32 }).notNull().unique(), // código para que el cliente acceda
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

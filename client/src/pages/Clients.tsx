@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { Plus, Users, Search, Phone, Mail, Target, Trash2, Loader2, UserCircle } from "lucide-react";
 import { toast } from "sonner";
+import { ARCHETYPES } from "@shared/constants";
 
 export default function Clients() {
   const [, setLocation] = useLocation();
@@ -68,9 +69,18 @@ export default function Clients() {
           {filtered.map((client: any) => (
             <div key={client.id} className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => setLocation(`/clients/${client.id}`)}>
               <div className="flex items-center gap-4 p-4">
-                <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <UserCircle className="h-5.5 w-5.5 text-primary" />
-                </div>
+                {(() => {
+                  const arch = client.archetype ? ARCHETYPES.find((a: any) => a.id === client.archetype) : null;
+                  return arch ? (
+                    <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={{ backgroundColor: `${arch.accentColor}15`, border: `1px solid ${arch.accentColor}30` }}>
+                      <img src={arch.image} alt={arch.name} className="h-9 w-9 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <UserCircle className="h-5.5 w-5.5 text-primary" />
+                    </div>
+                  );
+                })()}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="font-semibold text-[15px] truncate">{client.name}</span>

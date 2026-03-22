@@ -8,11 +8,13 @@ import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, Arrow
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ArchetypeSelector from "@/components/ArchetypeSelector";
+import { ARCHETYPES, MASCOT_URLS, EMPTY_STATE_MESSAGES, type ArchetypeId } from "@shared/constants";
 
 // ── Client Portal: Login + Dashboard ──
 export default function ClientPortal() {
   const [accessCode, setAccessCode] = useState("");
-  const [session, setSession] = useState<{ clientId: number; name: string; accessCode: string } | null>(() => {
+  const [session, setSession] = useState<{ clientId: number; name: string; accessCode: string; archetype?: string | null } | null>(() => {
     try {
       const saved = localStorage.getItem("clientPortalSession");
       return saved ? JSON.parse(saved) : null;
@@ -21,10 +23,22 @@ export default function ClientPortal() {
 
   const loginMut = trpc.clientPortal.loginByCode.useMutation({
     onSuccess: (data) => {
-      const s = { clientId: data.clientId, name: data.name, accessCode };
+      const s = { clientId: data.clientId, name: data.name, accessCode, archetype: data.archetype };
       setSession(s);
       localStorage.setItem("clientPortalSession", JSON.stringify(s));
       toast.success(`Bienvenido/a, ${data.name}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const setArchetypeMut = trpc.clientPortal.setArchetype.useMutation({
+    onSuccess: (data) => {
+      if (session) {
+        const updated = { ...session, archetype: data.archetype };
+        setSession(updated);
+        localStorage.setItem("clientPortalSession", JSON.stringify(updated));
+        toast.success("\u00a1Personaje seleccionado!");
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -74,15 +88,49 @@ export default function ClientPortal() {
     );
   }
 
+  // Show archetype onboarding if no archetype selected
+  if (!session.archetype) {
+    return (
+      <ArchetypeSelector
+        clientName={session.name}
+        isPending={setArchetypeMut.isPending}
+        onSelect={(archetype) => {
+          setArchetypeMut.mutate({
+            clientId: session.clientId,
+            accessCode: session.accessCode,
+            archetype,
+          });
+        }}
+      />
+    );
+  }
+
   return <ClientDashboard session={session} onLogout={handleLogout} />;
 }
 
 // ── Client Dashboard (after login) ──
-function ClientDashboard({ session, onLogout }: { session: { clientId: number; name: string; accessCode: string }; onLogout: () => void }) {
+// Helper: get dynamic greeting based on time of day
+function getGreeting(name: string, archetype?: ArchetypeId): string {
+  const hour = new Date().getHours();
+  const greetings: Record<string, Record<string, string>> = {
+    agil: { morning: `\u00a1Buenos d\u00edas, ${name}! Hoy es un gran d\u00eda para superarte.`, afternoon: `\u00a1Buenas tardes, ${name}! Sigue con esa energ\u00eda.`, evening: `Buenas noches, ${name}. Descansa bien para ma\u00f1ana.` },
+    flora: { morning: `\u00a1Buenos d\u00edas, ${name}! Empieza el d\u00eda con equilibrio.`, afternoon: `\u00a1Buenas tardes, ${name}! \u00bfC\u00f3mo va tu d\u00eda?`, evening: `Buenas noches, ${name}. Cu\u00eddate mucho.` },
+    bruto: { morning: `\u00a1Arriba, ${name}! Hoy toca darlo todo.`, afternoon: `\u00a1${name}! La fuerza no descansa.`, evening: `Buenas noches, ${name}. Los m\u00fasculos crecen descansando.` },
+    roca: { morning: `\u00a1Buenos d\u00edas, ${name}! Otro d\u00eda m\u00e1s sin rendirse.`, afternoon: `\u00a1Sigue as\u00ed, ${name}! La constancia es tu arma.`, evening: `Buenas noches, ${name}. Ma\u00f1ana m\u00e1s y mejor.` },
+  };
+  const timeKey = hour < 12 ? "morning" : hour < 20 ? "afternoon" : "evening";
+  return archetype && greetings[archetype] ? greetings[archetype][timeKey] : `\u00a1Hola, ${name}!`;
+}
+
+function ClientDashboard({ session, onLogout }: { session: { clientId: number; name: string; accessCode: string; archetype?: string | null }; onLogout: () => void }) {
   const [tab, setTab] = useState<string>("diet");
 
   const profileQ = trpc.clientPortal.getProfile.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
   const dietQ = trpc.clientPortal.getActiveDiet.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+
+  const archetype = (session.archetype || profileQ.data?.archetype) as ArchetypeId | undefined;
+  const archetypeData = archetype ? ARCHETYPES.find(a => a.id === archetype) : null;
+  const accentColor = archetypeData?.accentColor || "#6BCB77";
 
   const tabs = [
     { id: "diet", label: "Mi Dieta", icon: Utensils },
@@ -94,33 +142,53 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <div className="min-h-screen bg-background" data-archetype={archetype || undefined}>
+      {/* Header with mascot */}
+      <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(11,13,24,0.85)" }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-14 object-contain" />
+            {archetypeData ? (
+              <img src={archetypeData.image} alt={archetypeData.name} className="h-12 w-12 object-contain drop-shadow-lg" />
+            ) : (
+              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-12 object-contain" />
+            )}
             <div>
-              <h1 className="text-[17px] font-semibold tracking-tight uppercase">{session.name}</h1>
+              <h1 className="text-[17px] font-semibold tracking-tight uppercase" style={{ color: accentColor }}>{session.name}</h1>
               {profileQ.data?.goal && <p className="text-[12px] text-muted-foreground">{profileQ.data.goal}</p>}
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onLogout} className="text-[13px] text-muted-foreground">
-            Cerrar sesión
+            Cerrar sesi\u00f3n
           </Button>
         </div>
       </div>
 
+      {/* Greeting banner with mascot */}
+      {tab === "diet" && archetypeData && (
+        <div className="max-w-2xl mx-auto px-4 pt-4">
+          <div className="relative rounded-2xl overflow-hidden p-4" style={{ background: `linear-gradient(135deg, ${accentColor}15, ${accentColor}05)`, border: `1px solid ${accentColor}20` }}>
+            <div className="flex items-center gap-4">
+              <img src={archetypeData.image} alt={archetypeData.name} className="h-16 w-16 object-contain drop-shadow-lg flex-shrink-0" />
+              <div>
+                <p className="text-[15px] font-semibold text-foreground">{getGreeting(session.name, archetype)}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">Tu compa\u00f1ero <span style={{ color: accentColor }} className="font-semibold">{archetypeData.name}</span> te acompa\u00f1a</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab bar */}
-      <div className="sticky top-[57px] z-30 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="max-w-2xl mx-auto px-4 flex gap-1">
+      <div className="sticky top-[57px] z-30 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(11,13,24,0.85)" }}>
+        <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
-                tab === t.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                tab === t.id ? "text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
+              style={tab === t.id ? { borderBottomColor: accentColor, color: accentColor } : undefined}
             >
               <t.icon className="h-3.5 w-3.5" />
               {t.label}
@@ -130,25 +198,24 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       </div>
 
       {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {tab === "diet" && <DietTab dietQ={dietQ} session={session} />}
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-24">
+        {tab === "diet" && <DietTab dietQ={dietQ} session={session} archetype={archetype} accentColor={accentColor} />}
         {tab === "tracking" && <TrackingTab session={session} dietId={dietQ.data?.id} />}
         {tab === "wellness" && <WellnessTab session={session} />}
         {tab === "weekend" && <WeekendTab session={session} />}
-        {tab === "shopping" && <ShoppingTab session={session} />}
+        {tab === "shopping" && <ShoppingTab session={session} archetype={archetype} />}
         {tab === "chat" && <ChatTab session={session} />}
       </div>
 
-      {/* Mobile bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom">
+      {/* Mobile bottom nav with archetype accent */}
+      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom" style={{ backgroundColor: "rgba(11,13,24,0.92)" }}>
         <div className="flex justify-around py-2">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 ${
-                tab === t.id ? "text-primary" : "text-muted-foreground"
-              }`}
+              className="flex flex-col items-center gap-0.5 px-3 py-1 transition-colors"
+              style={{ color: tab === t.id ? accentColor : "rgba(255,255,255,0.4)" }}
             >
               <t.icon className="h-5 w-5" />
               <span className="text-[10px] font-medium">{t.label}</span>
@@ -161,7 +228,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
 }
 
 // ── Diet Tab ──
-function DietTab({ dietQ, session }: { dietQ: any; session: { clientId: number; name: string; accessCode: string } }) {
+function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; session: { clientId: number; name: string; accessCode: string }; archetype?: ArchetypeId; accentColor?: string }) {
   const [recipeSteps, setRecipeSteps] = useState<{ mealName: string; steps: string } | null>(null);
   const recipeStepsMut = trpc.clientPortal.getRecipeSteps.useMutation({
     onSuccess: (data, vars) => setRecipeSteps({ mealName: vars.mealName, steps: data }),
@@ -173,13 +240,21 @@ function DietTab({ dietQ, session }: { dietQ: any; session: { clientId: number; 
   const toggleDay = (idx: number) => setExpandedDays(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; });
   const toggleMeal = (key: string) => setExpandedMeals(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
   if (dietQ.isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  if (!dietQ.data) return (
-    <div className="text-center py-16">
-      <Utensils className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-      <p className="text-[15px] font-medium">Sin dieta asignada</p>
-      <p className="text-[13px] text-muted-foreground mt-1">Tu entrenador aún no te ha asignado un plan nutricional</p>
-    </div>
-  );
+  if (!dietQ.data) {
+    const emptyMsg = archetype && EMPTY_STATE_MESSAGES[archetype] ? EMPTY_STATE_MESSAGES[archetype].diet : "Tu entrenador a\u00fan no te ha asignado un plan nutricional";
+    const mascotImg = archetype ? ARCHETYPES.find(a => a.id === archetype)?.image : null;
+    return (
+      <div className="text-center py-16">
+        {mascotImg ? (
+          <img src={mascotImg} alt="" className="h-24 w-24 object-contain mx-auto mb-4 opacity-60" />
+        ) : (
+          <Utensils className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+        )}
+        <p className="text-[15px] font-medium">Sin dieta asignada</p>
+        <p className="text-[13px] text-muted-foreground mt-1 max-w-xs mx-auto">{emptyMsg}</p>
+      </div>
+    );
+  }
 
   const diet = dietQ.data;
   return (
@@ -1328,7 +1403,7 @@ function FastingTimer() {
 }
 
 // ── Shopping Tab (Interactive Shopping List) ──
-function ShoppingTab({ session }: { session: { clientId: number; name: string; accessCode: string } }) {
+function ShoppingTab({ session, archetype }: { session: { clientId: number; name: string; accessCode: string }; archetype?: ArchetypeId }) {
   const shoppingQ = trpc.clientPortal.getShoppingList.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
