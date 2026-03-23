@@ -298,6 +298,77 @@ const dietJsonSchema = {
   },
 };
 
+/**
+ * Attempts to repair truncated JSON from LLM by closing open brackets/braces.
+ * Uses a stack to track opening order and close in reverse (LIFO).
+ */
+function repairTruncatedDietJson(truncated: string): string {
+  let json = truncated.trim();
+  
+  // Remove trailing comma
+  json = json.replace(/,\s*$/, '');
+  
+  // Check if we're inside an unterminated string
+  let quoteCount = 0;
+  let esc = false;
+  for (const ch of json) {
+    if (esc) { esc = false; continue; }
+    if (ch === '\\') { esc = true; continue; }
+    if (ch === '"') quoteCount++;
+  }
+  
+  // If inside a string, truncate to last complete entry
+  if (quoteCount % 2 !== 0) {
+    const lastCompleteObj = json.lastIndexOf('},');
+    const lastCompleteArr = json.lastIndexOf('],');
+    const lastComplete = Math.max(lastCompleteObj, lastCompleteArr);
+    if (lastComplete > 0) {
+      json = json.slice(0, lastComplete + 1);
+    } else {
+      json += '"';
+    }
+  }
+  
+  json = json.replace(/,\s*$/, '');
+  
+  // Check if tail after last complete entry has unclosed structures
+  const lastCompleteEntry = json.lastIndexOf('},');
+  if (lastCompleteEntry > 0) {
+    const tail = json.slice(lastCompleteEntry + 1);
+    const tOB = (tail.match(/{/g) || []).length;
+    const tCB = (tail.match(/}/g) || []).length;
+    const tOBr = (tail.match(/\[/g) || []).length;
+    const tCBr = (tail.match(/]/g) || []).length;
+    if (tOB > tCB || tOBr > tCBr) {
+      json = json.slice(0, lastCompleteEntry + 1);
+    }
+  }
+  
+  json = json.replace(/,\s*$/, '');
+  
+  // Use a stack to track open structures in order
+  const stack: string[] = [];
+  let inStr = false;
+  let escaped = false;
+  
+  for (const ch of json) {
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') stack.push('}');
+    if (ch === '[') stack.push(']');
+    if (ch === '}' || ch === ']') stack.pop();
+  }
+  
+  // Close in reverse order (LIFO)
+  while (stack.length > 0) {
+    json += stack.pop();
+  }
+  
+  return json;
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -384,15 +455,32 @@ export const appRouter = router({
         });
 
         const content = llmResponse.choices[0]?.message?.content;
+        const finishReason = llmResponse.choices[0]?.finish_reason;
+        console.log(`[DietGen] finish_reason=${finishReason}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+
         if (!content || typeof content !== "string") {
+          console.error('[DietGen] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
           throw new Error("No se pudo generar la dieta. Inténtalo de nuevo.");
         }
 
         let generatedDiet: GeneratedDiet;
         try {
           generatedDiet = JSON.parse(content);
-        } catch {
-          throw new Error("Error al procesar la respuesta del generador de dietas.");
+        } catch (parseErr) {
+          console.error(`[DietGen] JSON parse failed. finish_reason=${finishReason}, content_length=${content.length}`);
+          console.error(`[DietGen] Content tail (last 200 chars): ${content.slice(-200)}`);
+          // If truncated (finish_reason=length), try to repair the JSON
+          if (finishReason === 'length' || finishReason === 'max_tokens') {
+            try {
+              const repaired = repairTruncatedDietJson(content);
+              generatedDiet = JSON.parse(repaired);
+              console.log('[DietGen] Successfully repaired truncated JSON');
+            } catch {
+              throw new Error("La dieta generada fue demasiado larga y se truncó. Intenta reducir el número de menús (máximo 5) o el número de comidas por día.");
+            }
+          } else {
+            throw new Error("Error al procesar la respuesta del generador de dietas. Inténtalo de nuevo.");
+          }
         }
 
         const dietId = await createDiet({
@@ -1303,15 +1391,31 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
         });
 
         const content = llmResponse.choices[0]?.message?.content;
+        const finishReasonRedo = llmResponse.choices[0]?.finish_reason;
+        console.log(`[RedoDiet] finish_reason=${finishReasonRedo}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+
         if (!content || typeof content !== "string") {
+          console.error('[RedoDiet] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
           throw new Error("No se pudo regenerar la dieta. Inténtalo de nuevo.");
         }
 
         let generatedDiet: GeneratedDiet;
         try {
           generatedDiet = JSON.parse(content);
-        } catch {
-          throw new Error("Error al procesar la respuesta del generador de dietas.");
+        } catch (parseErr) {
+          console.error(`[RedoDiet] JSON parse failed. finish_reason=${finishReasonRedo}, content_length=${content.length}`);
+          console.error(`[RedoDiet] Content tail (last 200 chars): ${content.slice(-200)}`);
+          if (finishReasonRedo === 'length' || finishReasonRedo === 'max_tokens') {
+            try {
+              const repaired = repairTruncatedDietJson(content);
+              generatedDiet = JSON.parse(repaired);
+              console.log('[RedoDiet] Successfully repaired truncated JSON');
+            } catch {
+              throw new Error("La dieta regenerada fue demasiado larga y se truncó. Intenta reducir el número de menús o comidas.");
+            }
+          } else {
+            throw new Error("Error al procesar la respuesta del generador de dietas. Inténtalo de nuevo.");
+          }
         }
 
         // Delete old menus, meals and foods

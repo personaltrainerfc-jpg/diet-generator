@@ -342,3 +342,6 @@
 - [x] V1: Skeleton screens durante generación de dietas (estructura de días y comidas con bloques grises animados)
 - [x] V2: Indicador de progreso textual con 8 mensajes rotativos cada 3s con transición fade in/out
 - [x] V3: Optimizar caché React Query (staleTime 5min listados, 10min detalle dieta)
+
+## BUG: Error al generar dieta con recetas seleccionadas
+- [x] BUG1: Corregido - max_tokens aumentado a 16384, añadida función repairTruncatedDietJson con pila LIFO, logging de finish_reason y content_length, mensajes de error descriptivos
