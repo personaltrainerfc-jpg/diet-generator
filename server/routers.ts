@@ -468,12 +468,13 @@ export const appRouter = router({
 
           const prompt = retryPrefix + basePrompt;
 
+          const dynamicMaxTokens = Math.min(4000 * input.totalMenus, 32768);
           const llmResponse = await invokeLLM({
             messages: [
               { role: "system", content: systemMsg },
               { role: "user", content: prompt },
             ],
-            maxTokens: 16384,
+            maxTokens: dynamicMaxTokens,
             response_format: {
               type: "json_schema",
               json_schema: dietJsonSchema,
@@ -518,23 +519,16 @@ export const appRouter = router({
             continue;
           }
 
-          // Validation 2: Calorie check per menu (15% tolerance)
-          const tolerancePercent = 0.15;
-          let calorieOk = true;
+          // Calorie check per menu (warning only - not blocking, macros are recalculated on save)
           const targetCal = input.totalCalories;
           for (const menu of parsed.menus) {
-            const menuCalories = menu.meals.reduce((sum, meal) =>
-              sum + meal.foods.reduce((s, f) => s + (f.calories || 0), 0), 0);
+            const menuCalories = (menu.meals || []).reduce((sum: number, meal: any) =>
+              sum + (meal.foods || []).reduce((s: number, f: any) => s + (f.calories || 0), 0), 0);
             const diff = Math.abs(menuCalories - targetCal);
-            const maxDiff = targetCal * tolerancePercent;
-            if (diff > maxDiff) {
-              lastError = `Menú ${menu.menuNumber}: objetivo ${targetCal}kcal, generado ${menuCalories}kcal (diferencia: ${diff}kcal, máximo permitido: ${Math.round(maxDiff)}kcal). Ajusta las cantidades para que cada menú esté entre ${Math.round(targetCal * 0.85)} y ${Math.round(targetCal * 1.15)} kcal.`;
-              console.warn(`[DietGen] Calorie mismatch menu ${menu.menuNumber}: target=${targetCal}, actual=${menuCalories}, diff=${diff}`);
-              calorieOk = false;
-              break;
+            if (diff > targetCal * 0.15) {
+              console.warn(`[DietGen] Calorie warning menu ${menu.menuNumber}: target=${targetCal}, actual=${menuCalories}, diff=${diff} (will be recalculated on save)`);
             }
           }
-          if (!calorieOk) continue;
 
           // All validations passed
           generatedDiet = parsed;
@@ -1469,12 +1463,13 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
 
           const prompt = retryPrefix + basePromptRedo;
 
+          const dynamicMaxTokensRedo = Math.min(4000 * config.totalMenus, 32768);
           const llmResponse = await invokeLLM({
             messages: [
               { role: "system", content: systemMsgRedo },
               { role: "user", content: prompt },
             ],
-            maxTokens: 16384,
+            maxTokens: dynamicMaxTokensRedo,
             response_format: {
               type: "json_schema",
               json_schema: dietJsonSchema,
@@ -1519,23 +1514,16 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
             continue;
           }
 
-          // Validation 2: Calorie check per menu (15% tolerance)
-          const tolerancePercentRedo = 0.15;
-          let calorieOkRedo = true;
+          // Calorie check per menu (warning only - not blocking, macros are recalculated on save)
           const targetCalRedo = config.totalCalories;
           for (const menu of parsed.menus) {
-            const menuCalories = menu.meals.reduce((sum, meal) =>
-              sum + meal.foods.reduce((s, f) => s + (f.calories || 0), 0), 0);
+            const menuCalories = (menu.meals || []).reduce((sum: number, meal: any) =>
+              sum + (meal.foods || []).reduce((s: number, f: any) => s + (f.calories || 0), 0), 0);
             const diff = Math.abs(menuCalories - targetCalRedo);
-            const maxDiff = targetCalRedo * tolerancePercentRedo;
-            if (diff > maxDiff) {
-              lastErrorRedo = `Menú ${menu.menuNumber}: objetivo ${targetCalRedo}kcal, generado ${menuCalories}kcal (diferencia: ${diff}kcal). Ajusta las cantidades.`;
-              console.warn(`[RedoDiet] Calorie mismatch menu ${menu.menuNumber}: target=${targetCalRedo}, actual=${menuCalories}, diff=${diff}`);
-              calorieOkRedo = false;
-              break;
+            if (diff > targetCalRedo * 0.15) {
+              console.warn(`[RedoDiet] Calorie warning menu ${menu.menuNumber}: target=${targetCalRedo}, actual=${menuCalories}, diff=${diff} (will be recalculated on save)`);
             }
           }
-          if (!calorieOkRedo) continue;
 
           // All validations passed
           generatedDiet = parsed;

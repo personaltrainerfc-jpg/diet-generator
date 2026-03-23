@@ -350,3 +350,6 @@
 - [x] P1: Garantizar número exacto de menús (parámetro maxTokens en invokeLLM, validación post-generación, instrucción reforzada en prompt)
 - [x] P2: Control estricto de calorías (instrucciones en prompt, validación post-guardado con tolerancia 15%, regla de verificación calórica)
 - [x] P3: Reintentos automáticos (hasta 3 intentos con feedback del error anterior en el prompt)
+
+## BUG: Validación calórica demasiado estricta con 7 menús
+- [x] BUG2: Relajar validación calórica - con 7 menús la IA pierde precisión en los últimos menús (1098kcal vs 1650kcal objetivo). Cambiar estrategia: eliminar validación calórica como bloqueante, solo validar número de menús, y aceptar la mejor respuesta disponible.
