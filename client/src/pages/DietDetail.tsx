@@ -590,7 +590,7 @@ export default function DietDetail() {
 
   const utils = trpc.useUtils();
 
-  const { data: diet, isLoading, error } = trpc.diet.getById.useQuery({ id: dietId }, { enabled: !isNaN(dietId) });
+  const { data: diet, isLoading, error } = trpc.diet.getById.useQuery({ id: dietId }, { enabled: !isNaN(dietId), staleTime: 10 * 60 * 1000 });
 
   const updateMealNameMut = trpc.diet.updateMealName.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Nombre actualizado"); }, onError: (err) => toast.error(err.message) });
   const updateFoodMut = trpc.diet.updateFood.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Alimento actualizado"); }, onError: (err) => toast.error(err.message) });

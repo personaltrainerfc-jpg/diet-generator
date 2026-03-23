@@ -337,3 +337,8 @@
 - [x] Z3: Mover imports dinámicos a imports estáticos en routers.ts
 - [x] Z4: Definir relaciones en drizzle/relations.ts
 - [x] Z5: Añadir índices a tablas principales (diets, menus, meals, foods, recipes, supplements, folders, customFoods, clients)
+
+## V: Mejoras de percepción de velocidad
+- [x] V1: Skeleton screens durante generación de dietas (estructura de días y comidas con bloques grises animados)
+- [x] V2: Indicador de progreso textual con 8 mensajes rotativos cada 3s con transición fade in/out
+- [x] V3: Optimizar caché React Query (staleTime 5min listados, 10min detalle dieta)

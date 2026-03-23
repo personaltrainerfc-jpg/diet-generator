@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
 import type { DietType, CookingLevel } from "@shared/constants";
+import DietGenerationSkeleton from "@/components/DietGenerationSkeleton";
 
 type DailyTarget = {
   day: number;
@@ -217,6 +218,11 @@ export default function Home() {
       ...(fastingProtocol ? { fastingProtocol } : {}),
     });
   };
+
+  // Show skeleton screen while generating
+  if (generateMutation.isPending) {
+    return <DietGenerationSkeleton totalMenus={totalMenus} mealsPerDay={mealsPerDay} />;
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-8">

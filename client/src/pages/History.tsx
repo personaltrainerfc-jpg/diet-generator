@@ -29,7 +29,7 @@ import {
 
 export default function History() {
   const [, setLocation] = useLocation();
-  const { data: diets, isLoading } = trpc.diet.list.useQuery();
+  const { data: diets, isLoading } = trpc.diet.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const utils = trpc.useUtils();
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateName, setDuplicateName] = useState("");

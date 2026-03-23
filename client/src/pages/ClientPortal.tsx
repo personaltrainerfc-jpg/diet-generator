@@ -125,8 +125,8 @@ function getGreeting(name: string, archetype?: ArchetypeId): string {
 function ClientDashboard({ session, onLogout }: { session: { clientId: number; name: string; accessCode: string; archetype?: string | null }; onLogout: () => void }) {
   const [tab, setTab] = useState<string>("diet");
 
-  const profileQ = trpc.clientPortal.getProfile.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
-  const dietQ = trpc.clientPortal.getActiveDiet.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const profileQ = trpc.clientPortal.getProfile.useQuery({ clientId: session.clientId, accessCode: session.accessCode }, { staleTime: 10 * 60 * 1000 });
+  const dietQ = trpc.clientPortal.getActiveDiet.useQuery({ clientId: session.clientId, accessCode: session.accessCode }, { staleTime: 10 * 60 * 1000 });
 
   const archetype = (session.archetype || profileQ.data?.archetype) as ArchetypeId | undefined;
   const archetypeData = archetype ? ARCHETYPES.find(a => a.id === archetype) : null;

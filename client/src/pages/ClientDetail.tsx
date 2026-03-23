@@ -92,16 +92,16 @@ export default function ClientDetail() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Queries
-  const clientQ = trpc.clientMgmt.getById.useQuery({ id: clientId }, { enabled: clientId > 0 });
-  const assessmentQ = trpc.clientMgmt.getAssessment.useQuery({ clientId }, { enabled: clientId > 0 });
-  const checkInsQ = trpc.clientMgmt.getCheckIns.useQuery({ clientId }, { enabled: clientId > 0 });
-  const photosQ = trpc.clientMgmt.getPhotos.useQuery({ clientId }, { enabled: clientId > 0 });
-  const measurementsQ = trpc.clientMgmt.getMeasurements.useQuery({ clientId }, { enabled: clientId > 0 });
-  const achievementsQ = trpc.clientMgmt.getClientAchievements.useQuery({ clientId }, { enabled: clientId > 0 });
+  const clientQ = trpc.clientMgmt.getById.useQuery({ id: clientId }, { enabled: clientId > 0, staleTime: 5 * 60 * 1000 });
+  const assessmentQ = trpc.clientMgmt.getAssessment.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 10 * 60 * 1000 });
+  const checkInsQ = trpc.clientMgmt.getCheckIns.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 5 * 60 * 1000 });
+  const photosQ = trpc.clientMgmt.getPhotos.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 10 * 60 * 1000 });
+  const measurementsQ = trpc.clientMgmt.getMeasurements.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 10 * 60 * 1000 });
+  const achievementsQ = trpc.clientMgmt.getClientAchievements.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 5 * 60 * 1000 });
   const messagesQ = trpc.clientMgmt.getMessages.useQuery({ clientId, limit: 50 }, { enabled: clientId > 0 });
-  const activeDietQ = trpc.clientMgmt.getActiveDiet.useQuery({ clientId }, { enabled: clientId > 0 });
-  const dietHistoryQ = trpc.clientMgmt.getDietHistory.useQuery({ clientId }, { enabled: clientId > 0 });
-  const trainerDietsQ = trpc.diet.list.useQuery(undefined, { enabled: clientId > 0 });
+  const activeDietQ = trpc.clientMgmt.getActiveDiet.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 10 * 60 * 1000 });
+  const dietHistoryQ = trpc.clientMgmt.getDietHistory.useQuery({ clientId }, { enabled: clientId > 0, staleTime: 10 * 60 * 1000 });
+  const trainerDietsQ = trpc.diet.list.useQuery(undefined, { enabled: clientId > 0, staleTime: 5 * 60 * 1000 });
 
   // Mutations
   const updateMut = trpc.clientMgmt.update.useMutation({ onSuccess: () => { toast.success("Cliente actualizado"); clientQ.refetch(); } });
