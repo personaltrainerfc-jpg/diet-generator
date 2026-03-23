@@ -5,6 +5,9 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { getDb } from "./db";
+import { menus as menusTable, diets as dietsTable, meals as mealsTable, foods as foodsTable } from "../drizzle/schema";
 import {
   createDiet, getUserDiets, getFullDiet, deleteDiet,
   createMenu, createMeal, createFood,
@@ -517,14 +520,11 @@ export const appRouter = router({
         // Verify ownership through chain: meal -> menu -> diet -> user
         const menuList = await getMenusByDietId(0); // We need to find the menu
         // Simplified: get menu by meal's menuId, then diet, then check user
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { menus, diets } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
-        const menuResult = await db.select().from(menus).where(eq(menus.id, meal.menuId)).limit(1);
+        const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
         if (!menuResult[0]) throw new Error("Menú no encontrado");
-        const dietResult = await db.select().from(diets).where(eq(diets.id, menuResult[0].dietId)).limit(1);
+        const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
         if (!dietResult[0] || dietResult[0].userId !== ctx.user.id) throw new Error("No tienes acceso");
 
         await updateMealName(input.mealId, input.mealName);
@@ -539,11 +539,8 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         // Verify ownership: menu -> diet -> user
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { menus: menusTable, diets: dietsTable, meals: mealsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, input.menuId)).limit(1);
         if (!menuResult[0]) throw new Error("Menú no encontrado");
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
@@ -662,11 +659,8 @@ export const appRouter = router({
         if (!meal) throw new Error("Comida no encontrada");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
         if (!menuResult[0]) throw new Error("Menú no encontrado");
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
@@ -692,11 +686,8 @@ export const appRouter = router({
         if (!food) throw new Error("Alimento no encontrado");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, food.mealId)).limit(1);
         if (!mealResult[0]) throw new Error("Comida no encontrada");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
@@ -738,11 +729,8 @@ export const appRouter = router({
         if (!food) throw new Error("Alimento no encontrado");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, food.mealId)).limit(1);
         if (!mealResult[0]) throw new Error("Comida no encontrada");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
@@ -873,11 +861,8 @@ Responde SOLO con JSON.`;
       }))
       .mutation(async ({ ctx, input }) => {
         // Verify ownership: meal -> menu -> diet -> user
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { meals: mealsTable, menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const mealResult = await db.select().from(mealsTable).where(eq(mealsTable.id, input.mealId)).limit(1);
         if (!mealResult[0]) throw new Error("Comida no encontrada");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, mealResult[0].menuId)).limit(1);
@@ -976,11 +961,8 @@ Responde SOLO con JSON.`;
         if (!meal) throw new Error("Comida no encontrada");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
         if (!menuResult[0]) throw new Error("Menú no encontrado");
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
@@ -1001,11 +983,8 @@ Responde SOLO con JSON.`;
         if (!meal) throw new Error("Comida no encontrada");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (db) {
-          const { menus: menusTable, diets: dietsTable } = await import("../drizzle/schema");
-          const { eq } = await import("drizzle-orm");
           const [menu] = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
           if (menu) {
             const [diet] = await db.select().from(dietsTable).where(eq(dietsTable.id, menu.dietId)).limit(1);
@@ -1027,11 +1006,8 @@ Responde SOLO con JSON.`;
         if (!meal) throw new Error("Comida no encontrada");
 
         // Verify ownership
-        const { getDb } = await import("./db");
         const db = await getDb();
         if (!db) throw new Error("Database not available");
-        const { menus: menusTable, diets: dietsTable, foods: foodsTable } = await import("../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
         const menuResult = await db.select().from(menusTable).where(eq(menusTable.id, meal.menuId)).limit(1);
         if (!menuResult[0]) throw new Error("Menú no encontrado");
         const dietResult = await db.select().from(dietsTable).where(eq(dietsTable.id, menuResult[0].dietId)).limit(1);
@@ -1347,12 +1323,9 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
             await deleteMeal(meal.id);
           }
           // Delete menu
-          const { getDb: getDbLocal } = await import("./db");
-          const dbLocal = await getDbLocal();
+          const dbLocal = await getDb();
           if (dbLocal) {
-            const { menus: menusTable } = await import("../drizzle/schema");
-            const { eq: eqLocal } = await import("drizzle-orm");
-            await dbLocal.delete(menusTable).where(eqLocal(menusTable.id, menu.id));
+            await dbLocal.delete(menusTable).where(eq(menusTable.id, menu.id));
           }
         }
 

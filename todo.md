@@ -330,3 +330,10 @@
 - [x] Y5: Corregir todos los colores hardcodeados en componentes
 - [x] Y6: Verificar legibilidad en todas las pantallas
 - [x] Y7: Asegurar que tarjetas, modales y dropdowns mantienen coherencia
+
+## Z: Correcciones técnicas rápidas
+- [x] Z1: Cambiar título del navegador a "NutriFlow - Nutrición Inteligente Para Profesionales"
+- [x] Z2: Eliminar thinking budget y reducir max_tokens a 8192 en llm.ts
+- [x] Z3: Mover imports dinámicos a imports estáticos en routers.ts
+- [x] Z4: Definir relaciones en drizzle/relations.ts
+- [x] Z5: Añadir índices a tablas principales (diets, menus, meals, foods, recipes, supplements, folders, customFoods, clients)
