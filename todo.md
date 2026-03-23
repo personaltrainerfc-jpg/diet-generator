@@ -345,3 +345,8 @@
 
 ## BUG: Error al generar dieta con recetas seleccionadas
 - [x] BUG1: Corregido - max_tokens aumentado a 16384, añadida función repairTruncatedDietJson con pila LIFO, logging de finish_reason y content_length, mensajes de error descriptivos
+
+## P: Problemas críticos en generación de dietas
+- [x] P1: Garantizar número exacto de menús (parámetro maxTokens en invokeLLM, validación post-generación, instrucción reforzada en prompt)
+- [x] P2: Control estricto de calorías (instrucciones en prompt, validación post-guardado con tolerancia 15%, regla de verificación calórica)
+- [x] P3: Reintentos automáticos (hasta 3 intentos con feedback del error anterior en el prompt)

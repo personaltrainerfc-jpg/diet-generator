@@ -141,13 +141,24 @@ function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietF
     mealStructure = `Distribuye las ${config.mealsPerDay} comidas de forma lógica a lo largo del día, empezando por desayuno y terminando por cena. Los snacks intermedios deben ser ligeros. Los desayunos NUNCA deben incluir pescado ni carne a la plancha.`;
   }
 
-  return `Eres un nutricionista profesional. Genera exactamente ${config.totalMenus} menú(s) diario(s) completo(s) con las siguientes especificaciones:
+  return `INSTRUCCIÓN CRÍTICA E INNEGOCIABLE: Debes generar EXACTAMENTE ${config.totalMenus} menú(s). Ni uno más ni uno menos. Si generas un número diferente, la respuesta será rechazada y tendrás que repetirla. Verifica antes de responder que el array "menus" contiene exactamente ${config.totalMenus} elemento(s).
+
+Eres un nutricionista profesional. Genera exactamente ${config.totalMenus} menú(s) diario(s) completo(s) con las siguientes especificaciones:
 
 OBJETIVOS NUTRICIONALES DIARIOS:
 - Calorías totales: ${config.totalCalories} kcal
 - Proteínas: ${proteinGrams}g (${config.proteinPercent}%)
 - Carbohidratos: ${carbsGrams}g (${config.carbsPercent}%)
 - Grasas: ${fatsGrams}g (${config.fatsPercent}%)
+
+CONTROL DE CALORÍAS (OBLIGATORIO Y CRÍTICO):
+- El objetivo calórico es ${config.totalCalories} kcal por día. EXACTAMENTE.
+- Tolerancia máxima permitida: ±${Math.round(config.totalCalories * 0.05)} kcal (5%).
+- Rango aceptable: entre ${Math.round(config.totalCalories * 0.95)} y ${Math.round(config.totalCalories * 1.05)} kcal.
+- ANTES de finalizar cada menú, suma las calorías de todos los alimentos de todas las comidas y verifica que el total está dentro del rango aceptable.
+- Si el total no está dentro del rango, ajusta las cantidades de los alimentos proporcionalmente hasta que lo esté.
+- Un menú con menos de ${Math.round(config.totalCalories * 0.90)} kcal o más de ${Math.round(config.totalCalories * 1.10)} kcal es un ERROR GRAVE.
+- Los valores de calorías de cada alimento deben calcularse según la cantidad exacta indicada, no por 100g.
 
 ESTRUCTURA DE COMIDAS (OBLIGATORIO - RESPETAR EXACTAMENTE):
 - Número de comidas por día: ${config.mealsPerDay}
@@ -208,6 +219,7 @@ REGLAS IMPORTANTES:
 10. MENÚS DIFERENTES: Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. Varía las fuentes de proteína, carbohidratos y verduras en cada menú.
 11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
 12. SIN REPETICIÓN ENTRE DÍAS: No repitas el mismo alimento principal (proteína, verdura o carbohidrato principal) en dos días/menús distintos del plan. Distribuye verduras, proteínas y carbohidratos de forma variada a lo largo de todos los días del menú. Si un día usas pechuga de pollo, otro día usa lomo de cerdo o merluza. Si un día usas brócoli, otro día usa judías verdes o calabacín. Maximiza la variedad.
+13. VERIFICACIÓN CALÓRICA OBLIGATORIA: Antes de cerrar el JSON de cada menú, realiza internamente esta comprobación: suma las calorías de todos los alimentos de todas las comidas de ese menú. El resultado debe estar entre ${Math.round(config.totalCalories * 0.95)} y ${Math.round(config.totalCalories * 1.05)} kcal. Si no cumple, redistribuye las cantidades antes de responder.
 
 CANTIDADES REALISTAS (OBLIGATORIO - MUY IMPORTANTE):
 - Proteínas (carne, pescado): entre 100g y 200g por ración. Ejemplo: 150g pechuga de pollo, 120g salmón, 180g merluza. NUNCA poner 30g de carne ni 400g.
@@ -441,46 +453,99 @@ export const appRouter = router({
         }
         const configWithRecipes = { ...input, recipesText };
 
-        const prompt = buildDietPrompt(configWithRecipes, previousDietFoods);
+        const basePrompt = buildDietPrompt(configWithRecipes, previousDietFoods);
+        const systemMsg = "Eres un nutricionista profesional con 15 años de experiencia en planificación de dietas para deportistas y personas activas en España. Responde siempre en español. Genera dietas con CANTIDADES REALISTAS (150g de proteína, 200g de verdura, 80g de arroz crudo, etc.), PLATOS RECONOCIBLES de la cocina cotidiana española/mediterránea (no listados de ingredientes sueltos), y COMBINACIONES CULINARIAS COHERENTES. Cada comida debe ser un plato que alguien cocinaría en su casa. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades.";
 
-        const llmResponse = await invokeLLM({
-          messages: [
-            { role: "system", content: "Eres un nutricionista profesional con 15 años de experiencia en planificación de dietas para deportistas y personas activas en España. Responde siempre en español. Genera dietas con CANTIDADES REALISTAS (150g de proteína, 200g de verdura, 80g de arroz crudo, etc.), PLATOS RECONOCIBLES de la cocina cotidiana española/mediterránea (no listados de ingredientes sueltos), y COMBINACIONES CULINARIAS COHERENTES. Cada comida debe ser un plato que alguien cocinaría en su casa. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
-            { role: "user", content: prompt },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: dietJsonSchema,
-          },
-        });
+        // Retry loop: up to 3 attempts
+        let generatedDiet: GeneratedDiet | null = null;
+        let lastError = '';
+        const maxAttempts = 3;
 
-        const content = llmResponse.choices[0]?.message?.content;
-        const finishReason = llmResponse.choices[0]?.finish_reason;
-        console.log(`[DietGen] finish_reason=${finishReason}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const retryPrefix = attempt > 1
+            ? `CORRECCIÓN NECESARIA (intento ${attempt}/${maxAttempts}): El intento anterior falló porque: ${lastError}. Corrige este problema específico en este intento.\n\n`
+            : '';
 
-        if (!content || typeof content !== "string") {
-          console.error('[DietGen] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
-          throw new Error("No se pudo generar la dieta. Inténtalo de nuevo.");
+          const prompt = retryPrefix + basePrompt;
+
+          const llmResponse = await invokeLLM({
+            messages: [
+              { role: "system", content: systemMsg },
+              { role: "user", content: prompt },
+            ],
+            maxTokens: 16384,
+            response_format: {
+              type: "json_schema",
+              json_schema: dietJsonSchema,
+            },
+          });
+
+          const content = llmResponse.choices[0]?.message?.content;
+          const finishReason = llmResponse.choices[0]?.finish_reason;
+          console.log(`[DietGen] attempt=${attempt}, finish_reason=${finishReason}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+
+          if (!content || typeof content !== "string") {
+            console.error('[DietGen] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
+            lastError = 'La IA no devolvió contenido. Respuesta vacía.';
+            continue;
+          }
+
+          let parsed: GeneratedDiet;
+          try {
+            parsed = JSON.parse(content);
+          } catch (parseErr) {
+            console.error(`[DietGen] JSON parse failed. finish_reason=${finishReason}, content_length=${content.length}`);
+            console.error(`[DietGen] Content tail (last 200 chars): ${content.slice(-200)}`);
+            if (finishReason === 'length' || finishReason === 'max_tokens') {
+              try {
+                const repaired = repairTruncatedDietJson(content);
+                parsed = JSON.parse(repaired);
+                console.log('[DietGen] Successfully repaired truncated JSON');
+              } catch {
+                lastError = `La respuesta JSON se truncó (finish_reason=${finishReason}). Genera una respuesta más compacta.`;
+                continue;
+              }
+            } else {
+              lastError = 'La respuesta no es JSON válido. Asegúrate de responder SOLO con JSON.';
+              continue;
+            }
+          }
+
+          // Validation 1: Number of menus
+          if (parsed.menus.length !== input.totalMenus) {
+            lastError = `Se solicitaron ${input.totalMenus} menú(s) pero generaste ${parsed.menus.length}. Genera EXACTAMENTE ${input.totalMenus} menú(s).`;
+            console.warn(`[DietGen] Menu count mismatch: expected=${input.totalMenus}, got=${parsed.menus.length}`);
+            continue;
+          }
+
+          // Validation 2: Calorie check per menu (15% tolerance)
+          const tolerancePercent = 0.15;
+          let calorieOk = true;
+          const targetCal = input.totalCalories;
+          for (const menu of parsed.menus) {
+            const menuCalories = menu.meals.reduce((sum, meal) =>
+              sum + meal.foods.reduce((s, f) => s + (f.calories || 0), 0), 0);
+            const diff = Math.abs(menuCalories - targetCal);
+            const maxDiff = targetCal * tolerancePercent;
+            if (diff > maxDiff) {
+              lastError = `Menú ${menu.menuNumber}: objetivo ${targetCal}kcal, generado ${menuCalories}kcal (diferencia: ${diff}kcal, máximo permitido: ${Math.round(maxDiff)}kcal). Ajusta las cantidades para que cada menú esté entre ${Math.round(targetCal * 0.85)} y ${Math.round(targetCal * 1.15)} kcal.`;
+              console.warn(`[DietGen] Calorie mismatch menu ${menu.menuNumber}: target=${targetCal}, actual=${menuCalories}, diff=${diff}`);
+              calorieOk = false;
+              break;
+            }
+          }
+          if (!calorieOk) continue;
+
+          // All validations passed
+          generatedDiet = parsed;
+          if (attempt > 1) {
+            console.log(`[DietGen] Succeeded on attempt ${attempt}`);
+          }
+          break;
         }
 
-        let generatedDiet: GeneratedDiet;
-        try {
-          generatedDiet = JSON.parse(content);
-        } catch (parseErr) {
-          console.error(`[DietGen] JSON parse failed. finish_reason=${finishReason}, content_length=${content.length}`);
-          console.error(`[DietGen] Content tail (last 200 chars): ${content.slice(-200)}`);
-          // If truncated (finish_reason=length), try to repair the JSON
-          if (finishReason === 'length' || finishReason === 'max_tokens') {
-            try {
-              const repaired = repairTruncatedDietJson(content);
-              generatedDiet = JSON.parse(repaired);
-              console.log('[DietGen] Successfully repaired truncated JSON');
-            } catch {
-              throw new Error("La dieta generada fue demasiado larga y se truncó. Intenta reducir el número de menús (máximo 5) o el número de comidas por día.");
-            }
-          } else {
-            throw new Error("Error al procesar la respuesta del generador de dietas. Inténtalo de nuevo.");
-          }
+        if (!generatedDiet) {
+          throw new Error(`No se pudo generar la dieta correctamente después de ${maxAttempts} intentos. Último error: ${lastError}. Inténtalo de nuevo.`);
         }
 
         const dietId = await createDiet({
@@ -559,6 +624,18 @@ export const appRouter = router({
 
           // Recalculate menu totals from actual meal values
           await updateMenuMacros(menuId);
+
+          // Post-save calorie validation (warning only)
+          const menuTotals = await getMenuById(menuId);
+          if (menuTotals) {
+            const calorieDiff = Math.abs(menuTotals.totalCalories - input.totalCalories);
+            const maxDiffWarn = input.totalCalories * 0.15;
+            if (calorieDiff > maxDiffWarn) {
+              console.warn(
+                `[DietGen] Menú ${menu.menuNumber}: objetivo ${input.totalCalories}kcal, generado ${menuTotals.totalCalories}kcal (diferencia: ${calorieDiff}kcal)`
+              );
+            }
+          }
         }
 
         try {
@@ -1377,45 +1454,99 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           fastingProtocol: (original as any).fastingProtocol || undefined,
         };
 
-        const prompt = buildDietPrompt(config, allPreviousFoods);
+        const basePromptRedo = buildDietPrompt(config, allPreviousFoods);
+        const systemMsgRedo = "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente lógicos que representen recetas reales de la gastronomía cotidiana española/mediterránea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades.";
 
-        const llmResponse = await invokeLLM({
-          messages: [
-            { role: "system", content: "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente lógicos que representen recetas reales de la gastronomía cotidiana española/mediterránea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades." },
-            { role: "user", content: prompt },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: dietJsonSchema,
-          },
-        });
+        // Retry loop: up to 3 attempts
+        let generatedDiet: GeneratedDiet | null = null;
+        let lastErrorRedo = '';
+        const maxAttemptsRedo = 3;
 
-        const content = llmResponse.choices[0]?.message?.content;
-        const finishReasonRedo = llmResponse.choices[0]?.finish_reason;
-        console.log(`[RedoDiet] finish_reason=${finishReasonRedo}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+        for (let attempt = 1; attempt <= maxAttemptsRedo; attempt++) {
+          const retryPrefix = attempt > 1
+            ? `CORRECCIÓN NECESARIA (intento ${attempt}/${maxAttemptsRedo}): El intento anterior falló porque: ${lastErrorRedo}. Corrige este problema específico en este intento.\n\n`
+            : '';
 
-        if (!content || typeof content !== "string") {
-          console.error('[RedoDiet] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
-          throw new Error("No se pudo regenerar la dieta. Inténtalo de nuevo.");
+          const prompt = retryPrefix + basePromptRedo;
+
+          const llmResponse = await invokeLLM({
+            messages: [
+              { role: "system", content: systemMsgRedo },
+              { role: "user", content: prompt },
+            ],
+            maxTokens: 16384,
+            response_format: {
+              type: "json_schema",
+              json_schema: dietJsonSchema,
+            },
+          });
+
+          const content = llmResponse.choices[0]?.message?.content;
+          const finishReasonRedo = llmResponse.choices[0]?.finish_reason;
+          console.log(`[RedoDiet] attempt=${attempt}, finish_reason=${finishReasonRedo}, content_length=${typeof content === 'string' ? content.length : 'N/A'}, usage=${JSON.stringify(llmResponse.usage || {})}`);
+
+          if (!content || typeof content !== "string") {
+            console.error('[RedoDiet] Empty content from LLM. Full response:', JSON.stringify(llmResponse.choices[0]));
+            lastErrorRedo = 'La IA no devolvió contenido. Respuesta vacía.';
+            continue;
+          }
+
+          let parsed: GeneratedDiet;
+          try {
+            parsed = JSON.parse(content);
+          } catch (parseErr) {
+            console.error(`[RedoDiet] JSON parse failed. finish_reason=${finishReasonRedo}, content_length=${content.length}`);
+            console.error(`[RedoDiet] Content tail (last 200 chars): ${content.slice(-200)}`);
+            if (finishReasonRedo === 'length' || finishReasonRedo === 'max_tokens') {
+              try {
+                const repaired = repairTruncatedDietJson(content);
+                parsed = JSON.parse(repaired);
+                console.log('[RedoDiet] Successfully repaired truncated JSON');
+              } catch {
+                lastErrorRedo = `La respuesta JSON se truncó (finish_reason=${finishReasonRedo}). Genera una respuesta más compacta.`;
+                continue;
+              }
+            } else {
+              lastErrorRedo = 'La respuesta no es JSON válido. Asegúrate de responder SOLO con JSON.';
+              continue;
+            }
+          }
+
+          // Validation 1: Number of menus
+          if (parsed.menus.length !== config.totalMenus) {
+            lastErrorRedo = `Se solicitaron ${config.totalMenus} menú(s) pero generaste ${parsed.menus.length}. Genera EXACTAMENTE ${config.totalMenus} menú(s).`;
+            console.warn(`[RedoDiet] Menu count mismatch: expected=${config.totalMenus}, got=${parsed.menus.length}`);
+            continue;
+          }
+
+          // Validation 2: Calorie check per menu (15% tolerance)
+          const tolerancePercentRedo = 0.15;
+          let calorieOkRedo = true;
+          const targetCalRedo = config.totalCalories;
+          for (const menu of parsed.menus) {
+            const menuCalories = menu.meals.reduce((sum, meal) =>
+              sum + meal.foods.reduce((s, f) => s + (f.calories || 0), 0), 0);
+            const diff = Math.abs(menuCalories - targetCalRedo);
+            const maxDiff = targetCalRedo * tolerancePercentRedo;
+            if (diff > maxDiff) {
+              lastErrorRedo = `Menú ${menu.menuNumber}: objetivo ${targetCalRedo}kcal, generado ${menuCalories}kcal (diferencia: ${diff}kcal). Ajusta las cantidades.`;
+              console.warn(`[RedoDiet] Calorie mismatch menu ${menu.menuNumber}: target=${targetCalRedo}, actual=${menuCalories}, diff=${diff}`);
+              calorieOkRedo = false;
+              break;
+            }
+          }
+          if (!calorieOkRedo) continue;
+
+          // All validations passed
+          generatedDiet = parsed;
+          if (attempt > 1) {
+            console.log(`[RedoDiet] Succeeded on attempt ${attempt}`);
+          }
+          break;
         }
 
-        let generatedDiet: GeneratedDiet;
-        try {
-          generatedDiet = JSON.parse(content);
-        } catch (parseErr) {
-          console.error(`[RedoDiet] JSON parse failed. finish_reason=${finishReasonRedo}, content_length=${content.length}`);
-          console.error(`[RedoDiet] Content tail (last 200 chars): ${content.slice(-200)}`);
-          if (finishReasonRedo === 'length' || finishReasonRedo === 'max_tokens') {
-            try {
-              const repaired = repairTruncatedDietJson(content);
-              generatedDiet = JSON.parse(repaired);
-              console.log('[RedoDiet] Successfully repaired truncated JSON');
-            } catch {
-              throw new Error("La dieta regenerada fue demasiado larga y se truncó. Intenta reducir el número de menús o comidas.");
-            }
-          } else {
-            throw new Error("Error al procesar la respuesta del generador de dietas. Inténtalo de nuevo.");
-          }
+        if (!generatedDiet) {
+          throw new Error(`No se pudo regenerar la dieta correctamente después de ${maxAttemptsRedo} intentos. Último error: ${lastErrorRedo}. Inténtalo de nuevo.`);
         }
 
         // Delete old menus, meals and foods
@@ -1488,6 +1619,18 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
 
           // Recalculate menu totals from actual meal values
           await updateMenuMacros(menuId);
+
+          // Post-save calorie validation (warning only)
+          const menuTotalsRedo = await getMenuById(menuId);
+          if (menuTotalsRedo) {
+            const calorieDiffRedo = Math.abs(menuTotalsRedo.totalCalories - config.totalCalories);
+            const maxDiffWarnRedo = config.totalCalories * 0.15;
+            if (calorieDiffRedo > maxDiffWarnRedo) {
+              console.warn(
+                `[RedoDiet] Menú ${menu.menuNumber}: objetivo ${config.totalCalories}kcal, generado ${menuTotalsRedo.totalCalories}kcal (diferencia: ${calorieDiffRedo}kcal)`
+              );
+            }
+          }
         }
 
         return { success: true };

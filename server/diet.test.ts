@@ -169,12 +169,15 @@ vi.mock("./db", () => ({
   }),
 }));
 
-// Mock the LLM module - returns different structures based on the prompt
-const dietResponse = JSON.stringify({
-  menus: [
-    {
-      menuNumber: 1,
-      totalCalories: 2000,
+// Dynamic mock that generates the correct number of menus with realistic calories
+function buildDietResponse(totalMenus: number, targetCalories: number) {
+  const menus = [];
+  for (let i = 1; i <= totalMenus; i++) {
+    const halfCal = Math.round(targetCalories / 2);
+    const otherHalf = targetCalories - halfCal;
+    menus.push({
+      menuNumber: i,
+      totalCalories: targetCalories,
       totalProtein: 150,
       totalCarbs: 225,
       totalFats: 56,
@@ -183,31 +186,57 @@ const dietResponse = JSON.stringify({
           mealNumber: 1,
           mealName: "Desayuno",
           description: "Porridge de avena con plátano y canela",
-          calories: 500,
+          calories: halfCal,
           protein: 38,
           carbs: 56,
           fats: 14,
           foods: [
             {
-              name: "Avena",
+              name: `Avena menú ${i}`,
               quantity: "80g",
-              calories: 300,
-              protein: 10,
+              calories: halfCal,
+              protein: 20,
               carbs: 50,
               fats: 6,
               alternativeName: "Arroz inflado",
               alternativeQuantity: "60g",
-              alternativeCalories: 290,
-              alternativeProtein: 8,
+              alternativeCalories: halfCal,
+              alternativeProtein: 18,
               alternativeCarbs: 52,
               alternativeFats: 5,
             },
           ],
         },
+        {
+          mealNumber: 2,
+          mealName: "Comida",
+          description: "Pollo a la plancha con arroz",
+          calories: otherHalf,
+          protein: 40,
+          carbs: 60,
+          fats: 15,
+          foods: [
+            {
+              name: `Pollo menú ${i}`,
+              quantity: "150g",
+              calories: otherHalf,
+              protein: 40,
+              carbs: 60,
+              fats: 15,
+              alternativeName: "Pavo a la plancha",
+              alternativeQuantity: "150g",
+              alternativeCalories: otherHalf,
+              alternativeProtein: 38,
+              alternativeCarbs: 58,
+              alternativeFats: 12,
+            },
+          ],
+        },
       ],
-    },
-  ],
-});
+    });
+  }
+  return JSON.stringify({ menus });
+}
 
 const singleMealResponse = JSON.stringify({
   mealName: "Merienda",
@@ -251,6 +280,19 @@ vi.mock("./_core/llm", () => ({
   invokeLLM: vi.fn().mockImplementation(({ messages }: any) => {
     const userMsg = messages.find((m: any) => m.role === "user")?.content || "";
     const isSingleMeal = userMsg.includes("UNA comida");
+
+    // Parse totalMenus and totalCalories from the prompt
+    let totalMenus = 1;
+    let targetCalories = 2000;
+    const menusMatch = userMsg.match(/EXACTAMENTE (\d+) menú/);
+    if (menusMatch) totalMenus = parseInt(menusMatch[1], 10);
+    const calMatch = userMsg.match(/Calorías totales: (\d+) kcal/);
+    if (calMatch) targetCalories = parseInt(calMatch[1], 10);
+
+    const content = isSingleMeal
+      ? singleMealResponse
+      : buildDietResponse(totalMenus, targetCalories);
+
     return Promise.resolve({
       id: "test",
       created: Date.now(),
@@ -260,7 +302,7 @@ vi.mock("./_core/llm", () => ({
           index: 0,
           message: {
             role: "assistant",
-            content: isSingleMeal ? singleMealResponse : dietResponse,
+            content,
           },
           finish_reason: "stop",
         },
