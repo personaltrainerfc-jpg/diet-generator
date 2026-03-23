@@ -1694,7 +1694,8 @@ Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros.
       .query(async ({ ctx, input }) => {
         const recipe = await getFullRecipe(input.id);
         if (!recipe) throw new Error("Receta no encontrada");
-        if (recipe.userId !== ctx.user.id) throw new Error("No tienes acceso a esta receta");
+        // Allow access to system recipes (isSystem=1) or own recipes
+        if (recipe.isSystem !== 1 && recipe.userId !== ctx.user.id) throw new Error("No tienes acceso a esta receta");
         return recipe;
       }),
 

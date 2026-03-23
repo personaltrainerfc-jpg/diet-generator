@@ -1,4 +1,4 @@
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, asc, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -316,7 +316,7 @@ export async function getUserRecipes(userId: number) {
   if (!db) throw new Error("Database not available");
   return db.select().from(recipes).where(
     or(eq(recipes.userId, userId), eq(recipes.isSystem, 1))
-  ).orderBy(desc(recipes.createdAt));
+  ).orderBy(desc(recipes.isSystem), asc(recipes.category), desc(recipes.createdAt));
 }
 
 export async function getRecipeById(recipeId: number) {

@@ -357,3 +357,10 @@
 ## BUG: Unexpected token '<' is not valid JSON
 - [x] BUG3: Error 'Unexpected token <' al regenerar comida - prompt compactado, maxTokens=4096, reintentos, logging, detección HTML en frontend
 - [x] BUG3b: Revisadas todas las llamadas LLM: añadido maxTokens a addMeal(4096), updateFood(1024), addFood(1024), generateGuide(4096), regenerateMeal(4096). Frontend con resilientFetch que detecta HTML y reintenta.
+
+## SR: Biblioteca de recetas del sistema (150 recetas)
+- [x] SR1: Migración DB - userId nullable para recetas del sistema (isSystem y category ya existían)
+- [x] SR2: Modificar recipe.list para devolver recetas del sistema + recetas del usuario (ordenadas sistema primero por categoría)
+- [x] SR3: Crear seed script con 150 recetas (30 desayunos, 30 snack_manana, 30 comidas, 30 snack_tarde, 30 cenas)
+- [x] SR4: Ejecutar seed script - 150 recetas insertadas correctamente
+- [x] SR5: Actualizar UI de Mis Recetas con badge "NutriFlow", filtros por categoría, buscador, y diferenciación visual

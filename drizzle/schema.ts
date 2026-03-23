@@ -97,7 +97,7 @@ export type InsertFood = typeof foods.$inferInsert;
 
 export const recipes = mysqlTable("recipes", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId"),  // null for system recipes
   name: varchar("name", { length: 255 }).notNull(),
   totalCalories: int("totalCalories").default(0).notNull(),
   totalProtein: int("totalProtein").default(0).notNull(),

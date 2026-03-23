@@ -675,10 +675,10 @@ export default function Home() {
 
             {/* Recipes */}
             <Section>
-              <SectionTitle icon={BookOpen} color="text-rose-500">Mis Recetas</SectionTitle>
-              <SectionDesc>Selecciona recetas propias para incorporarlas en el menu.</SectionDesc>
+              <SectionTitle icon={BookOpen} color="text-rose-500">Recetas</SectionTitle>
+              <SectionDesc>Selecciona recetas para incorporarlas en el plan. Las recetas NutriFlow vienen precargadas con macros verificados.</SectionDesc>
               {recipesQuery.data && recipesQuery.data.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                   {recipesQuery.data.map(recipe => (
                     <button
                       key={recipe.id}
@@ -687,17 +687,22 @@ export default function Home() {
                       className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
                         selectedRecipeIds.includes(recipe.id)
                           ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-border/50 hover:border-border hover:bg-accent/30"
+                          : recipe.isSystem
+                            ? "border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                            : "border-border/50 hover:border-border hover:bg-accent/30"
                       }`}
                     >
-                      <div>
-                        <span className="text-[13px] font-medium text-card-foreground">{recipe.name}</span>
-                        <span className="text-[11px] text-muted-foreground ml-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {recipe.isSystem ? (
+                          <span className="inline-flex items-center gap-0.5 shrink-0 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-md">NF</span>
+                        ) : null}
+                        <span className="text-[13px] font-medium text-card-foreground truncate">{recipe.name}</span>
+                        <span className="text-[11px] text-muted-foreground shrink-0">
                           {recipe.totalCalories} kcal
                         </span>
                       </div>
                       {selectedRecipeIds.includes(recipe.id) && (
-                        <Badge className="text-[10px] rounded-md">Seleccionada</Badge>
+                        <Badge className="text-[10px] rounded-md shrink-0 ml-2">Seleccionada</Badge>
                       )}
                     </button>
                   ))}

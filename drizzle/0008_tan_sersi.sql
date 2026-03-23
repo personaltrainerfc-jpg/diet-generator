@@ -1,0 +1,1 @@
+ALTER TABLE `recipes` MODIFY COLUMN `userId` int;
