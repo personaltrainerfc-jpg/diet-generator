@@ -353,3 +353,7 @@
 
 ## BUG: Validación calórica demasiado estricta con 7 menús
 - [x] BUG2: Relajar validación calórica - con 7 menús la IA pierde precisión en los últimos menús (1098kcal vs 1650kcal objetivo). Cambiar estrategia: eliminar validación calórica como bloqueante, solo validar número de menús, y aceptar la mejor respuesta disponible.
+
+## BUG: Unexpected token '<' is not valid JSON
+- [x] BUG3: Error 'Unexpected token <' al regenerar comida - prompt compactado, maxTokens=4096, reintentos, logging, detección HTML en frontend
+- [x] BUG3b: Revisadas todas las llamadas LLM: añadido maxTokens a addMeal(4096), updateFood(1024), addFood(1024), generateGuide(4096), regenerateMeal(4096). Frontend con resilientFetch que detecta HTML y reintenta.

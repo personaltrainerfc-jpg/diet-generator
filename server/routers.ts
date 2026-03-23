@@ -761,19 +761,31 @@ export const appRouter = router({
           },
         };
 
+        console.log(`[AddMeal] Calling LLM for menuId=${input.menuId}`);
         const llmResponse = await invokeLLM({
           messages: [
             { role: "system", content: "Eres un nutricionista profesional. Genera comidas equilibradas con alimentos reales y cantidades precisas en gramos. Todos los valores numéricos deben ser enteros." },
             { role: "user", content: prompt },
           ],
+          maxTokens: 4096,
           response_format: { type: "json_schema", json_schema: singleMealSchema },
         });
 
         const content = llmResponse.choices[0]?.message?.content;
-        if (!content || typeof content !== "string") throw new Error("No se pudo generar la comida");
+        const finishReason = llmResponse.choices[0]?.finish_reason;
+        console.log(`[AddMeal] finish_reason=${finishReason}, content_length=${typeof content === 'string' ? content.length : 'N/A'}`);
+        if (!content || typeof content !== "string") throw new Error("No se pudo generar la comida. Inténtalo de nuevo.");
 
         let generated: any;
-        try { generated = JSON.parse(content); } catch { throw new Error("Error al procesar la comida generada"); }
+        try {
+          generated = JSON.parse(content);
+        } catch {
+          if (finishReason === 'length' || finishReason === 'max_tokens') {
+            try { generated = JSON.parse(repairTruncatedDietJson(content)); console.log('[AddMeal] Repaired truncated JSON'); } catch { throw new Error("La respuesta se truncó. Inténtalo de nuevo."); }
+          } else {
+            throw new Error("Error al procesar la comida generada. Inténtalo de nuevo.");
+          }
+        }
 
         // Save to DB
         const mealId = await createMeal({
@@ -972,6 +984,7 @@ Responde SOLO con JSON.`;
                 { role: "system", content: "Eres un nutricionista profesional. Sugiere alternativas de alimentos coherentes con el momento del día. Todos los valores numéricos deben ser enteros." },
                 { role: "user", content: altPrompt },
               ],
+              maxTokens: 1024,
               response_format: { type: "json_schema", json_schema: altSchema },
             });
 
@@ -1069,6 +1082,7 @@ Responde SOLO con JSON.`;
               { role: "system", content: "Eres un nutricionista profesional. Sugiere alternativas de alimentos coherentes con el momento del día. Todos los valores numéricos deben ser enteros." },
               { role: "user", content: altPrompt },
             ],
+            maxTokens: 1024,
             response_format: { type: "json_schema", json_schema: altSchema },
           });
 
@@ -1161,6 +1175,7 @@ Responde SOLO con JSON.`;
         mealId: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
+        console.log(`[RegenMeal] Starting for mealId=${input.mealId}`);
         const meal = await getMealById(input.mealId);
         if (!meal) throw new Error("Comida no encontrada");
 
@@ -1176,15 +1191,12 @@ Responde SOLO con JSON.`;
         const currentFoods = await db.select().from(foodsTable).where(eq(foodsTable.mealId, input.mealId));
         const currentFoodNames = currentFoods.map(f => f.name).join(", ");
 
-        const prompt = `Genera UNA comida llamada "${meal.mealName}" con aproximadamente ${meal.calories} kcal, ${meal.protein}g proteína, ${meal.carbs}g carbohidratos, ${meal.fats}g grasa.
-
-IMPORTANTE: Esta comida reemplaza una versión anterior que tenía estos alimentos: ${currentFoodNames}. DEBES usar alimentos COMPLETAMENTE DIFERENTES a los anteriores. No repitas ninguno.
-
-${MEAL_PHILOSOPHY}
-
-La comida debe ser coherente con su nombre ("${meal.mealName}"). Si es desayuno, usa alimentos de desayuno. Si es comida/cena, usa platos principales. Si es snack, usa snacks ligeros.
-
-Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO con JSON.`;
+        // Compact prompt without full MEAL_PHILOSOPHY to reduce latency
+        const prompt = `Genera UNA comida "${meal.mealName}" con ~${meal.calories}kcal, ${meal.protein}g proteína, ${meal.carbs}g carbs, ${meal.fats}g grasa.
+NO uses estos alimentos: ${currentFoodNames}. Usa alimentos COMPLETAMENTE DIFERENTES.
+Coherente con "${meal.mealName}": desayuno=alimentos de desayuno, comida/cena=platos principales, snack=ligeros.
+Usa productos de supermercado español (Hacendado, etc). Cantidades en gramos. Cocina sencilla (plancha, horno, airfryer).
+Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros. Solo JSON.`;
 
         const singleMealSchema = {
           name: "single_meal",
@@ -1225,26 +1237,71 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
           },
         };
 
-        const llmResponse = await invokeLLM({
-          messages: [
-            { role: "system", content: "Eres un nutricionista profesional de NoLimitPerformance. Genera comidas equilibradas con alimentos reales y cantidades precisas en gramos. Sigue la filosofía de menús proporcionada. Todos los valores numéricos deben ser enteros." },
-            { role: "user", content: prompt },
-          ],
-          response_format: { type: "json_schema", json_schema: singleMealSchema },
-        });
+        // Retry up to 2 times for LLM failures
+        let generated: any = null;
+        let lastErr = '';
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            console.log(`[RegenMeal] LLM attempt ${attempt}`);
+            const llmResponse = await invokeLLM({
+              messages: [
+                { role: "system", content: "Eres un nutricionista profesional. Genera comidas equilibradas con alimentos reales y cantidades en gramos. Valores numéricos enteros. Responde SOLO con JSON." },
+                { role: "user", content: prompt },
+              ],
+              maxTokens: 4096,
+              response_format: { type: "json_schema", json_schema: singleMealSchema },
+            });
 
-        const content = llmResponse.choices[0]?.message?.content;
-        if (!content || typeof content !== "string") throw new Error("No se pudo regenerar la comida");
+            const content = llmResponse.choices[0]?.message?.content;
+            const finishReason = llmResponse.choices[0]?.finish_reason;
+            console.log(`[RegenMeal] attempt=${attempt}, finish_reason=${finishReason}, content_length=${typeof content === 'string' ? content.length : 'N/A'}`);
 
-        let generated: any;
-        try { generated = JSON.parse(content); } catch { throw new Error("Error al procesar la comida regenerada"); }
+            if (!content || typeof content !== "string") {
+              lastErr = 'La IA no devolvió contenido.';
+              continue;
+            }
+
+            try {
+              generated = JSON.parse(content);
+            } catch {
+              // Try to repair if truncated
+              if (finishReason === 'length' || finishReason === 'max_tokens') {
+                try {
+                  generated = JSON.parse(repairTruncatedDietJson(content));
+                  console.log('[RegenMeal] Repaired truncated JSON');
+                } catch {
+                  lastErr = 'JSON truncado e irreparable.';
+                  continue;
+                }
+              } else {
+                lastErr = 'Respuesta no es JSON válido.';
+                continue;
+              }
+            }
+
+            if (!generated.foods || !Array.isArray(generated.foods) || generated.foods.length === 0) {
+              lastErr = 'La comida generada no tiene alimentos.';
+              generated = null;
+              continue;
+            }
+
+            break; // Success
+          } catch (err: any) {
+            lastErr = err.message || 'Error desconocido en LLM';
+            console.error(`[RegenMeal] attempt ${attempt} failed:`, lastErr);
+          }
+        }
+
+        if (!generated) {
+          throw new Error(`No se pudo regenerar la comida. ${lastErr} Inténtalo de nuevo.`);
+        }
 
         // Delete old foods
         for (const f of currentFoods) {
           await deleteFood(f.id);
         }
 
-        // Update meal macros
+        // Update meal name
         await updateMealName(input.mealId, generated.mealName || meal.mealName);
 
         // Create new foods
@@ -1270,6 +1327,7 @@ Incluye entre 2 y 6 alimentos con una alternativa para cada uno. Responde SOLO c
         await updateMealMacros(input.mealId);
         await updateMenuMacros(meal.menuId);
 
+        console.log(`[RegenMeal] Success for mealId=${input.mealId}`);
         return { success: true };
       }),
 
@@ -1876,16 +1934,19 @@ La guía debe incluir estas secciones:
 
 Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezados, listas y negritas.`;
 
+        console.log('[GenerateGuide] Calling LLM');
         const llmResponse = await invokeLLM({
           messages: [
             { role: "system", content: "Eres un nutricionista profesional. Genera guías nutricionales completas, personalizadas y bien estructuradas en español." },
             { role: "user", content: guidePrompt },
           ],
+          maxTokens: 4096,
         });
 
         const guideContent = llmResponse.choices[0]?.message?.content;
+        console.log(`[GenerateGuide] finish_reason=${llmResponse.choices[0]?.finish_reason}, content_length=${typeof guideContent === 'string' ? guideContent.length : 'N/A'}`);
         if (!guideContent || typeof guideContent !== "string") {
-          throw new Error("No se pudo generar la guía nutricional.");
+          throw new Error("No se pudo generar la guía nutricional. Inténtalo de nuevo.");
         }
 
         return { content: guideContent, dietName: diet.name };
