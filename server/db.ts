@@ -1,4 +1,4 @@
-import { eq, desc, asc, or, inArray } from "drizzle-orm";
+import { eq, desc, asc, or, and, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -8,6 +8,7 @@ import {
   InsertFood, foods,
   InsertRecipe, recipes,
   InsertRecipeIngredient, recipeIngredients,
+  recipeFavorites,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -354,6 +355,12 @@ export async function getUserRecipes(userId: number) {
     inArray(recipeIngredients.recipeId, recipeIds)
   );
   
+  // Fetch user favorites
+  const userFavs = await db.select({ recipeId: recipeFavorites.recipeId })
+    .from(recipeFavorites)
+    .where(eq(recipeFavorites.userId, userId));
+  const favSet = new Set(userFavs.map(f => f.recipeId));
+  
   // Group ingredients by recipeId
   const ingredientsByRecipe = new Map<number, typeof allIngredients>();
   for (const ing of allIngredients) {
@@ -365,7 +372,24 @@ export async function getUserRecipes(userId: number) {
   return recipeList.map(r => ({
     ...r,
     ingredients: ingredientsByRecipe.get(r.id) || [],
+    isFavorite: favSet.has(r.id),
   }));
+}
+
+export async function toggleRecipeFavorite(userId: number, recipeId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Check if already favorited
+  const existing = await db.select().from(recipeFavorites)
+    .where(and(eq(recipeFavorites.userId, userId), eq(recipeFavorites.recipeId, recipeId)));
+  if (existing.length > 0) {
+    await db.delete(recipeFavorites)
+      .where(and(eq(recipeFavorites.userId, userId), eq(recipeFavorites.recipeId, recipeId)));
+    return false; // unfavorited
+  } else {
+    await db.insert(recipeFavorites).values({ userId, recipeId });
+    return true; // favorited
+  }
 }
 
 export async function getRecipeById(recipeId: number) {

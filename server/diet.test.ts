@@ -96,6 +96,7 @@ vi.mock("./db", () => ({
   addRecipeIngredient: vi.fn().mockResolvedValue(1),
   deleteRecipeIngredient: vi.fn().mockResolvedValue(undefined),
   updateRecipeMacros: vi.fn().mockResolvedValue(undefined),
+  toggleRecipeFavorite: vi.fn().mockResolvedValue(true),
   getFullRecipe: vi.fn().mockResolvedValue({ id: 1, userId: 1, name: "Pollo al curry", createdAt: new Date(), ingredients: [{ id: 1, recipeId: 1, name: "Pollo", quantity: "200g", calories: 330, protein: 62, carbs: 0, fats: 8 }] }),
   updateFood: vi.fn().mockResolvedValue(undefined),
   getMealById: vi.fn().mockResolvedValue({
@@ -1368,5 +1369,32 @@ describe("recipe.list includes system recipes", () => {
     const caller = appRouter.createCaller(ctx);
     const recipes = await caller.recipe.list();
     expect(Array.isArray(recipes)).toBe(true);
+  });
+});
+
+describe("recipe.toggleFavorite", () => {
+  it("toggles a recipe as favorite and returns isFavorite true", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { toggleRecipeFavorite } = await import("./db");
+    vi.mocked(toggleRecipeFavorite).mockResolvedValueOnce(true);
+    const result = await caller.recipe.toggleFavorite({ recipeId: 1 });
+    expect(result.isFavorite).toBe(true);
+    expect(toggleRecipeFavorite).toHaveBeenCalledWith(1, 1);
+  });
+
+  it("toggles a recipe as unfavorite and returns isFavorite false", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { toggleRecipeFavorite } = await import("./db");
+    vi.mocked(toggleRecipeFavorite).mockResolvedValueOnce(false);
+    const result = await caller.recipe.toggleFavorite({ recipeId: 1 });
+    expect(result.isFavorite).toBe(false);
+  });
+
+  it("requires authentication", async () => {
+    const ctx: TrpcContext = { user: null };
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.recipe.toggleFavorite({ recipeId: 1 })).rejects.toThrow();
   });
 });

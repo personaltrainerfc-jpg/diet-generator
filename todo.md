@@ -391,3 +391,10 @@
 - [x] U3-4: buildSystemRecipesSection() inyecta recetas agrupadas por categoría en el prompt
 - [x] U3-5: seed-system-recipes.mjs ejecutado: 150 recetas insertadas (30 desayunos, 30 snacks mañana, 30 comidas, 30 snacks tarde, 30 cenas)
 - [x] U3-6: Tests vitest añadidos (190 tests pasan)
+
+## U4: Filtro por categoría y favoritos en Mis Recetas
+- [x] U4-1: Filtro de recetas por categoría ya existía (verificado + añadido tab Favoritos)
+- [x] U4-2: Tabla recipe_favorites creada (userId + recipeId, unique constraint)
+- [x] U4-3: Procedimiento recipe.toggleFavorite + toggleRecipeFavorite en db.ts
+- [x] U4-4: Botón corazón con optimistic update + tab Favoritos con contador + empty state
+- [x] U4-5: 3 tests añadidos para toggleFavorite (193 tests pasan)

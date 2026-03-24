@@ -17,6 +17,7 @@ import {
   deleteMeal, deleteFood, getMenuById,
   createRecipe, getUserRecipes, getFullRecipe, deleteRecipe,
   addRecipeIngredient, deleteRecipeIngredient, updateRecipeMacros, getRecipeById,
+  toggleRecipeFavorite,
   updateDietCalories, copyMealToMenu, getFoodsByMealId,
   getSupplementsByDietId, createSupplement, updateSupplement, deleteSupplement, getSupplementById,
   getUserFolders, createFolder, deleteFolder, renameFolder, moveDietToFolder, getFolderById,
@@ -1895,6 +1896,13 @@ Valores numéricos enteros. Solo JSON.`;
         if (!recipe || recipe.userId !== ctx.user.id) throw new Error("No tienes acceso");
         await deleteRecipe(input.id);
         return { success: true };
+      }),
+
+    toggleFavorite: protectedProcedure
+      .input(z.object({ recipeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const isFavorite = await toggleRecipeFavorite(ctx.user.id, input.recipeId);
+        return { isFavorite };
       }),
   }),
 

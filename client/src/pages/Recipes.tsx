@@ -10,13 +10,14 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { BookOpen, Plus, Trash2, Loader2, ChefHat, Flame, Sparkles, Search, UtensilsCrossed, Coffee, Cookie, Salad, Moon, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { BookOpen, Plus, Trash2, Loader2, ChefHat, Flame, Sparkles, Search, UtensilsCrossed, Coffee, Cookie, Salad, Moon, ChevronDown, ChevronsUpDown, Heart } from "lucide-react";
 
 type IngredientForm = { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number };
 const emptyIngredient: IngredientForm = { name: "", quantity: "", calories: 0, protein: 0, carbs: 0, fats: 0 };
 
 const categoryLabels: Record<string, { label: string; icon: typeof Coffee }> = {
   all: { label: "Todas", icon: UtensilsCrossed },
+  favoritos: { label: "Favoritos", icon: Heart },
   desayuno: { label: "Desayuno", icon: Coffee },
   snack_manana: { label: "Snack AM", icon: Cookie },
   comida: { label: "Comida", icon: Salad },
@@ -47,6 +48,22 @@ export default function Recipes() {
     onError: (err) => toast.error(err.message),
   });
 
+  const toggleFavMut = trpc.recipe.toggleFavorite.useMutation({
+    onMutate: async ({ recipeId }) => {
+      await utils.recipe.list.cancel();
+      const prev = utils.recipe.list.getData();
+      utils.recipe.list.setData(undefined, (old) =>
+        old?.map(r => r.id === recipeId ? { ...r, isFavorite: !r.isFavorite } : r)
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) utils.recipe.list.setData(undefined, ctx.prev);
+      toast.error("Error al actualizar favorito");
+    },
+    onSettled: () => utils.recipe.list.invalidate(),
+  });
+
   const updateIngredient = (index: number, field: keyof IngredientForm, value: string | number) => {
     setIngredients(prev => { const updated = [...prev]; updated[index] = { ...updated[index], [field]: value }; return updated; });
   };
@@ -68,7 +85,9 @@ export default function Recipes() {
     if (!recipesQuery.data) return [];
     let filtered = recipesQuery.data;
 
-    if (activeCategory === "mis_recetas") {
+    if (activeCategory === "favoritos") {
+      filtered = filtered.filter(r => r.isFavorite);
+    } else if (activeCategory === "mis_recetas") {
       filtered = filtered.filter(r => !r.isSystem);
     } else if (activeCategory !== "all") {
       filtered = filtered.filter(r => r.category === activeCategory);
@@ -86,6 +105,7 @@ export default function Recipes() {
 
   const systemCount = recipesQuery.data?.filter(r => r.isSystem).length ?? 0;
   const userCount = recipesQuery.data?.filter(r => !r.isSystem).length ?? 0;
+  const favCount = recipesQuery.data?.filter(r => r.isFavorite).length ?? 0;
 
   const toggleExpanded = useCallback((id: number) => {
     setExpandedIds(prev => {
@@ -140,12 +160,15 @@ export default function Recipes() {
             onClick={() => setActiveCategory(key)}
             className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-all border ${
               activeCategory === key
-                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                : "bg-card text-muted-foreground border-border/50 hover:bg-secondary hover:text-foreground"
+                ? key === "favoritos" ? "bg-rose-500 text-white border-rose-500 shadow-sm" : "bg-primary text-primary-foreground border-primary shadow-sm"
+                : key === "favoritos" && favCount > 0 ? "bg-rose-500/5 text-rose-500 border-rose-500/20 hover:bg-rose-500/10" : "bg-card text-muted-foreground border-border/50 hover:bg-secondary hover:text-foreground"
             }`}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className={`h-3.5 w-3.5 ${key === "favoritos" && favCount > 0 ? "fill-current" : ""}`} />
             {label}
+            {key === "favoritos" && favCount > 0 && (
+              <span className={`ml-0.5 text-[11px] font-bold ${activeCategory === "favoritos" ? "text-white/80" : "text-rose-500/80"}`}>{favCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -206,7 +229,20 @@ export default function Recipes() {
                             )}
                           </div>
                         </div>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                        <div className="flex items-center gap-1 shrink-0 mt-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleFavMut.mutate({ recipeId: recipe.id }); }}
+                            className={`h-7 w-7 rounded-lg flex items-center justify-center transition-all ${
+                              recipe.isFavorite
+                                ? "text-rose-500 hover:bg-rose-500/10"
+                                : "text-muted-foreground/40 hover:text-rose-400 hover:bg-rose-500/10"
+                            }`}
+                            title={recipe.isFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                          >
+                            <Heart className={`h-4 w-4 ${recipe.isFavorite ? "fill-current" : ""}`} />
+                          </button>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                        </div>
                       </div>
                       {recipe.category && isSystem && (
                         <div className="mb-2.5">
@@ -275,6 +311,12 @@ export default function Recipes() {
               <h3 className="text-[17px] font-semibold mb-1">Sin resultados</h3>
               <p className="text-[13px] text-muted-foreground mb-5 max-w-xs">No se encontraron recetas que coincidan con "{searchQuery}".</p>
               <Button variant="outline" onClick={() => setSearchQuery("")} className="gap-2 rounded-xl">Limpiar búsqueda</Button>
+            </>
+          ) : activeCategory === "favoritos" ? (
+            <>
+              <h3 className="text-[17px] font-semibold mb-1">Sin recetas favoritas</h3>
+              <p className="text-[13px] text-muted-foreground mb-5 max-w-xs">Pulsa el corazón en cualquier receta para añadirla a tus favoritos.</p>
+              <Button variant="outline" onClick={() => setActiveCategory("all")} className="gap-2 rounded-xl">Ver todas las recetas</Button>
             </>
           ) : activeCategory === "mis_recetas" ? (
             <>

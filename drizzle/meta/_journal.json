@@ -71,6 +71,13 @@
       "when": 1774367953912,
       "tag": "0009_early_proemial_gods",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1774375608782,
+      "tag": "0010_stormy_vampiro",
+      "breakpoints": true
     }
   ]
 }

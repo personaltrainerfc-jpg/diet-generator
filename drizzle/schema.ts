@@ -689,3 +689,14 @@ export const activityStreaks = mysqlTable("activity_streaks", {
 
 export type ActivityStreak = typeof activityStreaks.$inferSelect;
 export type InsertActivityStreak = typeof activityStreaks.$inferInsert;
+
+// ── Recipe Favorites (favoritos por usuario) ──
+export const recipeFavorites = mysqlTable("recipe_favorites", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  recipeId: int("recipeId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RecipeFavorite = typeof recipeFavorites.$inferSelect;
+export type InsertRecipeFavorite = typeof recipeFavorites.$inferInsert;
