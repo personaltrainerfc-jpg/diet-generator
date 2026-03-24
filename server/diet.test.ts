@@ -316,6 +316,88 @@ vi.mock("./_core/notification", () => ({
   notifyOwner: vi.fn().mockResolvedValue(true),
 }));
 
+// Mock clientDb
+vi.mock("./clientDb", () => ({
+  getClientById: vi.fn().mockResolvedValue({ id: 1, name: "Test Client", trainerId: 1, status: "active" }),
+  assignDietToClient: vi.fn().mockResolvedValue({ id: 1 }),
+  getClientsByTrainer: vi.fn().mockResolvedValue([]),
+  getClientByAccessCode: vi.fn().mockResolvedValue(null),
+  updateClient: vi.fn().mockResolvedValue(undefined),
+  deleteClient: vi.fn().mockResolvedValue(undefined),
+  createClient: vi.fn().mockResolvedValue({ id: 1 }),
+  getClientActiveDiet: vi.fn().mockResolvedValue(null),
+  getClientDietHistory: vi.fn().mockResolvedValue([]),
+  logAdherence: vi.fn().mockResolvedValue({ id: 1 }),
+  getAdherenceByDate: vi.fn().mockResolvedValue(null),
+  getAdherenceRange: vi.fn().mockResolvedValue([]),
+  addProgressPhoto: vi.fn().mockResolvedValue({ id: 1 }),
+  getProgressPhotos: vi.fn().mockResolvedValue([]),
+  deleteProgressPhoto: vi.fn().mockResolvedValue(undefined),
+  createCheckIn: vi.fn().mockResolvedValue({ id: 1 }),
+  getCheckIns: vi.fn().mockResolvedValue([]),
+  updateCheckInFeedback: vi.fn().mockResolvedValue(undefined),
+  sendMessage: vi.fn().mockResolvedValue({ id: 1 }),
+  getMessages: vi.fn().mockResolvedValue([]),
+  markMessagesRead: vi.fn().mockResolvedValue(undefined),
+  getUnreadCount: vi.fn().mockResolvedValue(0),
+  createAchievement: vi.fn().mockResolvedValue({ id: 1 }),
+  getAchievements: vi.fn().mockResolvedValue([]),
+  deleteAchievement: vi.fn().mockResolvedValue(undefined),
+  unlockAchievement: vi.fn().mockResolvedValue({ id: 1 }),
+  getClientAchievements: vi.fn().mockResolvedValue([]),
+  addMeasurement: vi.fn().mockResolvedValue({ id: 1 }),
+  getMeasurements: vi.fn().mockResolvedValue([]),
+  deleteMeasurement: vi.fn().mockResolvedValue(undefined),
+  createAssessment: vi.fn().mockResolvedValue({ id: 1 }),
+  getAssessment: vi.fn().mockResolvedValue(null),
+  updateAssessment: vi.fn().mockResolvedValue(undefined),
+  getTrainerDashboardStats: vi.fn().mockResolvedValue({ totalClients: 0, activeClients: 0, totalDiets: 0, pendingCheckIns: 0 }),
+  createDietTemplate: vi.fn().mockResolvedValue({ id: 1 }),
+  getDietTemplates: vi.fn().mockResolvedValue([]),
+  deleteDietTemplate: vi.fn().mockResolvedValue(undefined),
+  getClientFavoriteFoods: vi.fn().mockResolvedValue([]),
+  addClientFavoriteFood: vi.fn().mockResolvedValue({ id: 1 }),
+  deleteClientFavoriteFood: vi.fn().mockResolvedValue(undefined),
+  createClientTag: vi.fn().mockResolvedValue({ id: 1 }),
+  getClientTags: vi.fn().mockResolvedValue([]),
+  deleteClientTag: vi.fn().mockResolvedValue(undefined),
+  assignClientTag: vi.fn().mockResolvedValue(undefined),
+  removeClientTag: vi.fn().mockResolvedValue(undefined),
+  getClientTagAssignments: vi.fn().mockResolvedValue([]),
+  createClientInvitation: vi.fn().mockResolvedValue({ id: 1 }),
+  getClientInvitations: vi.fn().mockResolvedValue([]),
+  getClientInvitationByToken: vi.fn().mockResolvedValue(null),
+  acceptClientInvitation: vi.fn().mockResolvedValue(undefined),
+  deleteClientInvitation: vi.fn().mockResolvedValue(undefined),
+  getHydrationLogs: vi.fn().mockResolvedValue([]),
+  logHydration: vi.fn().mockResolvedValue({ id: 1 }),
+  getSleepLogs: vi.fn().mockResolvedValue([]),
+  logSleep: vi.fn().mockResolvedValue({ id: 1 }),
+  getWellnessLogs: vi.fn().mockResolvedValue([]),
+  logWellness: vi.fn().mockResolvedValue({ id: 1 }),
+  getWeekendFeedback: vi.fn().mockResolvedValue([]),
+  logWeekendFeedback: vi.fn().mockResolvedValue({ id: 1 }),
+  getWeekendMeals: vi.fn().mockResolvedValue([]),
+  logWeekendMeal: vi.fn().mockResolvedValue({ id: 1 }),
+  getMealReminders: vi.fn().mockResolvedValue([]),
+  setMealReminder: vi.fn().mockResolvedValue({ id: 1 }),
+  deleteMealReminder: vi.fn().mockResolvedValue(undefined),
+  getMotivationLogs: vi.fn().mockResolvedValue([]),
+  logMotivation: vi.fn().mockResolvedValue({ id: 1 }),
+  getActivityLogs: vi.fn().mockResolvedValue([]),
+  logActivity: vi.fn().mockResolvedValue({ id: 1 }),
+  getActivityStreaks: vi.fn().mockResolvedValue(null),
+  getActivityBadges: vi.fn().mockResolvedValue([]),
+  getClientActivityBadges: vi.fn().mockResolvedValue([]),
+  awardActivityBadge: vi.fn().mockResolvedValue({ id: 1 }),
+  getWearableConnections: vi.fn().mockResolvedValue([]),
+  connectWearable: vi.fn().mockResolvedValue({ id: 1 }),
+  disconnectWearable: vi.fn().mockResolvedValue(undefined),
+  getAiEscalationAlerts: vi.fn().mockResolvedValue([]),
+  createAiEscalationAlert: vi.fn().mockResolvedValue({ id: 1 }),
+  resolveAiEscalationAlert: vi.fn().mockResolvedValue(undefined),
+}));
+
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
 function createAuthContext(): TrpcContext {
@@ -1173,5 +1255,79 @@ describe("diet.createManual", () => {
       totalCarbs: 225,
       totalFats: 56,
     }));
+  });
+});
+
+describe("diet.createManual - creationMethod and clientId", () => {
+  it("sets creationMethod to 'manual' on createDiet call", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { createDiet } = await import("./db");
+
+    vi.mocked(createDiet).mockClear();
+
+    await caller.diet.createManual({
+      name: "Manual Method Test",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    });
+
+    expect(createDiet).toHaveBeenCalledWith(expect.objectContaining({
+      creationMethod: "manual",
+    }));
+  });
+
+  it("assigns diet to client when clientId is provided", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { assignDietToClient, getClientById } = await import("./clientDb");
+
+    vi.mocked(assignDietToClient).mockClear();
+    vi.mocked(getClientById).mockClear();
+
+    await caller.diet.createManual({
+      name: "Client Diet",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+      clientId: 1,
+    });
+
+    expect(getClientById).toHaveBeenCalledWith(1);
+    expect(assignDietToClient).toHaveBeenCalledWith(1, 1); // clientId, dietId
+  });
+
+  it("does not assign diet when clientId is not provided", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { assignDietToClient } = await import("./clientDb");
+
+    vi.mocked(assignDietToClient).mockClear();
+
+    await caller.diet.createManual({
+      name: "No Client Diet",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    });
+
+    expect(assignDietToClient).not.toHaveBeenCalled();
+  });
+
+  it("throws error when clientId belongs to another trainer", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { getClientById } = await import("./clientDb");
+
+    vi.mocked(getClientById).mockResolvedValueOnce({ id: 2, name: "Other Client", trainerId: 999, status: "active" } as any);
+
+    await expect(caller.diet.createManual({
+      name: "Wrong Trainer",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+      clientId: 2,
+    })).rejects.toThrow("No tienes acceso a este cliente");
   });
 });

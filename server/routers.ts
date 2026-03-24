@@ -28,6 +28,7 @@ import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
 import { MEAL_PHILOSOPHY } from "@shared/mealPhilosophy";
 import { clientRouter, clientPortalRouter } from "./clientRouters";
+import { assignDietToClient, getClientById } from "./clientDb";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -594,6 +595,7 @@ export const appRouter = router({
           preferredFoods: input.preferredFoods.length > 0 ? input.preferredFoods : null,
           allergies: input.allergies.length > 0 ? input.allergies : null,
           fastingProtocol: input.fastingProtocol || null,
+          creationMethod: "ai",
         });
 
         for (const menu of generatedDiet.menus) {
@@ -692,6 +694,11 @@ export const appRouter = router({
         clientId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // Validate clientId belongs to this trainer
+        if (input.clientId) {
+          const client = await getClientById(input.clientId);
+          if (!client || client.trainerId !== ctx.user.id) throw new Error("No tienes acceso a este cliente");
+        }
         const dietId = await createDiet({
           userId: ctx.user.id,
           name: input.name,
@@ -704,6 +711,7 @@ export const appRouter = router({
           dietType: "personalizada",
           allergies: [],
           preferences: "",
+          creationMethod: "manual",
         });
         for (let m = 1; m <= input.totalMenus; m++) {
           const menuId = await createMenu({
@@ -723,7 +731,11 @@ export const appRouter = router({
             });
           }
         }
-        console.log(`[ManualDiet] Created diet ${dietId} with ${input.totalMenus} menus x ${input.mealNames.length} meals`);
+        // Assign to client if specified
+        if (input.clientId) {
+          await assignDietToClient(input.clientId, dietId);
+        }
+        console.log(`[ManualDiet] Created diet ${dietId} with ${input.totalMenus} menus x ${input.mealNames.length} meals${input.clientId ? ` (assigned to client ${input.clientId})` : ""}`);
         return { dietId };
       }),
 
@@ -1496,6 +1508,7 @@ Valores numéricos enteros. Solo JSON.`;
           dietType: (original as any).dietType || 'equilibrada',
           cookingLevel: (original as any).cookingLevel || 'moderate',
           preferences: (original as any).preferences || null,
+          creationMethod: "duplicate",
         });
 
         // Copy all menus, meals and foods

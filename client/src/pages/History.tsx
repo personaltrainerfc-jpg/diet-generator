@@ -24,7 +24,7 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import {
   Flame, UtensilsCrossed, Trash2, Eye,
-  Loader2, ChefHat, Copy, ChevronRight
+  Loader2, ChefHat, Copy, ChevronRight, Sparkles, PenLine, Files
 } from "lucide-react";
 
 export default function History() {
@@ -109,7 +109,22 @@ export default function History() {
             >
               <div className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[15px] font-semibold text-card-foreground truncate">{diet.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[15px] font-semibold text-card-foreground truncate">{diet.name}</h3>
+                    {(diet as any).creationMethod === "manual" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shrink-0 uppercase tracking-wide">
+                        <PenLine className="h-2.5 w-2.5" />Manual
+                      </span>
+                    ) : (diet as any).creationMethod === "duplicate" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 shrink-0 uppercase tracking-wide">
+                        <Files className="h-2.5 w-2.5" />Copia
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shrink-0 uppercase tracking-wide">
+                        <Sparkles className="h-2.5 w-2.5" />IA
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 mt-1.5">
                     <span className="flex items-center gap-1 text-[12px] text-muted-foreground">
                       <Flame className="h-3 w-3 text-orange-500" />

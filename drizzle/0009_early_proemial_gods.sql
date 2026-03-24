@@ -1,0 +1,1 @@
+ALTER TABLE `diets` ADD `creationMethod` varchar(20) DEFAULT 'ai' NOT NULL;

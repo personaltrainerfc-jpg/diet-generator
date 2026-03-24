@@ -37,6 +37,7 @@ export const diets = mysqlTable("diets", {
   allergies: json("allergies").$type<string[]>(),
   fastingProtocol: varchar("fastingProtocol", { length: 20 }),
   folderId: int("folderId"),
+  creationMethod: varchar("creationMethod", { length: 20 }).default("ai").notNull(), // 'ai' | 'manual' | 'duplicate'
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

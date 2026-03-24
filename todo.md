@@ -378,3 +378,8 @@
 - [x] T10: Copiar comida a varios días (frontend checkboxes multi-select + backend copyMealToMultiple)
 - [x] T11: Drag and drop para reordenar comidas (@dnd-kit + backend reorderMeals + GripVertical handle)
 - [x] T12: Crear dieta manualmente sin IA (backend createManual + frontend formulario simplificado)
+
+## U2: Mejoras post-T12
+- [x] U2-1: Selector de cliente en diálogo de dieta manual (vincular dieta directamente a un cliente)
+- [x] U2-2: Guardar dieta como plantilla reutilizable desde DietDetail (botón FileStack)
+- [x] U2-3: Badge visual "Manual vs IA vs Copia" en historial de dietas (creationMethod field)

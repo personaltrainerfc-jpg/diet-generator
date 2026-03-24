@@ -8,11 +8,12 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
   Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot, MessageSquare,
-  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2
+  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2, Users
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
@@ -96,6 +97,8 @@ export default function Home() {
   const [manualMenus, setManualMenus] = useState(1);
   const [manualMealNames, setManualMealNames] = useState<string[]>(["Desayuno", "Snack AM", "Comida", "Snack PM", "Cena"]);
   const [manualNewMeal, setManualNewMeal] = useState("");
+  const [manualClientId, setManualClientId] = useState<number | undefined>(undefined);
+  const clientsQuery = trpc.clientMgmt.list.useQuery();
 
   const createManualMutation = trpc.diet.createManual.useMutation({
     onSuccess: (data) => {
@@ -119,6 +122,7 @@ export default function Home() {
       fatsPercent: fatsPercent,
       totalMenus: manualMenus,
       mealNames: manualMealNames,
+      ...(manualClientId ? { clientId: manualClientId } : {}),
     });
   };
 
@@ -892,6 +896,29 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Client selector */}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold uppercase tracking-wide flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                Asignar a cliente
+                <span className="text-[11px] text-muted-foreground font-normal normal-case">(opcional)</span>
+              </Label>
+              <Select
+                value={manualClientId ? String(manualClientId) : "none"}
+                onValueChange={v => setManualClientId(v === "none" ? undefined : Number(v))}
+              >
+                <SelectTrigger className="rounded-xl h-10">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="none">Sin asignar</SelectItem>
+                  {(clientsQuery.data || []).filter(c => c.status === "active").map(client => (
+                    <SelectItem key={client.id} value={String(client.id)}>{client.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Create button */}

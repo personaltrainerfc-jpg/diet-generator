@@ -23,7 +23,7 @@ import {
   Loader2, ArrowLeft, ArrowLeftRight, Download, Copy, RefreshCw,
   Trash2, Plus, Search, ShoppingCart, Flame, Beef, Wheat, Droplets,
   Pencil, StickyNote, Settings2, BookOpen, FileDown, ClipboardCopy,
-  AlertCircle, Pill, Save, Eye, EyeOff, GripVertical,
+  AlertCircle, Pill, Save, Eye, EyeOff, GripVertical, FileStack,
 } from "lucide-react";
 import type { FullDiet, FullMenu, FullMeal, FullFood } from "@shared/types";
 import { LOGO_URL } from "@shared/constants";
@@ -613,6 +613,9 @@ export default function DietDetail() {
   const [regeneratingMealId, setRegeneratingMealId] = useState<number | null>(null);
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
   const [duplicateName, setDuplicateName] = useState("");
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateTags, setTemplateTags] = useState("");
   const [showAdjustMacros, setShowAdjustMacros] = useState(false);
   const [showCopyMeal, setShowCopyMeal] = useState(false);
   const [copyMealId, setCopyMealId] = useState<number | null>(null);
@@ -650,6 +653,7 @@ export default function DietDetail() {
   const deleteMealMut = trpc.diet.deleteMeal.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Comida eliminada"); }, onError: (err) => toast.error(err.message) });
   const addMealMut = trpc.diet.addMeal.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Comida añadida"); }, onError: (err) => toast.error(err.message) });
   const duplicateMut = trpc.diet.duplicate.useMutation({ onSuccess: (data) => { toast.success("Dieta duplicada"); setLocation(`/diet/${data.dietId}`); }, onError: (err) => toast.error(err.message) });
+  const saveTemplateMut = trpc.clientMgmt.createTemplate.useMutation({ onSuccess: () => { toast.success("Plantilla guardada"); setShowTemplateDialog(false); }, onError: (err) => toast.error(err.message) });
   const regenerateMealMut = trpc.diet.regenerateMeal.useMutation({
     onMutate: (vars) => { setRegeneratingMealId(vars.mealId); toast.info("Regenerando..."); },
     onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Comida regenerada"); setRegeneratingMealId(null); },
@@ -741,6 +745,7 @@ export default function DietDetail() {
           <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => { setDuplicateName(diet.name + " (copia)"); setShowDuplicateDialog(true); }} disabled={duplicateMut.isPending} className="rounded-xl h-9 w-9">
             {duplicateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
           </Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => { setTemplateName(diet.name); setTemplateTags(""); setShowTemplateDialog(true); }} className="rounded-xl h-9 w-9"><FileStack className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Guardar como plantilla</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setShowShoppingList(true)} className="rounded-xl h-9 w-9"><ShoppingCart className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Lista de la compra</TooltipContent></Tooltip>
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading} className="rounded-xl h-9">
             {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
@@ -834,6 +839,42 @@ export default function DietDetail() {
               <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} className="rounded-xl">Cancelar</Button>
               <Button onClick={() => { if (duplicateName.trim()) { duplicateMut.mutate({ id: dietId, name: duplicateName.trim() }); setShowDuplicateDialog(false); } }} disabled={!duplicateName.trim() || duplicateMut.isPending} className="rounded-xl">
                 {duplicateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Copy className="h-4 w-4 mr-2" />}Duplicar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save as Template Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-[17px]"><FileStack className="h-5 w-5 text-primary" />Guardar como Plantilla</DialogTitle></DialogHeader>
+          <p className="text-[13px] text-muted-foreground -mt-1">Guarda esta dieta como plantilla reutilizable para futuros clientes.</p>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium">Nombre de la plantilla</label>
+              <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Ej: Definición mujer 60kg" autoFocus className="rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium">Etiquetas <span className="text-muted-foreground font-normal">(separadas por coma, opcional)</span></label>
+              <Input value={templateTags} onChange={(e) => setTemplateTags(e.target.value)} placeholder="Ej: definición, mujer, 60kg" className="rounded-xl" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowTemplateDialog(false)} className="rounded-xl">Cancelar</Button>
+              <Button
+                onClick={() => {
+                  if (templateName.trim()) {
+                    saveTemplateMut.mutate({
+                      dietId,
+                      name: templateName.trim(),
+                      tags: templateTags ? templateTags.split(",").map(t => t.trim()).filter(Boolean) : undefined,
+                    });
+                  }
+                }}
+                disabled={!templateName.trim() || saveTemplateMut.isPending}
+                className="rounded-xl"
+              >
+                {saveTemplateMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileStack className="h-4 w-4 mr-2" />}Guardar
               </Button>
             </div>
           </div>
