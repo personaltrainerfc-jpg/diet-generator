@@ -23,6 +23,7 @@ import {
   getUserCustomFoods, createCustomFood, deleteCustomFood,
   getDietInstructions, upsertDietInstructions,
   reorderFoods, reorderMeals, toggleMealEnabled, saveMealAsRecipe,
+  getSystemRecipeNames, invalidateSystemRecipeCache,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
@@ -58,7 +59,25 @@ const dietConfigSchema = z.object({
   fastingProtocol: z.string().max(20).optional(),
 });
 
-function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietFoods?: string[]): string {
+async function buildSystemRecipesSection(): Promise<string> {
+  const systemRecipes = await getSystemRecipeNames();
+  const totalRecipes = systemRecipes.desayuno.length + systemRecipes.snack.length + systemRecipes.comida.length + systemRecipes.cena.length + systemRecipes.otro.length;
+  if (totalRecipes === 0) return "";
+  const sections: string[] = [];
+  if (systemRecipes.desayuno.length > 0) sections.push(`DESAYUNOS DISPONIBLES:\n${systemRecipes.desayuno.map(n => `- ${n}`).join("\n")}`);
+  if (systemRecipes.snack.length > 0) sections.push(`SNACKS DISPONIBLES:\n${systemRecipes.snack.map(n => `- ${n}`).join("\n")}`);
+  if (systemRecipes.comida.length > 0) sections.push(`COMIDAS DISPONIBLES:\n${systemRecipes.comida.map(n => `- ${n}`).join("\n")}`);
+  if (systemRecipes.cena.length > 0) sections.push(`CENAS DISPONIBLES:\n${systemRecipes.cena.map(n => `- ${n}`).join("\n")}`);
+  if (systemRecipes.otro.length > 0) sections.push(`OTROS PLATOS DISPONIBLES:\n${systemRecipes.otro.map(n => `- ${n}`).join("\n")}`);
+  return `RECETAS DE REFERENCIA DISPONIBLES (USA ESTAS COMO BASE PRIORITARIA):
+Tienes acceso a una biblioteca de ${totalRecipes} recetas reales y probadas. Cuando generes los menús, prioriza usar estas recetas como base para construir las comidas en lugar de inventar combinaciones nuevas. Puedes adaptar las cantidades para cuadrar con los macros objetivo pero mantén la esencia del plato.
+
+${sections.join("\n\n")}
+
+Si ninguna receta disponible encaja con los macros o restricciones del usuario, entonces genera un plato nuevo siguiendo las mismas reglas de coherencia culinaria.`;
+}
+
+async function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietFoods?: string[]): Promise<string> {
   const proteinGrams = Math.round((config.totalCalories * config.proteinPercent / 100) / 4);
   const carbsGrams = Math.round((config.totalCalories * config.carbsPercent / 100) / 4);
   const fatsGrams = Math.round((config.totalCalories * config.fatsPercent / 100) / 9);
@@ -188,6 +207,8 @@ REFERENCIA NUTRICIONAL DE ALIMENTOS (valores por 100g):
 ${foodRef}
 
 ${MEAL_PHILOSOPHY}
+
+${await buildSystemRecipesSection()}
 
 COMBINACIONES DE ALIMENTOS COHERENTES E INTELIGENTES (OBLIGATORIO):
 - Cada comida debe representar un PLATO REAL de la gastronomía cotidiana (preferiblemente española/mediterránea).
@@ -486,7 +507,7 @@ export const appRouter = router({
         }
         const configWithRecipes = { ...input, recipesText };
 
-        const basePrompt = buildDietPrompt(configWithRecipes, previousDietFoods);
+        const basePrompt = await buildDietPrompt(configWithRecipes, previousDietFoods);
         const systemMsg = "Eres un nutricionista profesional con 15 años de experiencia en planificación de dietas para deportistas y personas activas en España. Responde siempre en español. Genera dietas con CANTIDADES REALISTAS (150g de proteína, 200g de verdura, 80g de arroz crudo, etc.), PLATOS RECONOCIBLES de la cocina cotidiana española/mediterránea (no listados de ingredientes sueltos), y COMBINACIONES CULINARIAS COHERENTES. Cada comida debe ser un plato que alguien cocinaría en su casa. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades.";
 
         // Retry loop: up to 3 attempts
@@ -1622,7 +1643,7 @@ Valores numéricos enteros. Solo JSON.`;
           fastingProtocol: (original as any).fastingProtocol || undefined,
         };
 
-        const basePromptRedo = buildDietPrompt(config, allPreviousFoods);
+        const basePromptRedo = await buildDietPrompt(config, allPreviousFoods);
         const systemMsgRedo = "Eres un nutricionista profesional experto en planificación de dietas. Responde siempre en español. Genera dietas realistas, equilibradas y con alimentos variados. Construye platos culinariamente lógicos que representen recetas reales de la gastronomía cotidiana española/mediterránea. Usa los valores nutricionales de referencia proporcionados para calcular macros precisos según las cantidades.";
 
         // Retry loop: up to 3 attempts

@@ -383,3 +383,11 @@
 - [x] U2-1: Selector de cliente en diálogo de dieta manual (vincular dieta directamente a un cliente)
 - [x] U2-2: Guardar dieta como plantilla reutilizable desde DietDetail (botón FileStack)
 - [x] U2-3: Badge visual "Manual vs IA vs Copia" en historial de dietas (creationMethod field)
+
+## U3: Sistema de recetas del sistema (150 recetas)
+- [x] U3-1: Campos isSystemRecipe y category ya existían en tabla recipes (verificado)
+- [x] U3-2: recipe.list ya devuelve recetas del sistema + usuario (verificado)
+- [x] U3-3: Caché en memoria getSystemRecipeNames() con invalidateSystemRecipeCache()
+- [x] U3-4: buildSystemRecipesSection() inyecta recetas agrupadas por categoría en el prompt
+- [x] U3-5: seed-system-recipes.mjs ejecutado: 150 recetas insertadas (30 desayunos, 30 snacks mañana, 30 comidas, 30 snacks tarde, 30 cenas)
+- [x] U3-6: Tests vitest añadidos (190 tests pasan)

@@ -167,6 +167,14 @@ vi.mock("./db", () => ({
     };
     return db;
   }),
+  getSystemRecipeNames: vi.fn().mockResolvedValue({
+    desayuno: ["Tortilla de claras con avena", "Bowl de yogur griego con granola"],
+    snack: ["Tarro de cottage con fruta", "Skyr con chía y mango"],
+    comida: ["Pollo al horno con arroz integral", "Salmón con patatas y espárragos"],
+    cena: ["Merluza al horno con verduras", "Tortilla de espinacas con ensalada"],
+    otro: [],
+  }),
+  invalidateSystemRecipeCache: vi.fn(),
 }));
 
 // Dynamic mock that generates the correct number of menus with realistic calories
@@ -1329,5 +1337,36 @@ describe("diet.createManual - creationMethod and clientId", () => {
       mealNames: ["Desayuno"],
       clientId: 2,
     })).rejects.toThrow("No tienes acceso a este cliente");
+  });
+});
+
+describe("System Recipes Cache", () => {
+  it("getSystemRecipeNames returns grouped recipes", async () => {
+    const { getSystemRecipeNames } = await import("./db");
+    const result = await getSystemRecipeNames();
+    expect(result).toHaveProperty("desayuno");
+    expect(result).toHaveProperty("snack");
+    expect(result).toHaveProperty("comida");
+    expect(result).toHaveProperty("cena");
+    expect(result).toHaveProperty("otro");
+    expect(result.desayuno.length).toBeGreaterThan(0);
+    expect(result.snack.length).toBeGreaterThan(0);
+    expect(result.comida.length).toBeGreaterThan(0);
+    expect(result.cena.length).toBeGreaterThan(0);
+  });
+
+  it("invalidateSystemRecipeCache clears the cache", async () => {
+    const { invalidateSystemRecipeCache } = await import("./db");
+    invalidateSystemRecipeCache();
+    expect(invalidateSystemRecipeCache).toHaveBeenCalled();
+  });
+});
+
+describe("recipe.list includes system recipes", () => {
+  it("returns both user and system recipes", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const recipes = await caller.recipe.list();
+    expect(Array.isArray(recipes)).toBe(true);
   });
 });

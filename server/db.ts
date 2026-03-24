@@ -13,6 +13,35 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+// ── System recipes cache (loaded once, reused across all diet generations) ──
+let _systemRecipeCache: { desayuno: string[]; snack: string[]; comida: string[]; cena: string[]; otro: string[] } | null = null;
+
+export async function getSystemRecipeNames(): Promise<{ desayuno: string[]; snack: string[]; comida: string[]; cena: string[]; otro: string[] }> {
+  if (_systemRecipeCache) return _systemRecipeCache;
+  const db = await getDb();
+  if (!db) return { desayuno: [], snack: [], comida: [], cena: [], otro: [] };
+  const systemRecipes = await db.select({ name: recipes.name, category: recipes.category })
+    .from(recipes)
+    .where(eq(recipes.isSystem, 1))
+    .orderBy(asc(recipes.category), asc(recipes.name));
+  const grouped = { desayuno: [] as string[], snack: [] as string[], comida: [] as string[], cena: [] as string[], otro: [] as string[] };
+  for (const r of systemRecipes) {
+    let cat = (r.category || "otro");
+    // Map snack_manana and snack_tarde to snack
+    if (cat === "snack_manana" || cat === "snack_tarde" || cat === "snack") cat = "snack";
+    const key = cat as keyof typeof grouped;
+    if (grouped[key]) grouped[key].push(r.name);
+    else grouped.otro.push(r.name);
+  }
+  _systemRecipeCache = grouped;
+  console.log(`[SystemRecipes] Cached ${systemRecipes.length} system recipes (${grouped.desayuno.length} desayuno, ${grouped.snack.length} snack, ${grouped.comida.length} comida, ${grouped.cena.length} cena, ${grouped.otro.length} otro)`);
+  return _systemRecipeCache;
+}
+
+export function invalidateSystemRecipeCache() {
+  _systemRecipeCache = null;
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
