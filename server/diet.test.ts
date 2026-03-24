@@ -1035,3 +1035,143 @@ describe("diet.generate with new options", () => {
     expect(result.dietId).toBe(1);
   });
 });
+
+describe("diet.createManual", () => {
+  it("creates an empty diet with specified menus and meals", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { createDiet, createMenu, createMeal } = await import("./db");
+
+    // Reset mocks
+    vi.mocked(createDiet).mockClear();
+    vi.mocked(createMenu).mockClear();
+    vi.mocked(createMeal).mockClear();
+
+    const result = await caller.diet.createManual({
+      name: "Dieta Manual Test",
+      totalCalories: 2500,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      totalMenus: 2,
+      mealNames: ["Desayuno", "Comida", "Cena"],
+    });
+
+    expect(result.dietId).toBe(1);
+    // Should create 1 diet
+    expect(createDiet).toHaveBeenCalledTimes(1);
+    expect(createDiet).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 1,
+      name: "Dieta Manual Test",
+      totalCalories: 2500,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      totalMenus: 2,
+      mealsPerDay: 3,
+      dietType: "personalizada",
+    }));
+    // Should create 2 menus
+    expect(createMenu).toHaveBeenCalledTimes(2);
+    // Should create 3 meals per menu = 6 total
+    expect(createMeal).toHaveBeenCalledTimes(6);
+    // Verify meal names
+    const mealCalls = vi.mocked(createMeal).mock.calls;
+    expect(mealCalls[0][0]).toMatchObject({ mealName: "Desayuno", mealNumber: 1, calories: 0 });
+    expect(mealCalls[1][0]).toMatchObject({ mealName: "Comida", mealNumber: 2, calories: 0 });
+    expect(mealCalls[2][0]).toMatchObject({ mealName: "Cena", mealNumber: 3, calories: 0 });
+  });
+
+  it("creates single menu with single meal", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { createDiet, createMenu, createMeal } = await import("./db");
+
+    vi.mocked(createDiet).mockClear();
+    vi.mocked(createMenu).mockClear();
+    vi.mocked(createMeal).mockClear();
+
+    const result = await caller.diet.createManual({
+      name: "Mini Dieta",
+      totalCalories: 1500,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    });
+
+    expect(result.dietId).toBe(1);
+    expect(createDiet).toHaveBeenCalledTimes(1);
+    expect(createMenu).toHaveBeenCalledTimes(1);
+    expect(createMeal).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses default macro percentages when not specified", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { createDiet } = await import("./db");
+
+    vi.mocked(createDiet).mockClear();
+
+    await caller.diet.createManual({
+      name: "Default Macros",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    });
+
+    expect(createDiet).toHaveBeenCalledWith(expect.objectContaining({
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+    }));
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.createManual({
+      name: "Unauthorized",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    })).rejects.toThrow();
+  });
+
+  it("rejects invalid input (empty meal names)", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.createManual({
+      name: "Bad Input",
+      totalCalories: 2000,
+      totalMenus: 1,
+      mealNames: [],
+    })).rejects.toThrow();
+  });
+
+  it("calculates correct menu macros from percentages", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { createMenu } = await import("./db");
+
+    vi.mocked(createMenu).mockClear();
+
+    await caller.diet.createManual({
+      name: "Macro Check",
+      totalCalories: 2000,
+      proteinPercent: 30,
+      carbsPercent: 45,
+      fatsPercent: 25,
+      totalMenus: 1,
+      mealNames: ["Desayuno"],
+    });
+
+    // protein: 2000 * 30/100 / 4 = 150g
+    // carbs: 2000 * 45/100 / 4 = 225g
+    // fats: 2000 * 25/100 / 9 = 56g
+    expect(createMenu).toHaveBeenCalledWith(expect.objectContaining({
+      totalCalories: 2000,
+      totalProtein: 150,
+      totalCarbs: 225,
+      totalFats: 56,
+    }));
+  });
+});

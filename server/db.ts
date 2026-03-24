@@ -1,4 +1,4 @@
-import { eq, desc, asc, or } from "drizzle-orm";
+import { eq, desc, asc, or, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -314,9 +314,29 @@ export async function createRecipe(recipe: InsertRecipe) {
 export async function getUserRecipes(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.select().from(recipes).where(
+  const recipeList = await db.select().from(recipes).where(
     or(eq(recipes.userId, userId), eq(recipes.isSystem, 1))
   ).orderBy(desc(recipes.isSystem), asc(recipes.category), desc(recipes.createdAt));
+  
+  // Fetch ingredients for all recipes in one query
+  const recipeIds = recipeList.map(r => r.id);
+  if (recipeIds.length === 0) return [];
+  const allIngredients = await db.select().from(recipeIngredients).where(
+    inArray(recipeIngredients.recipeId, recipeIds)
+  );
+  
+  // Group ingredients by recipeId
+  const ingredientsByRecipe = new Map<number, typeof allIngredients>();
+  for (const ing of allIngredients) {
+    const list = ingredientsByRecipe.get(ing.recipeId) || [];
+    list.push(ing);
+    ingredientsByRecipe.set(ing.recipeId, list);
+  }
+  
+  return recipeList.map(r => ({
+    ...r,
+    ingredients: ingredientsByRecipe.get(r.id) || [],
+  }));
 }
 
 export async function getRecipeById(recipeId: number) {
@@ -538,6 +558,16 @@ export async function reorderFoods(mealId: number, foodIds: number[]) {
   if (!db) throw new Error("Database not available");
   for (let i = 0; i < foodIds.length; i++) {
     await db.update(foods).set({ sortOrder: i }).where(eq(foods.id, foodIds[i]));
+  }
+}
+
+// ── Reorder meals within a menu ──
+
+export async function reorderMeals(menuId: number, mealIds: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  for (let i = 0; i < mealIds.length; i++) {
+    await db.update(meals).set({ mealNumber: i + 1 }).where(eq(meals.id, mealIds[i]));
   }
 }
 

@@ -23,11 +23,14 @@ import {
   Loader2, ArrowLeft, ArrowLeftRight, Download, Copy, RefreshCw,
   Trash2, Plus, Search, ShoppingCart, Flame, Beef, Wheat, Droplets,
   Pencil, StickyNote, Settings2, BookOpen, FileDown, ClipboardCopy,
-  AlertCircle, Pill, Save,
+  AlertCircle, Pill, Save, Eye, EyeOff, GripVertical,
 } from "lucide-react";
 import type { FullDiet, FullMenu, FullMeal, FullFood } from "@shared/types";
 import { LOGO_URL } from "@shared/constants";
 import SupplementsPanel from "./Supplements";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ── Editable Meal Name ──
 function EditableMealName({ meal, onSave }: { meal: FullMeal; onSave: (name: string) => void }) {
@@ -314,7 +317,7 @@ function MealNotes({ meal, onSave }: { meal: FullMeal; onSave: (notes: string | 
 }
 
 // ── Meal Card ──
-function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, isDeletable, isRegenerating }: {
+function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, onAddRecipe, isDeletable, isRegenerating }: {
   meal: FullMeal; onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void; onDeleteMeal: (mealId: number) => void;
@@ -322,6 +325,7 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onRegenerateMeal: (mealId: number) => void; onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
   onCopyMeal?: (mealId: number) => void; onSaveAsRecipe?: (mealId: number) => void;
+  onAddRecipe?: (mealId: number) => void;
   isDeletable: boolean; isRegenerating: boolean;
 }) {
   const [addFoodOpen, setAddFoodOpen] = useState(false);
@@ -441,10 +445,18 @@ function MealCard({ meal, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
             <FoodRow key={food.id} food={food} mealName={meal.mealName} onUpdateFood={onUpdateFood} onDeleteFood={onDeleteFood} />
           ))}
         </div>
-        <button onClick={() => setAddFoodOpen(true)}
-          className="w-full mt-3 py-2.5 rounded-xl border border-dashed border-border/60 text-[12px] text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-1.5">
-          <Plus className="h-3.5 w-3.5" /> Añadir alimento
-        </button>
+        <div className="flex gap-2 mt-3">
+          <button onClick={() => setAddFoodOpen(true)}
+            className="flex-1 py-2.5 rounded-xl border border-dashed border-border/60 text-[12px] text-muted-foreground hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Añadir alimento
+          </button>
+          {onAddRecipe && (
+            <button onClick={() => onAddRecipe(meal.id)}
+              className="flex-1 py-2.5 rounded-xl border border-dashed border-emerald-500/40 text-[12px] text-muted-foreground hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center justify-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5" /> Añadir receta
+            </button>
+          )}
+        </div>
         <MealNotes meal={meal} onSave={(notes) => onUpdateNotes(meal.id, notes)} />
       </div>
 
@@ -483,7 +495,21 @@ function AddMealDialog({ open, onClose, onAdd, isLoading }: {
 }
 
 // ── Menu View ──
-function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, addingMeal, regeneratingMealId }: {
+// ── Sortable Meal Card Wrapper ──
+function SortableMealCard({ meal, ...props }: { meal: FullMeal } & Omit<Parameters<typeof MealCard>[0], 'meal'>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: meal.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="relative group/sortable">
+      <div {...attributes} {...listeners} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 cursor-grab active:cursor-grabbing p-1 rounded-lg bg-background/80 border border-border/40 opacity-0 group-hover/sortable:opacity-100 transition-opacity shadow-sm" title="Arrastrar para reordenar">
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <MealCard meal={meal} {...props} />
+    </div>
+  );
+}
+
+function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDeleteMeal, onAddMeal, onAddFood, onRegenerateMeal, onUpdateNotes, onUpdateDescription, onCopyMeal, onSaveAsRecipe, onAddRecipe, onReorderMeals, addingMeal, regeneratingMealId }: {
   menu: FullMenu; onMealNameChange: (mealId: number, name: string) => void;
   onUpdateFood: (foodId: number, data: Record<string, unknown>) => void;
   onDeleteFood: (foodId: number) => void; onDeleteMeal: (mealId: number) => void;
@@ -492,6 +518,8 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
   onRegenerateMeal: (mealId: number) => void; onUpdateNotes: (mealId: number, notes: string | null) => void;
   onUpdateDescription: (mealId: number, description: string | null) => void;
   onCopyMeal?: (mealId: number) => void; onSaveAsRecipe?: (mealId: number) => void;
+  onAddRecipe?: (mealId: number) => void;
+  onReorderMeals?: (menuId: number, mealIds: number[]) => void;
   addingMeal: boolean; regeneratingMealId: number | null;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -542,15 +570,28 @@ function MenuView({ menu, onMealNameChange, onUpdateFood, onDeleteFood, onDelete
         ))}
       </div>
 
-      {/* Meals */}
-      <div className="space-y-4">
-        {sortedMeals.map(meal => (
-          <MealCard key={meal.id} meal={meal} onMealNameChange={onMealNameChange} onUpdateFood={onUpdateFood}
-            onDeleteFood={onDeleteFood} onDeleteMeal={onDeleteMeal} onAddFood={onAddFood} onRegenerateMeal={onRegenerateMeal}
-            onUpdateNotes={onUpdateNotes} onUpdateDescription={onUpdateDescription} onCopyMeal={onCopyMeal}
-            onSaveAsRecipe={onSaveAsRecipe} isDeletable={canDeleteMeal} isRegenerating={regeneratingMealId === meal.id} />
-        ))}
-      </div>
+      {/* Meals with drag & drop */}
+      <DndContext sensors={useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), useSensor(KeyboardSensor))} collisionDetection={closestCenter}
+        onDragEnd={(event: DragEndEvent) => {
+          const { active, over } = event;
+          if (over && active.id !== over.id) {
+            const oldIndex = sortedMeals.findIndex(m => m.id === active.id);
+            const newIndex = sortedMeals.findIndex(m => m.id === over.id);
+            const newOrder = arrayMove(sortedMeals, oldIndex, newIndex);
+            onReorderMeals?.(menu.id, newOrder.map(m => m.id));
+          }
+        }}>
+        <SortableContext items={sortedMeals.map(m => m.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-4">
+            {sortedMeals.map(meal => (
+              <SortableMealCard key={meal.id} meal={meal} onMealNameChange={onMealNameChange} onUpdateFood={onUpdateFood}
+                onDeleteFood={onDeleteFood} onDeleteMeal={onDeleteMeal} onAddFood={onAddFood} onRegenerateMeal={onRegenerateMeal}
+                onUpdateNotes={onUpdateNotes} onUpdateDescription={onUpdateDescription} onCopyMeal={onCopyMeal}
+                onSaveAsRecipe={onSaveAsRecipe} onAddRecipe={onAddRecipe} isDeletable={canDeleteMeal} isRegenerating={regeneratingMealId === meal.id} />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Add meal */}
       <Button variant="outline" className="w-full border-dashed border-2 hover:border-primary hover:text-primary rounded-2xl h-12" onClick={() => setAddDialogOpen(true)} disabled={addingMeal}>
@@ -575,7 +616,7 @@ export default function DietDetail() {
   const [showAdjustMacros, setShowAdjustMacros] = useState(false);
   const [showCopyMeal, setShowCopyMeal] = useState(false);
   const [copyMealId, setCopyMealId] = useState<number | null>(null);
-  const [copyTargetMenuId, setCopyTargetMenuId] = useState<number | null>(null);
+  const [copyTargetMenuIds, setCopyTargetMenuIds] = useState<Set<number>>(new Set());
   const [copyReplaceMealNumber, setCopyReplaceMealNumber] = useState<number | undefined>(undefined);
   const [showGuide, setShowGuide] = useState(false);
   const [guideContent, setGuideContent] = useState<string | null>(null);
@@ -587,6 +628,16 @@ export default function DietDetail() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [instructionsText, setInstructionsText] = useState("");
   const [showSupplements, setShowSupplements] = useState(false);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [recipeMealId, setRecipeMealId] = useState<number | null>(null);
+  const [hiddenMenuIds, setHiddenMenuIds] = useState<Set<number>>(new Set());
+  const toggleMenuVisibility = useCallback((menuId: number) => {
+    setHiddenMenuIds(prev => {
+      const next = new Set(prev);
+      if (next.has(menuId)) next.delete(menuId); else next.add(menuId);
+      return next;
+    });
+  }, []);
 
   const utils = trpc.useUtils();
 
@@ -610,7 +661,14 @@ export default function DietDetail() {
   const saveAsRecipeMut = trpc.mealAction.saveAsRecipe.useMutation({ onSuccess: () => toast.success("Guardada como receta"), onError: (err) => toast.error(err.message) });
   const adjustMacrosMut = trpc.dietAdjust.adjustMacros.useMutation({ onMutate: () => toast.info("Ajustando macros..."), onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Macros ajustados"); setShowAdjustMacros(false); }, onError: (err) => toast.error(err.message) });
   const copyMealMut = trpc.dietAdjust.copyMeal.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Comida copiada"); setShowCopyMeal(false); setCopyMealId(null); }, onError: (err) => toast.error(err.message) });
+  const copyMealMultiMut = trpc.dietAdjust.copyMealToMultiple.useMutation({ onSuccess: (data) => { utils.diet.getById.invalidate({ id: dietId }); toast.success(`Comida copiada a ${data.copied} menú${data.copied > 1 ? "s" : ""}`); setShowCopyMeal(false); setCopyMealId(null); setCopyTargetMenuIds(new Set()); }, onError: (err) => toast.error(err.message) });
+  const addRecipeToMealMut = trpc.mealAction.addRecipeToMeal.useMutation({
+    onMutate: () => toast.info("Añadiendo receta..."),
+    onSuccess: (data) => { utils.diet.getById.invalidate({ id: dietId }); toast.success(`Receta añadida (${data.addedCount} alimentos)`); setShowRecipeModal(false); setRecipeMealId(null); },
+    onError: (err) => toast.error(err.message),
+  });
   const generateGuideMut = trpc.dietAdjust.generateGuide.useMutation({ onMutate: () => toast.info("Generando guía..."), onSuccess: (data) => { setGuideContent(data.content); setShowGuide(true); }, onError: (err) => toast.error(err.message) });
+  const reorderMealsMut = trpc.mealAction.reorderMeals.useMutation({ onSuccess: () => { utils.diet.getById.invalidate({ id: dietId }); toast.success("Comidas reordenadas"); }, onError: (err) => toast.error(err.message) });
 
   const handleMealNameChange = useCallback((mealId: number, name: string) => { updateMealNameMut.mutate({ mealId, mealName: name }); }, [updateMealNameMut]);
   const handleUpdateFood = useCallback((foodId: number, data: Record<string, unknown>) => { updateFoodMut.mutate(data as any); }, [updateFoodMut]);
@@ -622,7 +680,16 @@ export default function DietDetail() {
   const handleUpdateNotes = useCallback((mealId: number, notes: string | null) => { updateNotesMut.mutate({ mealId, notes }); }, [updateNotesMut]);
   const handleUpdateDescription = useCallback((mealId: number, description: string | null) => { updateDescriptionMut.mutate({ mealId, description }); }, [updateDescriptionMut]);
   const handleSaveAsRecipe = useCallback((mealId: number) => { saveAsRecipeMut.mutate({ mealId }); }, [saveAsRecipeMut]);
-  const handleCopyMeal = (mealId: number) => { setCopyMealId(mealId); setCopyTargetMenuId(null); setCopyReplaceMealNumber(undefined); setShowCopyMeal(true); };
+  const handleAddRecipe = useCallback((mealId: number) => { setRecipeMealId(mealId); setShowRecipeModal(true); }, []);
+  const handleReorderMeals = useCallback((menuId: number, mealIds: number[]) => { reorderMealsMut.mutate({ menuId, mealIds }); }, [reorderMealsMut]);
+  const handleCopyMeal = (mealId: number) => { setCopyMealId(mealId); setCopyTargetMenuIds(new Set()); setCopyReplaceMealNumber(undefined); setShowCopyMeal(true); };
+  const toggleCopyTarget = useCallback((menuId: number) => {
+    setCopyTargetMenuIds(prev => {
+      const next = new Set(prev);
+      if (next.has(menuId)) next.delete(menuId); else next.add(menuId);
+      return next;
+    });
+  }, []);
   const handleOpenAdjustMacros = () => { if (diet) { setAdjustCalories(diet.totalCalories); setAdjustProtein(diet.proteinPercent); setAdjustCarbs(diet.carbsPercent); setAdjustFats(diet.fatsPercent); setShowAdjustMacros(true); } };
 
   const handleDownloadPdf = async () => {
@@ -712,22 +779,29 @@ export default function DietDetail() {
                       <th className="text-right py-2 px-2 font-medium text-amber-600">Carbs</th>
                       <th className="text-right py-2 px-2 font-medium text-blue-600">Grasas</th>
                       <th className="text-right py-2 pl-2 font-medium text-muted-foreground">Comidas</th>
+                      <th className="text-center py-2 pl-2 font-medium text-muted-foreground w-10"><Eye className="h-3.5 w-3.5 mx-auto" /></th>
                     </tr>
                   </thead>
                   <tbody>
                     {diet.menus.sort((a: any, b: any) => a.menuNumber - b.menuNumber).map((menu: any) => {
+                      const isHidden = hiddenMenuIds.has(menu.id);
                       const totals = menu.meals.reduce((acc: any, meal: any) => {
                         meal.foods.forEach((f: any) => { acc.cal += f.calories || 0; acc.prot += f.protein || 0; acc.carbs += f.carbs || 0; acc.fats += f.fats || 0; });
                         return acc;
                       }, { cal: 0, prot: 0, carbs: 0, fats: 0 });
                       return (
-                        <tr key={menu.id} className="border-b border-border/30 last:border-0">
+                        <tr key={menu.id} className={`border-b border-border/30 last:border-0 transition-opacity ${isHidden ? "opacity-40" : ""}`}>
                           <td className="py-2 pr-4 font-medium">Menú {menu.menuNumber}</td>
                           <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.cal)}</td>
                           <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.prot)}g</td>
                           <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.carbs)}g</td>
                           <td className="py-2 px-2 text-right tabular-nums">{Math.round(totals.fats)}g</td>
                           <td className="py-2 pl-2 text-right text-muted-foreground">{menu.meals.length}</td>
+                          <td className="py-2 pl-2 text-center">
+                            <button onClick={() => toggleMenuVisibility(menu.id)} className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all mx-auto">
+                              {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -801,32 +875,59 @@ export default function DietDetail() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCopyMeal} onOpenChange={(v) => { if (!v) { setShowCopyMeal(false); setCopyMealId(null); } }}>
+      <Dialog open={showCopyMeal} onOpenChange={(v) => { if (!v) { setShowCopyMeal(false); setCopyMealId(null); setCopyTargetMenuIds(new Set()); } }}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="flex items-center gap-2 text-[17px]"><ClipboardCopy className="h-5 w-5 text-primary" />Copiar Comida</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label className="font-medium text-[13px]">Menú destino</Label>
+              <Label className="font-medium text-[13px]">Menús destino <span className="text-muted-foreground font-normal">(selecciona uno o varios)</span></Label>
               <div className="flex flex-wrap gap-2">
-                {diet.menus.map(m => <Button key={m.id} variant={copyTargetMenuId === m.id ? "default" : "outline"} size="sm" onClick={() => setCopyTargetMenuId(m.id)} className="rounded-xl">Menú {m.menuNumber}</Button>)}
+                {diet.menus.map(m => {
+                  const isSource = copyMealId ? diet.menus.find(menu => menu.meals.some(meal => meal.id === copyMealId))?.id === m.id : false;
+                  const isSelected = copyTargetMenuIds.has(m.id);
+                  return (
+                    <button key={m.id} disabled={isSource} onClick={() => toggleCopyTarget(m.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[13px] font-medium border transition-all flex items-center gap-1.5 ${
+                        isSource ? "opacity-40 cursor-not-allowed border-border/50 text-muted-foreground" :
+                        isSelected ? "bg-primary text-primary-foreground border-primary" :
+                        "border-border/50 text-foreground hover:border-primary/50 hover:bg-primary/5"}`}>
+                      {isSelected && <span className="text-[11px]">&#10003;</span>}
+                      Menú {m.menuNumber}
+                      {isSource && <span className="text-[10px]">(origen)</span>}
+                    </button>
+                  );
+                })}
               </div>
+              {copyTargetMenuIds.size > 1 && <p className="text-[11px] text-muted-foreground">{copyTargetMenuIds.size} menús seleccionados</p>}
             </div>
-            {copyTargetMenuId && (
+            {copyTargetMenuIds.size > 0 && (
               <div className="space-y-2">
                 <Label className="font-medium text-[13px]">Reemplazar (opcional)</Label>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant={copyReplaceMealNumber === undefined ? "default" : "outline"} size="sm" onClick={() => setCopyReplaceMealNumber(undefined)} className="rounded-xl">Añadir nueva</Button>
-                  {diet.menus.find(m => m.id === copyTargetMenuId)?.meals.map(meal => (
-                    <Button key={meal.id} variant={copyReplaceMealNumber === meal.mealNumber ? "default" : "outline"} size="sm" onClick={() => setCopyReplaceMealNumber(meal.mealNumber)} className="rounded-xl">{meal.mealName}</Button>
-                  ))}
+                  <Button variant={copyReplaceMealNumber === undefined ? "default" : "outline"} size="sm" onClick={() => setCopyReplaceMealNumber(undefined)} className="rounded-xl text-[12px]">Añadir nueva</Button>
+                  {(() => {
+                    const firstTargetId = Array.from(copyTargetMenuIds)[0];
+                    const firstTarget = diet.menus.find(m => m.id === firstTargetId);
+                    return firstTarget?.meals.map(meal => (
+                      <Button key={meal.id} variant={copyReplaceMealNumber === meal.mealNumber ? "default" : "outline"} size="sm" onClick={() => setCopyReplaceMealNumber(meal.mealNumber)} className="rounded-xl text-[12px]">{meal.mealName}</Button>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCopyMeal(false)} className="rounded-xl">Cancelar</Button>
-              <Button onClick={() => { if (copyMealId && copyTargetMenuId) copyMealMut.mutate({ mealId: copyMealId, targetMenuId: copyTargetMenuId, replaceMealNumber: copyReplaceMealNumber }); }}
-                disabled={!copyTargetMenuId || copyMealMut.isPending} className="rounded-xl">
-                {copyMealMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ClipboardCopy className="h-4 w-4 mr-2" />}Copiar
+              <Button variant="outline" onClick={() => { setShowCopyMeal(false); setCopyTargetMenuIds(new Set()); }} className="rounded-xl">Cancelar</Button>
+              <Button onClick={() => {
+                if (!copyMealId || copyTargetMenuIds.size === 0) return;
+                const ids = Array.from(copyTargetMenuIds);
+                if (ids.length === 1) {
+                  copyMealMut.mutate({ mealId: copyMealId, targetMenuId: ids[0], replaceMealNumber: copyReplaceMealNumber });
+                } else {
+                  copyMealMultiMut.mutate({ mealId: copyMealId, targetMenuIds: ids, replaceMealNumber: copyReplaceMealNumber });
+                }
+              }} disabled={copyTargetMenuIds.size === 0 || copyMealMut.isPending || copyMealMultiMut.isPending} className="rounded-xl">
+                {(copyMealMut.isPending || copyMealMultiMut.isPending) ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ClipboardCopy className="h-4 w-4 mr-2" />}
+                Copiar{copyTargetMenuIds.size > 1 ? ` a ${copyTargetMenuIds.size} menús` : ""}
               </Button>
             </div>
           </div>
@@ -875,26 +976,105 @@ export default function DietDetail() {
         <MenuView menu={diet.menus[0]} onMealNameChange={handleMealNameChange} onUpdateFood={handleUpdateFood} onDeleteFood={handleDeleteFood}
           onDeleteMeal={handleDeleteMeal} onAddMeal={handleAddMeal} onAddFood={handleAddFood} onRegenerateMeal={handleRegenerateMeal}
           onUpdateNotes={handleUpdateNotes} onUpdateDescription={handleUpdateDescription} onSaveAsRecipe={handleSaveAsRecipe}
-          addingMeal={addMealMut.isPending} regeneratingMealId={regeneratingMealId} />
+          onAddRecipe={handleAddRecipe} onReorderMeals={handleReorderMeals} addingMeal={addMealMut.isPending} regeneratingMealId={regeneratingMealId} />
       ) : (
         <Tabs defaultValue="1" className="w-full">
           <TabsList className="w-full justify-start flex-wrap h-auto gap-1 p-1 rounded-2xl bg-secondary/50">
-            {diet.menus.sort((a, b) => a.menuNumber - b.menuNumber).map(menu => (
+            {diet.menus.sort((a, b) => a.menuNumber - b.menuNumber).filter(m => !hiddenMenuIds.has(m.id)).map(menu => (
               <TabsTrigger key={menu.id} value={String(menu.menuNumber)} className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-xl text-[13px]">
                 Menú {menu.menuNumber}
               </TabsTrigger>
             ))}
+            {hiddenMenuIds.size > 0 && (
+              <span className="text-[11px] text-muted-foreground flex items-center gap-1 px-2"><EyeOff className="h-3 w-3" />{hiddenMenuIds.size} oculto{hiddenMenuIds.size > 1 ? "s" : ""}</span>
+            )}
           </TabsList>
-          {diet.menus.sort((a, b) => a.menuNumber - b.menuNumber).map(menu => (
+          {diet.menus.sort((a, b) => a.menuNumber - b.menuNumber).filter(m => !hiddenMenuIds.has(m.id)).map(menu => (
             <TabsContent key={menu.id} value={String(menu.menuNumber)} className="mt-4">
               <MenuView menu={menu} onMealNameChange={handleMealNameChange} onUpdateFood={handleUpdateFood} onDeleteFood={handleDeleteFood}
                 onDeleteMeal={handleDeleteMeal} onAddMeal={handleAddMeal} onAddFood={handleAddFood} onRegenerateMeal={handleRegenerateMeal}
                 onUpdateNotes={handleUpdateNotes} onUpdateDescription={handleUpdateDescription} onCopyMeal={handleCopyMeal}
-                onSaveAsRecipe={handleSaveAsRecipe} addingMeal={addMealMut.isPending} regeneratingMealId={regeneratingMealId} />
+                onSaveAsRecipe={handleSaveAsRecipe} onAddRecipe={handleAddRecipe} onReorderMeals={handleReorderMeals}
+                addingMeal={addMealMut.isPending} regeneratingMealId={regeneratingMealId} />
             </TabsContent>
           ))}
         </Tabs>
       )}
+
+      {/* Add Recipe to Meal Dialog */}
+      <Dialog open={showRecipeModal} onOpenChange={(v) => { if (!v) { setShowRecipeModal(false); setRecipeMealId(null); } }}>
+        <DialogContent className="max-w-lg rounded-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-[17px]"><BookOpen className="h-5 w-5 text-emerald-500" />Añadir receta a comida</DialogTitle></DialogHeader>
+          <AddRecipeToMealContent mealId={recipeMealId} onSelect={(recipeId) => { if (recipeMealId) addRecipeToMealMut.mutate({ mealId: recipeMealId, recipeId }); }} isLoading={addRecipeToMealMut.isPending} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Add Recipe To Meal Content ──
+function AddRecipeToMealContent({ mealId, onSelect, isLoading }: { mealId: number | null; onSelect: (recipeId: number) => void; isLoading: boolean }) {
+  const { data: recipes, isLoading: loadingRecipes } = trpc.recipe.list.useQuery(undefined, { enabled: !!mealId });
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+
+  const filtered = useMemo(() => {
+    if (!recipes) return [];
+    return recipes.filter(r => {
+      const matchSearch = !search || r.name.toLowerCase().includes(search.toLowerCase());
+      const matchCat = category === "all" || r.category === category;
+      return matchSearch && matchCat;
+    });
+  }, [recipes, search, category]);
+
+  const categories = [
+    { value: "all", label: "Todas" },
+    { value: "desayuno", label: "Desayuno" },
+    { value: "snack_manana", label: "Snack AM" },
+    { value: "comida", label: "Comida" },
+    { value: "snack_tarde", label: "Snack PM" },
+    { value: "cena", label: "Cena" },
+  ];
+
+  if (loadingRecipes) return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  if (!recipes || recipes.length === 0) return <p className="text-center text-muted-foreground py-8 text-sm">No tienes recetas guardadas.</p>;
+
+  return (
+    <div className="flex flex-col gap-3 overflow-hidden">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar receta..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 rounded-xl" />
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        {categories.map(c => (
+          <button key={c.value} onClick={() => setCategory(c.value)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${category === c.value ? "bg-primary text-primary-foreground" : "bg-secondary/60 text-muted-foreground hover:bg-secondary"}`}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-y-auto max-h-[45vh] space-y-1.5 pr-1">
+        {filtered.length === 0 ? (
+          <p className="text-center text-muted-foreground py-6 text-sm">Sin resultados</p>
+        ) : filtered.map(recipe => (
+          <button key={recipe.id} onClick={() => onSelect(recipe.id)} disabled={isLoading}
+            className="w-full text-left px-4 py-3 rounded-xl border border-border/50 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all flex items-center justify-between gap-3 disabled:opacity-50">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium truncate">{recipe.name}</span>
+                {recipe.isSystem === 1 && <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-emerald-500/30 text-emerald-600 shrink-0">NF</Badge>}
+              </div>
+              <div className="flex gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                <span>{recipe.totalCalories} kcal</span>
+                <span>P:{recipe.totalProtein}g</span>
+                <span>C:{recipe.totalCarbs}g</span>
+                <span>G:{recipe.totalFats}g</span>
+              </div>
+            </div>
+            <Plus className="h-4 w-4 text-emerald-500 shrink-0" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

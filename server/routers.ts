@@ -22,7 +22,7 @@ import {
   getUserFolders, createFolder, deleteFolder, renameFolder, moveDietToFolder, getFolderById,
   getUserCustomFoods, createCustomFood, deleteCustomFood,
   getDietInstructions, upsertDietInstructions,
-  reorderFoods, toggleMealEnabled, saveMealAsRecipe,
+  reorderFoods, reorderMeals, toggleMealEnabled, saveMealAsRecipe,
 } from "./db";
 import type { GeneratedDiet } from "@shared/types";
 import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodDb";
@@ -98,6 +98,10 @@ function buildDietPrompt(config: z.infer<typeof dietConfigSchema>, previousDietF
     "Aceite de oliva", "Aguacate", "Almendras", "Nueces",
     "Yogur griego natural", "Yogur desnatado 0%", "Leche semidesnatada", "Queso fresco batido 0%",
     "Jamón serrano", "Jamón cocido bajo en grasa",
+    "Café solo espresso (30ml)", "Café americano (150ml)", "Café con leche desnatada cortado (60ml leche)",
+    "Café con leche semidesnatada (150ml leche)", "Café con leche entera (150ml leche)",
+    "Café con leche desnatada (150ml leche)", "Café con bebida de avena sin azúcar (150ml)",
+    "Café con bebida de almendra sin azúcar (150ml)", "Café descafeinado solo",
   ];
 
   const foodRef = commonCategories
@@ -210,15 +214,29 @@ REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
 2. Para CADA alimento, proporciona SIEMPRE UNA alternativa equivalente con macros similares Y coherente con el momento del día. NUNCA dejes un alimento sin alternativa.
 3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
+   REGLA DE GRUPO ALIMENTARIO: La alternativa SIEMPRE debe pertenecer al MISMO grupo alimentario que el alimento original:
+   - Proteína → otra proteína (pollo → pavo, salmón → merluza, huevos → atún)
+   - Carbohidrato → otro carbohidrato (arroz → pasta, patata → boniato, pan → avena)
+   - Verdura → otra verdura (brócoli → judías verdes, espinacas → acelgas)
+   - Fruta → otra fruta (manzana → pera, plátano → kiwi)
+   - Lácteo → otro lácteo (yogur griego → queso fresco, leche → kefir)
+   - Frutos secos → otros frutos secos (almendras → nueces, anacardos → pistachos)
+   EXCEPCIÓN SIN ALTERNATIVA: Los aceites (aceite de oliva, aceite de coco), condimentos (sal, pimienta, especias), y bebidas básicas (café, infusión) NO necesitan alternativa. Para estos, pon el campo "alternative" con el MISMO alimento y los MISMOS macros. Ejemplo: aceite de oliva → alternativa: aceite de oliva (mismos macros).
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
-5. Indica cantidades precisas (en gramos o unidades).
+5. Indica cantidades precisas (en gramos o unidades). REDONDEO PRÁCTICO: Las cantidades en gramos deben ser múltiplos de 5 (hasta 100g) o múltiplos de 10 (por encima de 100g). Ejemplo: 25g, 40g, 80g, 120g, 150g, 200g. NUNCA uses cantidades como 37g, 123g o 87g.
 6. Usa EXACTAMENTE los nombres de comida indicados en la estructura de comidas.
 7. Asegúrate de que la suma de macros de todas las comidas se aproxime a los objetivos diarios.
 8. Todos los valores numéricos deben ser enteros (sin decimales).
 9. Los macros de cada alimento deben ser proporcionales a la cantidad indicada (no por 100g).
-10. MENÚS DIFERENTES: Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE. Varía las fuentes de proteína, carbohidratos y verduras en cada menú.
+10. MENÚS DIFERENTES: Si se generan varios menús, CADA MENÚ DEBE SER COMPLETAMENTE DIFERENTE en sus platos principales. Varía las fuentes de proteína, carbohidratos y verduras en cada menú.
+    ROTACIÓN DE PROTEÍNAS OBLIGATORIA: Distribuye las proteínas entre los días de forma rotativa. Si tienes 7 menús, usa al menos 5 fuentes de proteína diferentes en las comidas principales (pollo, ternera, cerdo, salmón, merluza, atún, huevos, legumbres, pavo, lubina). NO repitas la misma proteína en comida y cena del mismo día.
+    ROTACIÓN DE CARBOHIDRATOS: Alterna entre arroz, pasta, patata, boniato, legumbres, pan, quinoa, cuscus. No uses el mismo carbohidrato más de 2 veces en todo el plan.
+    ROTACIÓN DE VERDURAS: Usa al menos 6 verduras diferentes a lo largo del plan (brócoli, judías verdes, espinacas, calabacín, tomate, pimiento, berenjena, coliflor, acelgas, champiñones).
+    VARIEDAD EN DESAYUNOS: No repitas el mismo desayuno dos días seguidos. Alterna entre tostadas, avena/porridge, yogur con fruta, huevos revueltos, bowl de avena, tortitas, etc.
+    VARIEDAD EN SNACKS: Alterna entre fruta, yogur, frutos secos, tostada pequeña, batido de proteínas. No repitas el mismo snack dos días seguidos.
 11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
 12. SIN REPETICIÓN ENTRE DÍAS: No repitas el mismo alimento principal (proteína, verdura o carbohidrato principal) en dos días/menús distintos del plan. Distribuye verduras, proteínas y carbohidratos de forma variada a lo largo de todos los días del menú. Si un día usas pechuga de pollo, otro día usa lomo de cerdo o merluza. Si un día usas brócoli, otro día usa judías verdes o calabacín. Maximiza la variedad.
+    COHERENCIA CULINARIA: Cada comida debe tener sentido como plato real. Los alimentos dentro de una comida deben combinar bien entre sí. Evita mezclas absurdas como "atún con yogur y plátano" o "salmón con avena y fresas". Piensa en platos que un cocinero real prepararía.
 13. VERIFICACIÓN CALÓRICA OBLIGATORIA: Antes de cerrar el JSON de cada menú, realiza internamente esta comprobación: suma las calorías de todos los alimentos de todas las comidas de ese menú. El resultado debe estar entre ${Math.round(config.totalCalories * 0.95)} y ${Math.round(config.totalCalories * 1.05)} kcal. Si no cumple, redistribuye las cantidades antes de responder.
 
 CANTIDADES REALISTAS (OBLIGATORIO - MUY IMPORTANTE):
@@ -314,6 +332,20 @@ const dietJsonSchema = {
  * Attempts to repair truncated JSON from LLM by closing open brackets/braces.
  * Uses a stack to track opening order and close in reverse (LIFO).
  */
+/**
+ * Rounds a food quantity to the nearest practical measurement.
+ * - Quantities <= 15g: round to nearest 5 (5, 10, 15)
+ * - Quantities <= 100g: round to nearest 5 (20, 25, 30...)
+ * - Quantities > 100g: round to nearest 10 (110, 120, 130...)
+ * - Minimum: 5g
+ */
+function roundToNearestPractical(grams: number): number {
+  if (grams <= 0) return 5;
+  if (grams <= 15) return Math.max(5, Math.round(grams / 5) * 5);
+  if (grams <= 100) return Math.round(grams / 5) * 5;
+  return Math.round(grams / 10) * 10;
+}
+
 function repairTruncatedDietJson(truncated: string): string {
   let json = truncated.trim();
   
@@ -647,6 +679,53 @@ export const appRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       return getUserDiets(ctx.user.id);
     }),
+
+    createManual: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(200),
+        totalCalories: z.number().min(500).max(10000),
+        proteinPercent: z.number().min(5).max(60).default(30),
+        carbsPercent: z.number().min(5).max(70).default(45),
+        fatsPercent: z.number().min(5).max(60).default(25),
+        totalMenus: z.number().min(1).max(14),
+        mealNames: z.array(z.string().min(1)).min(1).max(10),
+        clientId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const dietId = await createDiet({
+          userId: ctx.user.id,
+          name: input.name,
+          totalCalories: input.totalCalories,
+          proteinPercent: input.proteinPercent,
+          carbsPercent: input.carbsPercent,
+          fatsPercent: input.fatsPercent,
+          totalMenus: input.totalMenus,
+          mealsPerDay: input.mealNames.length,
+          dietType: "personalizada",
+          allergies: [],
+          preferences: "",
+        });
+        for (let m = 1; m <= input.totalMenus; m++) {
+          const menuId = await createMenu({
+            dietId,
+            menuNumber: m,
+            totalCalories: input.totalCalories,
+            totalProtein: Math.round(input.totalCalories * input.proteinPercent / 100 / 4),
+            totalCarbs: Math.round(input.totalCalories * input.carbsPercent / 100 / 4),
+            totalFats: Math.round(input.totalCalories * input.fatsPercent / 100 / 9),
+          });
+          for (let i = 0; i < input.mealNames.length; i++) {
+            await createMeal({
+              menuId,
+              mealNumber: i + 1,
+              mealName: input.mealNames[i],
+              calories: 0, protein: 0, carbs: 0, fats: 0,
+            });
+          }
+        }
+        console.log(`[ManualDiet] Created diet ${dietId} with ${input.totalMenus} menus x ${input.mealNames.length} meals`);
+        return { dietId };
+      }),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -1191,12 +1270,36 @@ Responde SOLO con JSON.`;
         const currentFoods = await db.select().from(foodsTable).where(eq(foodsTable.mealId, input.mealId));
         const currentFoodNames = currentFoods.map(f => f.name).join(", ");
 
-        // Compact prompt without full MEAL_PHILOSOPHY to reduce latency
+        // Get diet preferences for context
+        const diet = dietResult[0];
+        const dietType = (diet as any).dietType || '';
+        const preferences = (diet as any).preferences || '';
+        const allergies = (diet as any).allergies || '';
+
+        // Determine meal-time context
+        const mealNameLower = meal.mealName.toLowerCase();
+        let mealTimeContext = '';
+        if (mealNameLower.includes('desayuno') || mealNameLower.includes('primera comida')) {
+          mealTimeContext = 'DESAYUNO: Alimentos típicos de desayuno español. Ejemplos: tostadas con AOVE y tomate, avena con fruta, yogur con granola, huevos revueltos, tortitas de avena, porridge, café con leche. NUNCA incluyas carne roja, pescado al horno ni platos de comida/cena.';
+        } else if (mealNameLower.includes('snack') || mealNameLower.includes('media mañana') || mealNameLower.includes('media tarde') || mealNameLower.includes('merienda')) {
+          mealTimeContext = 'SNACK/TENTEMPIE: Alimentos ligeros entre comidas. Ejemplos: fruta + frutos secos, yogur con semillas, tostada pequeña con pavo, batido de proteínas, queso fresco con membrillo. Porciones pequeñas (100-300kcal).';
+        } else if (mealNameLower.includes('comida') || mealNameLower.includes('almuerzo') || mealNameLower.includes('segunda comida')) {
+          mealTimeContext = 'COMIDA PRINCIPAL: Plato completo con proteína + carbohidrato + verdura. Ejemplos: lentejas estofadas, salmón al horno con patatas, pasta boloñesa, pollo a la plancha con arroz y ensalada. Debe ser un PLATO RECONOCIBLE, no ingredientes sueltos.';
+        } else if (mealNameLower.includes('cena') || mealNameLower.includes('tercera comida') || mealNameLower.includes('última comida')) {
+          mealTimeContext = 'CENA: Plato más ligero que la comida pero completo. Ejemplos: merluza al horno con verduras, tortilla francesa con ensalada, crema de calabacín con pechuga a la plancha, revuelto de champiñones con jamón. Evita carbohidratos pesados (pasta, arroz abundante).';
+        }
+
         const prompt = `Genera UNA comida "${meal.mealName}" con ~${meal.calories}kcal, ${meal.protein}g proteína, ${meal.carbs}g carbs, ${meal.fats}g grasa.
-NO uses estos alimentos: ${currentFoodNames}. Usa alimentos COMPLETAMENTE DIFERENTES.
-Coherente con "${meal.mealName}": desayuno=alimentos de desayuno, comida/cena=platos principales, snack=ligeros.
-Usa productos de supermercado español (Hacendado, etc). Cantidades en gramos. Cocina sencilla (plancha, horno, airfryer).
-Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros. Solo JSON.`;
+
+${mealTimeContext}
+${dietType ? `Tipo de dieta: ${dietType}.` : ''}
+${allergies ? `ALERGIAS (EXCLUIR TOTALMENTE): ${allergies}.` : ''}
+${preferences ? `Preferencias del usuario: ${preferences}.` : ''}
+
+NO uses estos alimentos (ya están en la comida actual): ${currentFoodNames}. Usa alimentos COMPLETAMENTE DIFERENTES.
+Cantidades en gramos, múltiplos de 5 (hasta 100g) o de 10 (>100g). Cocina sencilla (plancha, horno, airfryer, vapor).
+Incluye 2-6 alimentos. Cada alimento con alternativa del MISMO grupo alimentario (proteína→proteína, verdura→verdura). Aceites/condimentos: alternativa = mismo alimento.
+Valores numéricos enteros. Solo JSON.`;
 
         const singleMealSchema = {
           name: "single_meal",
@@ -1802,7 +1905,7 @@ Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros.
               let newQty = food.quantity;
               if (qtyMatch) {
                 const oldQtyNum = parseFloat(qtyMatch[1]);
-                const newQtyNum = Math.round(oldQtyNum * ratio);
+                const newQtyNum = roundToNearestPractical(Math.round(oldQtyNum * ratio));
                 newQty = food.quantity.replace(qtyMatch[1], String(newQtyNum));
               }
               await updateFood(food.id, {
@@ -1817,7 +1920,7 @@ Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros.
                 alternativeFats: food.alternativeFats ? Math.round(food.alternativeFats * ratio) : null,
                 alternativeQuantity: food.alternativeQuantity ? (() => {
                   const aqm = food.alternativeQuantity!.match(/(\d+\.?\d*)/);
-                  if (aqm) return food.alternativeQuantity!.replace(aqm[1], String(Math.round(parseFloat(aqm[1]) * ratio)));
+                  if (aqm) return food.alternativeQuantity!.replace(aqm[1], String(roundToNearestPractical(Math.round(parseFloat(aqm[1]) * ratio))));
                   return food.alternativeQuantity;
                 })() : null,
               });
@@ -1867,6 +1970,43 @@ Incluye 2-6 alimentos con alternativa para cada uno. Valores numéricos enteros.
         await updateMenuMacros(input.targetMenuId);
 
         return { newMealId };
+      }),
+
+    // ── Copy meal to multiple menus at once ──
+    copyMealToMultiple: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        targetMenuIds: z.array(z.number()).min(1),
+        replaceMealNumber: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        const sourceMenu = await getMenuById(meal.menuId);
+        if (!sourceMenu) throw new Error("Menú no encontrado");
+        const sourceDiet = await getDietById(sourceMenu.dietId);
+        if (!sourceDiet || sourceDiet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const results: { menuId: number; newMealId: number }[] = [];
+        for (const targetMenuId of input.targetMenuIds) {
+          const targetMenu = await getMenuById(targetMenuId);
+          if (!targetMenu) continue;
+          const targetDiet = await getDietById(targetMenu.dietId);
+          if (!targetDiet || targetDiet.userId !== ctx.user.id) continue;
+
+          if (input.replaceMealNumber) {
+            const existingMeals = await getMealsByMenuId(targetMenuId);
+            const toReplace = existingMeals.find(m => m.mealNumber === input.replaceMealNumber);
+            if (toReplace) await deleteMeal(toReplace.id);
+          }
+
+          const mealNumber = input.replaceMealNumber || meal.mealNumber;
+          const newMealId = await copyMealToMenu(input.mealId, targetMenuId, mealNumber);
+          await updateMenuMacros(targetMenuId);
+          results.push({ menuId: targetMenuId, newMealId });
+        }
+
+        return { copied: results.length, results };
       }),
 
     // ── Copy full menu (all meals) to another menu ──
@@ -2131,6 +2271,56 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         return { recipeId };
       }),
 
+    addRecipeToMeal: protectedProcedure
+      .input(z.object({
+        mealId: z.number(),
+        recipeId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const meal = await getMealById(input.mealId);
+        if (!meal) throw new Error("Comida no encontrada");
+        const menu = await getMenuById(meal.menuId);
+        if (!menu) throw new Error("Menú no encontrado");
+        const diet = await getDietById(menu.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+
+        const recipe = await getFullRecipe(input.recipeId);
+        if (!recipe) throw new Error("Receta no encontrada");
+        // Allow system recipes or user's own recipes
+        if (recipe.userId !== null && recipe.userId !== ctx.user.id) throw new Error("No tienes acceso a esta receta");
+
+        // Get current max sortOrder
+        const existingFoods = await getFoodsByMealId(input.mealId);
+        let maxSort = existingFoods.reduce((max, f) => Math.max(max, f.sortOrder || 0), 0);
+
+        // Insert each ingredient as a food in the meal
+        for (const ing of recipe.ingredients) {
+          maxSort++;
+          await createFood({
+            mealId: input.mealId,
+            name: ing.name,
+            quantity: ing.quantity,
+            calories: ing.calories,
+            protein: ing.protein,
+            carbs: ing.carbs,
+            fats: ing.fats,
+            alternativeName: ing.name, // same as original (user can edit later)
+            alternativeQuantity: ing.quantity,
+            alternativeCalories: ing.calories,
+            alternativeProtein: ing.protein,
+            alternativeCarbs: ing.carbs,
+            alternativeFats: ing.fats,
+            sortOrder: maxSort,
+          });
+        }
+
+        // Recalculate meal and menu macros
+        await updateMealMacros(meal.id);
+        await updateMenuMacros(menu.id);
+
+        return { success: true, addedCount: recipe.ingredients.length };
+      }),
+
     reorderFoods: protectedProcedure
       .input(z.object({
         mealId: z.number(),
@@ -2144,6 +2334,20 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         const diet = await getDietById(menu.dietId);
         if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
         await reorderFoods(input.mealId, input.foodIds);
+        return { success: true };
+      }),
+
+    reorderMeals: protectedProcedure
+      .input(z.object({
+        menuId: z.number(),
+        mealIds: z.array(z.number()),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const menu = await getMenuById(input.menuId);
+        if (!menu) throw new Error("Menú no encontrado");
+        const diet = await getDietById(menu.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        await reorderMeals(input.menuId, input.mealIds);
         return { success: true };
       }),
 

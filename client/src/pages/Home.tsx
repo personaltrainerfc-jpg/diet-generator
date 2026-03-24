@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
   Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot, MessageSquare,
-  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp
+  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
@@ -87,6 +88,47 @@ export default function Home() {
   const [fastingProtocol, setFastingProtocol] = useState("");
 
   const recipesQuery = trpc.recipe.list.useQuery();
+
+  // ── Manual diet state ──
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualName, setManualName] = useState("Mi Dieta Manual");
+  const [manualCalories, setManualCalories] = useState(2000);
+  const [manualMenus, setManualMenus] = useState(1);
+  const [manualMealNames, setManualMealNames] = useState<string[]>(["Desayuno", "Snack AM", "Comida", "Snack PM", "Cena"]);
+  const [manualNewMeal, setManualNewMeal] = useState("");
+
+  const createManualMutation = trpc.diet.createManual.useMutation({
+    onSuccess: (data) => {
+      toast.success("Dieta manual creada. Añade alimentos y recetas.");
+      setManualOpen(false);
+      setLocation(`/diet/${data.dietId}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al crear la dieta manual");
+    },
+  });
+
+  const handleCreateManual = () => {
+    if (!manualName.trim()) { toast.error("Escribe un nombre para la dieta"); return; }
+    if (manualMealNames.length === 0) { toast.error("Añade al menos una comida"); return; }
+    createManualMutation.mutate({
+      name: manualName.trim(),
+      totalCalories: manualCalories,
+      proteinPercent: proteinPercent,
+      carbsPercent: carbsPercent,
+      fatsPercent: fatsPercent,
+      totalMenus: manualMenus,
+      mealNames: manualMealNames,
+    });
+  };
+
+  const handleAddManualMeal = () => {
+    const trimmed = manualNewMeal.trim();
+    if (trimmed && !manualMealNames.includes(trimmed)) {
+      setManualMealNames([...manualMealNames, trimmed]);
+      setManualNewMeal("");
+    }
+  };
 
   const macroSum = proteinPercent + carbsPercent + fatsPercent;
   const proteinGrams = Math.round((totalCalories * proteinPercent / 100) / 4);
@@ -717,25 +759,156 @@ export default function Home() {
         )}
 
         {/* Submit */}
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full rounded-2xl h-12 text-[15px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 uppercase tracking-wide"
-          disabled={generateMutation.isPending || macroSum < 95 || macroSum > 105}
-        >
-          {generateMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Generando dieta con IA...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-5 w-5" />
-              Generar Dieta
-            </>
-          )}
-        </Button>
+        <div className="flex flex-col gap-3">
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full rounded-2xl h-12 text-[15px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 uppercase tracking-wide"
+            disabled={generateMutation.isPending || macroSum < 95 || macroSum > 105}
+          >
+            {generateMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Generando dieta con IA...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-5 w-5" />
+                Generar Dieta con IA
+              </>
+            )}
+          </Button>
+
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border/50" /></div>
+            <span className="relative bg-background px-3 text-[12px] text-muted-foreground uppercase tracking-wider">o bien</span>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full rounded-2xl h-12 text-[15px] font-semibold transition-all duration-200 uppercase tracking-wide"
+            onClick={() => setManualOpen(true)}
+          >
+            <PenLine className="mr-2 h-5 w-5" />
+            Crear Dieta Manual
+          </Button>
+        </div>
       </form>
+
+      {/* ── Manual Diet Dialog ── */}
+      <Dialog open={manualOpen} onOpenChange={setManualOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[18px] font-bold uppercase tracking-wide flex items-center gap-2">
+              <PenLine className="h-5 w-5 text-primary" />
+              Crear Dieta Manual
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-[13px] text-muted-foreground -mt-2 leading-relaxed">
+            Crea una dieta vacía y añade alimentos y recetas manualmente.
+          </p>
+
+          <div className="space-y-4 mt-2">
+            {/* Name */}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold uppercase tracking-wide">Nombre</Label>
+              <Input
+                value={manualName}
+                onChange={e => setManualName(e.target.value)}
+                placeholder="Ej: Dieta de mantenimiento"
+                className="rounded-xl h-10"
+              />
+            </div>
+
+            {/* Calories */}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold uppercase tracking-wide">Calorías objetivo</Label>
+              <Input
+                type="number"
+                value={manualCalories}
+                onChange={e => setManualCalories(Number(e.target.value))}
+                min={500}
+                max={10000}
+                className="rounded-xl h-10"
+              />
+            </div>
+
+            {/* Menus */}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold uppercase tracking-wide">Número de menús</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[manualMenus]}
+                  onValueChange={v => setManualMenus(v[0])}
+                  min={1}
+                  max={14}
+                  step={1}
+                  className="flex-1"
+                />
+                <span className="text-[15px] font-bold tabular-nums w-8 text-center">{manualMenus}</span>
+              </div>
+            </div>
+
+            {/* Meal names */}
+            <div className="space-y-2">
+              <Label className="text-[13px] font-semibold uppercase tracking-wide">Comidas por menú</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {manualMealNames.map((meal, i) => (
+                  <Badge key={i} variant="secondary" className="text-[12px] gap-1 pr-1 rounded-lg">
+                    {meal}
+                    <button
+                      type="button"
+                      onClick={() => setManualMealNames(prev => prev.filter((_, idx) => idx !== i))}
+                      className="ml-0.5 hover:text-destructive transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={manualNewMeal}
+                  onChange={e => setManualNewMeal(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddManualMeal(); } }}
+                  placeholder="Añadir comida..."
+                  className="rounded-xl h-9 text-[13px]"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleAddManualMeal} className="rounded-xl shrink-0">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Desayuno", "Snack AM", "Comida", "Snack PM", "Cena", "Pre-entreno", "Post-entreno"].filter(s => !manualMealNames.includes(s)).map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => setManualMealNames(prev => [...prev, suggestion])}
+                    className="text-[11px] px-2 py-0.5 rounded-md border border-dashed border-border/60 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                  >
+                    + {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Create button */}
+            <Button
+              onClick={handleCreateManual}
+              disabled={createManualMutation.isPending || !manualName.trim() || manualMealNames.length === 0}
+              className="w-full rounded-xl h-11 text-[14px] font-semibold uppercase tracking-wide"
+            >
+              {createManualMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creando...</>
+              ) : (
+                <><PenLine className="mr-2 h-4 w-4" />Crear Dieta Vacía</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

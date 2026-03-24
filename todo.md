@@ -364,3 +364,17 @@
 - [x] SR3: Crear seed script con 150 recetas (30 desayunos, 30 snack_manana, 30 comidas, 30 snack_tarde, 30 cenas)
 - [x] SR4: Ejecutar seed script - 150 recetas insertadas correctamente
 - [x] SR5: Actualizar UI de Mis Recetas con badge "NutriFlow", filtros por categoría, buscador, y diferenciación visual
+
+## T: 12 Tareas de mejora de la app
+- [x] T1: Añadir 9 variantes de café a foodDb.ts + referencia en buildDietPrompt
+- [x] T2: Recetas colapsadas por defecto en Recipes.tsx con Collapsible + botón expandir/colapsar todas
+- [x] T3: Sustitutos coherentes - aceites/condimentos sin alternativa + instrucción grupo alimentario en prompts
+- [x] T4: Redondeo inteligente de gramos en dietAdjust.adjustMacros (roundToNearestPractical) + instrucción en prompt
+- [x] T5: Coherencia y variedad en menús - rotación de proteínas/carbohidratos/verduras/desayunos/snacks + coherencia culinaria
+- [x] T6: Mejorar prompt de regenerateMeal con contexto de momento del día, tipo de dieta, alergias y preferencias
+- [x] T7: Skeleton screens y mensajes rotativos (YA IMPLEMENTADO - verificado)
+- [x] T8: Botón añadir receta a comida (frontend modal + backend addRecipeToMeal)
+- [x] T9: Mostrar/ocultar menús en cuadro resumen (botón ojo + oculta tabs + indicador de ocultos)
+- [x] T10: Copiar comida a varios días (frontend checkboxes multi-select + backend copyMealToMultiple)
+- [x] T11: Drag and drop para reordenar comidas (@dnd-kit + backend reorderMeals + GripVertical handle)
+- [x] T12: Crear dieta manualmente sin IA (backend createManual + frontend formulario simplificado)

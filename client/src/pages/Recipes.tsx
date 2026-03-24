@@ -1,15 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { BookOpen, Plus, Trash2, Loader2, ChefHat, Flame, Sparkles, Search, UtensilsCrossed, Coffee, Cookie, Salad, Moon } from "lucide-react";
+import { BookOpen, Plus, Trash2, Loader2, ChefHat, Flame, Sparkles, Search, UtensilsCrossed, Coffee, Cookie, Salad, Moon, ChevronDown, ChevronsUpDown } from "lucide-react";
 
 type IngredientForm = { name: string; quantity: string; calories: number; protein: number; carbs: number; fats: number };
 const emptyIngredient: IngredientForm = { name: "", quantity: "", calories: 0, protein: 0, carbs: 0, fats: 0 };
@@ -31,6 +32,7 @@ export default function Recipes() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   const recipesQuery = trpc.recipe.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const utils = trpc.useUtils();
@@ -85,6 +87,23 @@ export default function Recipes() {
   const systemCount = recipesQuery.data?.filter(r => r.isSystem).length ?? 0;
   const userCount = recipesQuery.data?.filter(r => !r.isSystem).length ?? 0;
 
+  const toggleExpanded = useCallback((id: number) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => {
+    setExpandedIds(new Set(filteredRecipes.map(r => r.id)));
+  }, [filteredRecipes]);
+
+  const collapseAll = useCallback(() => {
+    setExpandedIds(new Set());
+  }, []);
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
@@ -131,6 +150,19 @@ export default function Recipes() {
         ))}
       </div>
 
+      {/* Expand/Collapse all buttons */}
+      {filteredRecipes.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={expandAll} className="gap-1.5 rounded-xl h-8 text-[12px]">
+            <ChevronsUpDown className="h-3.5 w-3.5" />Expandir todas
+          </Button>
+          <Button variant="outline" size="sm" onClick={collapseAll} className="gap-1.5 rounded-xl h-8 text-[12px]">
+            <ChevronsUpDown className="h-3.5 w-3.5" />Colapsar todas
+          </Button>
+          <span className="text-[12px] text-muted-foreground ml-auto">{filteredRecipes.length} recetas</span>
+        </div>
+      )}
+
       {/* Recipe grid */}
       {recipesQuery.isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -138,54 +170,100 @@ export default function Recipes() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredRecipes.map(recipe => {
             const isSystem = !!recipe.isSystem;
+            const isExpanded = expandedIds.has(recipe.id);
             return (
-              <div
+              <Collapsible
                 key={recipe.id}
-                className={`rounded-2xl border shadow-sm hover:shadow-md transition-all p-5 group ${
-                  isSystem
-                    ? "bg-gradient-to-br from-card to-emerald-500/5 border-emerald-500/20 dark:border-emerald-500/15"
-                    : "bg-card border-border/50"
-                } text-card-foreground`}
+                open={isExpanded}
+                onOpenChange={() => toggleExpanded(recipe.id)}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      isSystem ? "bg-emerald-500/10" : "bg-primary/10"
-                    }`}>
-                      {isSystem
-                        ? <Sparkles className="h-4.5 w-4.5 text-emerald-500" />
-                        : <ChefHat className="h-4.5 w-4.5 text-primary" />
-                      }
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-[14px] leading-tight line-clamp-2">{recipe.name}</h3>
-                      {isSystem && (
-                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                          <Sparkles className="h-2.5 w-2.5" />NutriFlow
-                        </span>
+                <div
+                  className={`rounded-2xl border shadow-sm hover:shadow-md transition-all group ${
+                    isSystem
+                      ? "bg-gradient-to-br from-card to-emerald-500/5 border-emerald-500/20 dark:border-emerald-500/15"
+                      : "bg-card border-border/50"
+                  } text-card-foreground`}
+                >
+                  {/* Collapsed header - always visible */}
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full text-left p-5 cursor-pointer">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            isSystem ? "bg-emerald-500/10" : "bg-primary/10"
+                          }`}>
+                            {isSystem
+                              ? <Sparkles className="h-4.5 w-4.5 text-emerald-500" />
+                              : <ChefHat className="h-4.5 w-4.5 text-primary" />
+                            }
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-[14px] leading-tight line-clamp-2">{recipe.name}</h3>
+                            {isSystem && (
+                              <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                <Sparkles className="h-2.5 w-2.5" />NutriFlow
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                      </div>
+                      {recipe.category && isSystem && (
+                        <div className="mb-2.5">
+                          <Badge variant="outline" className="rounded-full text-[10px] font-medium capitalize border-border/50">
+                            {categoryLabels[recipe.category]?.label ?? recipe.category}
+                          </Badge>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium"><Flame className="h-3 w-3 text-orange-500" />{recipe.totalCalories} kcal</Badge>
+                        <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">P {recipe.totalProtein}g</Badge>
+                        <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">C {recipe.totalCarbs}g</Badge>
+                        <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">G {recipe.totalFats}g</Badge>
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+
+                  {/* Expanded content - ingredients */}
+                  <CollapsibleContent>
+                    <div className="px-5 pb-5">
+                      <Separator className="mb-3" />
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Ingredientes</p>
+                      {recipe.ingredients && recipe.ingredients.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {recipe.ingredients.map((ing: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between text-[12px] py-1 px-2 rounded-lg bg-secondary/40">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-medium truncate">{ing.name}</span>
+                                <span className="text-muted-foreground shrink-0">{ing.quantity}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-muted-foreground shrink-0">
+                                <span>{ing.calories}kcal</span>
+                                <span className="text-red-500">P{ing.protein}g</span>
+                                <span className="text-amber-500">C{ing.carbs}g</span>
+                                <span className="text-blue-500">G{ing.fats}g</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[12px] text-muted-foreground italic">Sin ingredientes detallados</p>
+                      )}
+                      {/* Delete button for user recipes */}
+                      {!isSystem && (
+                        <div className="mt-3 pt-3 border-t border-border/30">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(recipe.id); }}
+                            className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />Eliminar receta
+                          </button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  {!isSystem && (
-                    <button onClick={() => setDeleteConfirm(recipe.id)} className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 shrink-0">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  </CollapsibleContent>
                 </div>
-                {recipe.category && isSystem && (
-                  <div className="mb-2.5">
-                    <Badge variant="outline" className="rounded-full text-[10px] font-medium capitalize border-border/50">
-                      {categoryLabels[recipe.category]?.label ?? recipe.category}
-                    </Badge>
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium"><Flame className="h-3 w-3 text-orange-500" />{recipe.totalCalories} kcal</Badge>
-                  <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">P {recipe.totalProtein}g</Badge>
-                  <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">C {recipe.totalCarbs}g</Badge>
-                  <Badge variant="secondary" className="rounded-full gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">G {recipe.totalFats}g</Badge>
-                </div>
-              </div>
+              </Collapsible>
             );
           })}
         </div>
@@ -225,7 +303,6 @@ export default function Recipes() {
               <Label className="font-medium text-[13px]">Nombre de la receta</Label>
               <Input value={recipeName} onChange={e => setRecipeName(e.target.value)} placeholder="Ej: Pollo al curry con arroz basmati" className="rounded-xl" />
             </div>
-            <Separator className="opacity-50" />
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="font-medium text-[13px]">Ingredientes</Label>
