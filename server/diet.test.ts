@@ -405,6 +405,15 @@ vi.mock("./clientDb", () => ({
   getAiEscalationAlerts: vi.fn().mockResolvedValue([]),
   createAiEscalationAlert: vi.fn().mockResolvedValue({ id: 1 }),
   resolveAiEscalationAlert: vi.fn().mockResolvedValue(undefined),
+  // Bloque J: Progress reports & alerts
+  createProgressReport: vi.fn().mockResolvedValue({ id: 1 }),
+  getProgressReportsByClient: vi.fn().mockResolvedValue([]),
+  getProgressReportById: vi.fn().mockResolvedValue(null),
+  createAdherenceAlert: vi.fn().mockResolvedValue({ id: 1 }),
+  getAlertsByTrainer: vi.fn().mockResolvedValue([]),
+  resolveAlert: vi.fn().mockResolvedValue({ success: true }),
+  getClientAdherenceByDayOfWeek: vi.fn().mockResolvedValue([]),
+  getActiveClientsByTrainer: vi.fn().mockResolvedValue([]),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -1396,5 +1405,260 @@ describe("recipe.toggleFavorite", () => {
     const ctx: TrpcContext = { user: null };
     const caller = appRouter.createCaller(ctx);
     await expect(caller.recipe.toggleFavorite({ recipeId: 1 })).rejects.toThrow();
+  });
+});
+
+describe("diet.interpretDescription", () => {
+  it("calls LLM and returns interpreted params with macros summing to 100", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { invokeLLM } = await import("./_core/llm");
+    vi.mocked(invokeLLM).mockResolvedValueOnce({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            name: "Plan Déficit Carlos",
+            totalCalories: 1800,
+            proteinPercent: 35,
+            carbsPercent: 40,
+            fatsPercent: 25,
+            mealsPerDay: 5,
+            totalMenus: 7,
+            avoidFoods: ["pescado"],
+            dietType: "equilibrada",
+            cookingLevel: "minimal",
+            fastingProtocol: null,
+            allergies: [],
+            preferredFoods: [],
+            reasoning: "Déficit calórico para perder 5kg"
+          }),
+          role: "assistant"
+        },
+        index: 0,
+        finish_reason: "stop"
+      }]
+    } as any);
+
+    const result = await caller.diet.interpretDescription({
+      description: "Carlos, 38 años, 85kg, quiere perder 5kg, odia el pescado"
+    });
+    expect(result.name).toBe("Plan Déficit Carlos");
+    expect(result.totalCalories).toBe(1800);
+    expect(result.proteinPercent + result.carbsPercent + result.fatsPercent).toBe(100);
+    expect(result.avoidFoods).toContain("pescado");
+  });
+
+  it("auto-fixes macros when they don't sum to 100", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { invokeLLM } = await import("./_core/llm");
+    vi.mocked(invokeLLM).mockResolvedValueOnce({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            name: "Test",
+            totalCalories: 2000,
+            proteinPercent: 30,
+            carbsPercent: 50,
+            fatsPercent: 30,
+            mealsPerDay: 4,
+            totalMenus: 5,
+            avoidFoods: [],
+            dietType: "equilibrada",
+            cookingLevel: "moderate",
+            fastingProtocol: null,
+            allergies: [],
+            preferredFoods: [],
+            reasoning: "Test"
+          }),
+          role: "assistant"
+        },
+        index: 0,
+        finish_reason: "stop"
+      }]
+    } as any);
+
+    const result = await caller.diet.interpretDescription({
+      description: "Test client description for auto-fix macros"
+    });
+    // carbsPercent should be auto-adjusted: 100 - 30 - 30 = 40
+    expect(result.proteinPercent + result.carbsPercent + result.fatsPercent).toBe(100);
+    expect(result.carbsPercent).toBe(40);
+  });
+
+  it("clamps calories to valid range", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const { invokeLLM } = await import("./_core/llm");
+    vi.mocked(invokeLLM).mockResolvedValueOnce({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            name: "Test",
+            totalCalories: 5000,
+            proteinPercent: 30,
+            carbsPercent: 45,
+            fatsPercent: 25,
+            mealsPerDay: 8,
+            totalMenus: 10,
+            avoidFoods: [],
+            dietType: "equilibrada",
+            cookingLevel: "moderate",
+            fastingProtocol: null,
+            allergies: [],
+            preferredFoods: [],
+            reasoning: "Test"
+          }),
+          role: "assistant"
+        },
+        index: 0,
+        finish_reason: "stop"
+      }]
+    } as any);
+
+    const result = await caller.diet.interpretDescription({
+      description: "Test client description for clamping values"
+    });
+    expect(result.totalCalories).toBe(4000);
+    expect(result.mealsPerDay).toBe(6);
+    expect(result.totalMenus).toBe(7);
+  });
+
+  it("requires authentication", async () => {
+    const ctx: TrpcContext = { user: null };
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.interpretDescription({
+      description: "Test description"
+    })).rejects.toThrow();
+  });
+
+  it("rejects descriptions shorter than 10 characters", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.diet.interpretDescription({
+      description: "short"
+    })).rejects.toThrow();
+  });
+});
+
+
+// ── Progress Reports Tests ──
+describe("clientMgmt.generateProgressReport", () => {
+  it("should generate a progress report for a client", async () => {
+    const { createProgressReport, getAdherenceRange, getMeasurements, getClientById } = await import("./clientDb");
+    (getClientById as any).mockResolvedValueOnce({ id: 1, name: "Test Client", trainerId: 1, status: "active", weight: 75000 });
+    (getAdherenceRange as any).mockResolvedValueOnce([
+      { completed: 1 }, { completed: 1 }, { completed: 0 }, { completed: 1 },
+    ]);
+    (getMeasurements as any).mockResolvedValueOnce([]);
+    (createProgressReport as any).mockResolvedValueOnce({ id: 1 });
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.generateProgressReport({
+      clientId: 1,
+      periodStart: "2026-03-01",
+      periodEnd: "2026-03-07",
+    });
+
+    expect(result).toHaveProperty("adherencePercent");
+    expect(result.mealsTotal).toBe(4);
+    expect(result.mealsCompleted).toBe(3);
+    expect(createProgressReport).toHaveBeenCalled();
+  });
+
+  it("should reject if client does not belong to trainer", async () => {
+    const { getClientById } = await import("./clientDb");
+    (getClientById as any).mockResolvedValueOnce({ id: 1, name: "Other Client", trainerId: 999, status: "active" });
+
+    const caller = appRouter.createCaller(createAuthContext());
+    await expect(caller.clientMgmt.generateProgressReport({
+      clientId: 1,
+      periodStart: "2026-03-01",
+      periodEnd: "2026-03-07",
+    })).rejects.toThrow("Cliente no encontrado");
+  });
+});
+
+describe("clientMgmt.getClientReports", () => {
+  it("should return reports for a valid client", async () => {
+    const { getClientById, getProgressReportsByClient } = await import("./clientDb");
+    (getClientById as any).mockResolvedValueOnce({ id: 1, name: "Test Client", trainerId: 1 });
+    (getProgressReportsByClient as any).mockResolvedValueOnce([{ id: 1, adherencePercent: 85 }]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.getClientReports({ clientId: 1 });
+    expect(result).toHaveLength(1);
+    expect(result[0].adherencePercent).toBe(85);
+  });
+});
+
+describe("clientMgmt.resolveAdherenceAlert", () => {
+  it("should resolve an alert", async () => {
+    const { resolveAlert } = await import("./clientDb");
+    (resolveAlert as any).mockResolvedValueOnce({ success: true });
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.resolveAdherenceAlert({ alertId: 1 });
+    expect(result.success).toBe(true);
+    expect(resolveAlert).toHaveBeenCalledWith(1, 1);
+  });
+});
+
+describe("clientMgmt.getClientAdherencePattern", () => {
+  it("should return adherence by day of week", async () => {
+    const { getClientById, getClientAdherenceByDayOfWeek } = await import("./clientDb");
+    (getClientById as any).mockResolvedValueOnce({ id: 1, name: "Test Client", trainerId: 1 });
+    (getClientAdherenceByDayOfWeek as any).mockResolvedValueOnce([
+      { day: "Lunes", dayIndex: 1, adherencePercent: 90, total: 10 },
+      { day: "Martes", dayIndex: 2, adherencePercent: 80, total: 10 },
+    ]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.getClientAdherencePattern({ clientId: 1 });
+    expect(result).toHaveLength(2);
+    expect(result[0].day).toBe("Lunes");
+  });
+});
+
+
+// ── Adherence Engine Tests ──
+describe("clientMgmt.runAdherenceAnalysis", () => {
+  it("should run analysis and return alertsCreated count", async () => {
+    const { getActiveClientsByTrainer, getAdherenceRange, getAlertsByTrainer, getClientAdherenceByDayOfWeek } = await import("./clientDb");
+    (getActiveClientsByTrainer as any).mockResolvedValueOnce([
+      { id: 1, name: "Test Client", trainerId: 1, status: "active" },
+    ]);
+    (getAlertsByTrainer as any).mockResolvedValueOnce([]);
+    (getAdherenceRange as any).mockResolvedValueOnce([
+      { completed: 0, date: "2026-03-10", mealNumber: 1 },
+      { completed: 0, date: "2026-03-11", mealNumber: 1 },
+      { completed: 0, date: "2026-03-12", mealNumber: 1 },
+      { completed: 0, date: "2026-03-13", mealNumber: 1 },
+      { completed: 0, date: "2026-03-14", mealNumber: 1 },
+    ]);
+    (getClientAdherenceByDayOfWeek as any).mockResolvedValueOnce([
+      { day: "Lunes", dayIndex: 1, adherencePercent: 0, total: 1 },
+      { day: "Martes", dayIndex: 2, adherencePercent: 0, total: 1 },
+      { day: "Miércoles", dayIndex: 3, adherencePercent: 0, total: 1 },
+      { day: "Jueves", dayIndex: 4, adherencePercent: 0, total: 1 },
+      { day: "Viernes", dayIndex: 5, adherencePercent: 0, total: 1 },
+      { day: "Sábado", dayIndex: 6, adherencePercent: 0, total: 0 },
+      { day: "Domingo", dayIndex: 0, adherencePercent: 0, total: 0 },
+    ]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.runAdherenceAnalysis();
+    expect(result).toHaveProperty("alertsCreated");
+    expect(typeof result.alertsCreated).toBe("number");
+  });
+
+  it("should return 0 alerts when no clients exist", async () => {
+    const { getActiveClientsByTrainer, getAlertsByTrainer } = await import("./clientDb");
+    (getActiveClientsByTrainer as any).mockResolvedValueOnce([]);
+    (getAlertsByTrainer as any).mockResolvedValueOnce([]);
+
+    const caller = appRouter.createCaller(createAuthContext());
+    const result = await caller.clientMgmt.runAdherenceAnalysis();
+    expect(result.alertsCreated).toBe(0);
   });
 });

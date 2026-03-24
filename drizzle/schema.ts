@@ -700,3 +700,42 @@ export const recipeFavorites = mysqlTable("recipe_favorites", {
 
 export type RecipeFavorite = typeof recipeFavorites.$inferSelect;
 export type InsertRecipeFavorite = typeof recipeFavorites.$inferInsert;
+
+
+// ── Progress Reports (informes de progreso compartibles) ──
+export const progressReports = mysqlTable("progress_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  trainerId: int("trainerId").notNull(),
+  periodStart: varchar("periodStart", { length: 10 }).notNull(), // YYYY-MM-DD
+  periodEnd: varchar("periodEnd", { length: 10 }).notNull(), // YYYY-MM-DD
+  adherencePercent: int("adherencePercent").notNull(), // 0-100
+  mealsCompleted: int("mealsCompleted").notNull(),
+  mealsTotal: int("mealsTotal").notNull(),
+  weightStart: int("weightStart"), // gramos
+  weightEnd: int("weightEnd"), // gramos
+  motivationalMessage: text("motivationalMessage"),
+  highlights: json("highlights").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProgressReport = typeof progressReports.$inferSelect;
+export type InsertProgressReport = typeof progressReports.$inferInsert;
+
+// ── Adherence Alerts (alertas predictivas de adherencia) ──
+export const adherenceAlerts = mysqlTable("adherence_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  trainerId: int("trainerId").notNull(),
+  alertType: varchar("alertType", { length: 50 }).notNull(), // 'drop_3days', 'skip_meal_pattern', 'weekend_drop', 'overall_low'
+  severity: mysqlEnum("severity", ["low", "medium", "high"]).default("medium").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  suggestion: text("suggestion"),
+  resolved: int("resolved").default(0).notNull(), // 0 = no, 1 = sí
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AdherenceAlert = typeof adherenceAlerts.$inferSelect;
+export type InsertAdherenceAlert = typeof adherenceAlerts.$inferInsert;

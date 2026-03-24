@@ -460,6 +460,103 @@ export const appRouter = router({
   clientPortal: clientPortalRouter,
 
   diet: router({
+    interpretDescription: protectedProcedure
+      .input(z.object({ description: z.string().min(10).max(1000) }))
+      .mutation(async ({ input }) => {
+        const interpretPrompt = `Eres un nutricionista experto. A partir de la siguiente 
+descripción de un cliente, extrae e interpreta los parámetros necesarios para 
+crear su plan nutricional. Sé inteligente en tus deducciones: si dice que quiere 
+perder peso calcula un déficit calórico apropiado, si menciona que va al gym 
+ajusta las proteínas al alza, si menciona horarios deduce el número de comidas 
+más lógico, si menciona que no le gusta algún alimento añádelo a avoidFoods.
+
+Descripción del cliente: "${input.description}"
+
+Devuelve ÚNICAMENTE un JSON con esta estructura exacta sin texto adicional:
+{
+  "name": "nombre del plan sugerido basado en el objetivo",
+  "totalCalories": número entero entre 1200 y 4000,
+  "proteinPercent": número entero,
+  "carbsPercent": número entero,
+  "fatsPercent": número entero,
+  "mealsPerDay": número entero entre 3 y 6,
+  "totalMenus": número entero entre 5 y 7,
+  "avoidFoods": array de strings con alimentos a evitar mencionados,
+  "dietType": uno de: "equilibrada" | "mediterranea" | "keto" | "paleo" | "realfood" | "vegetariana" | "vegana",
+  "cookingLevel": uno de: "minimal" | "moderate" | "elaborate",
+  "fastingProtocol": null o "16/8" o "18/6" si se menciona ayuno,
+  "allergies": array de strings con alergias mencionadas,
+  "preferredFoods": array de strings con alimentos preferidos mencionados,
+  "reasoning": "explicación breve en español de por qué has elegido estos parámetros"
+}
+
+La suma de proteinPercent + carbsPercent + fatsPercent debe ser exactamente 100.
+Si no tienes suficiente información para algún parámetro usa valores estándar 
+conservadores y explícalo en el campo reasoning.`;
+
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: "Eres un nutricionista experto. Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional." },
+            { role: "user", content: interpretPrompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "diet_interpretation",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  totalCalories: { type: "integer" },
+                  proteinPercent: { type: "integer" },
+                  carbsPercent: { type: "integer" },
+                  fatsPercent: { type: "integer" },
+                  mealsPerDay: { type: "integer" },
+                  totalMenus: { type: "integer" },
+                  avoidFoods: { type: "array", items: { type: "string" } },
+                  dietType: { type: "string" },
+                  cookingLevel: { type: "string" },
+                  fastingProtocol: { type: ["string", "null"] },
+                  allergies: { type: "array", items: { type: "string" } },
+                  preferredFoods: { type: "array", items: { type: "string" } },
+                  reasoning: { type: "string" },
+                },
+                required: ["name", "totalCalories", "proteinPercent", "carbsPercent", "fatsPercent", "mealsPerDay", "totalMenus", "avoidFoods", "dietType", "cookingLevel", "fastingProtocol", "allergies", "preferredFoods", "reasoning"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const content = response.choices?.[0]?.message?.content;
+        if (!content) throw new Error("No se pudo interpretar la descripción");
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(content as string);
+        } catch {
+          throw new Error("La IA no devolvió un JSON válido");
+        }
+
+        // Validate and auto-fix macro sum to 100
+        const macroSum = parsed.proteinPercent + parsed.carbsPercent + parsed.fatsPercent;
+        if (macroSum !== 100) {
+          parsed.carbsPercent = 100 - parsed.proteinPercent - parsed.fatsPercent;
+          if (parsed.carbsPercent < 0) {
+            parsed.carbsPercent = 0;
+            parsed.fatsPercent = 100 - parsed.proteinPercent;
+          }
+        }
+
+        // Clamp values to valid ranges
+        parsed.totalCalories = Math.max(1200, Math.min(4000, parsed.totalCalories));
+        parsed.mealsPerDay = Math.max(3, Math.min(6, parsed.mealsPerDay));
+        parsed.totalMenus = Math.max(5, Math.min(7, parsed.totalMenus));
+
+        return parsed;
+      }),
+
     generate: protectedProcedure
       .input(dietConfigSchema)
       .mutation(async ({ ctx, input }) => {

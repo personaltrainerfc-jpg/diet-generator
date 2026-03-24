@@ -4,7 +4,8 @@ import {
   clients, clientDiets, adherenceLogs, progressPhotos,
   weeklyCheckIns, chatMessages, achievements, clientAchievements,
   bodyMeasurements, initialAssessments, diets,
-  activityBadges, clientActivityBadges, activityStreaks
+  activityBadges, clientActivityBadges, activityStreaks,
+  progressReports, adherenceAlerts
 } from "../drizzle/schema";
 import { getFullDiet } from "./db";
 
@@ -1006,4 +1007,127 @@ export async function evaluateBadges(clientId: number, activityData: { steps?: n
   }
   
   return newlyUnlocked;
+}
+
+
+// ── Progress Reports ──
+export async function createProgressReport(data: {
+  clientId: number; trainerId: number;
+  periodStart: string; periodEnd: string;
+  adherencePercent: number; mealsCompleted: number; mealsTotal: number;
+  weightStart?: number | null; weightEnd?: number | null;
+  motivationalMessage?: string | null; highlights?: string[];
+}) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(progressReports).values({
+    clientId: data.clientId,
+    trainerId: data.trainerId,
+    periodStart: data.periodStart,
+    periodEnd: data.periodEnd,
+    adherencePercent: data.adherencePercent,
+    mealsCompleted: data.mealsCompleted,
+    mealsTotal: data.mealsTotal,
+    weightStart: data.weightStart ?? null,
+    weightEnd: data.weightEnd ?? null,
+    motivationalMessage: data.motivationalMessage ?? null,
+    highlights: data.highlights ?? [],
+  });
+  return { id: result.insertId };
+}
+
+export async function getProgressReportsByClient(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(progressReports)
+    .where(eq(progressReports.clientId, clientId))
+    .orderBy(desc(progressReports.createdAt));
+}
+
+export async function getProgressReportById(id: number) {
+  const db = await getDb(); assertDb(db);
+  const [report] = await db.select().from(progressReports).where(eq(progressReports.id, id));
+  return report || null;
+}
+
+// ── Adherence Alerts ──
+export async function createAdherenceAlert(data: {
+  clientId: number; trainerId: number;
+  alertType: string; severity: "low" | "medium" | "high";
+  title: string; description?: string; suggestion?: string;
+}) {
+  const db = await getDb(); assertDb(db);
+  const [result] = await db.insert(adherenceAlerts).values({
+    clientId: data.clientId,
+    trainerId: data.trainerId,
+    alertType: data.alertType,
+    severity: data.severity,
+    title: data.title,
+    description: data.description ?? null,
+    suggestion: data.suggestion ?? null,
+  });
+  return { id: result.insertId };
+}
+
+export async function getAlertsByTrainer(trainerId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select({
+    alert: adherenceAlerts,
+    clientName: clients.name,
+  }).from(adherenceAlerts)
+    .innerJoin(clients, eq(adherenceAlerts.clientId, clients.id))
+    .where(and(
+      eq(adherenceAlerts.trainerId, trainerId),
+      eq(adherenceAlerts.resolved, 0)
+    ))
+    .orderBy(
+      desc(sql`FIELD(${adherenceAlerts.severity}, 'high', 'medium', 'low')`),
+      desc(adherenceAlerts.createdAt)
+    );
+}
+
+export async function resolveAlert(alertId: number, trainerId: number) {
+  const db = await getDb(); assertDb(db);
+  await db.update(adherenceAlerts)
+    .set({ resolved: 1, resolvedAt: new Date() })
+    .where(and(
+      eq(adherenceAlerts.id, alertId),
+      eq(adherenceAlerts.trainerId, trainerId)
+    ));
+  return { success: true };
+}
+
+export async function getClientAdherenceByDayOfWeek(clientId: number) {
+  const db = await getDb(); assertDb(db);
+  // Get all adherence logs for this client, grouped by day of week
+  const logs = await db.select().from(adherenceLogs)
+    .where(eq(adherenceLogs.clientId, clientId));
+  
+  // Group by day of week (0=Sun, 1=Mon, ..., 6=Sat)
+  const dayStats: Record<number, { completed: number; total: number }> = {};
+  for (let d = 0; d < 7; d++) dayStats[d] = { completed: 0, total: 0 };
+  
+  for (const log of logs) {
+    const date = new Date(log.date);
+    const day = date.getDay(); // 0=Sun
+    dayStats[day].total++;
+    if (log.completed) dayStats[day].completed++;
+  }
+  
+  // Return as array Mon-Sun (1,2,3,4,5,6,0)
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+  const dayNames = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  return dayOrder.map((d, i) => ({
+    day: dayNames[i],
+    dayIndex: d,
+    adherencePercent: dayStats[d].total > 0 ? Math.round((dayStats[d].completed / dayStats[d].total) * 100) : 0,
+    total: dayStats[d].total,
+  }));
+}
+
+export async function getActiveClientsByTrainer(trainerId: number) {
+  const db = await getDb(); assertDb(db);
+  return db.select().from(clients)
+    .where(and(
+      eq(clients.trainerId, trainerId),
+      eq(clients.status, "active")
+    ));
 }

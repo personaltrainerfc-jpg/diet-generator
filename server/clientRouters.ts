@@ -40,9 +40,14 @@ import {
   getWearableConnection, upsertWearableConnection, disconnectWearable,
   // Bloque I: Gamificación
   getAllActivityBadges, getClientActivityBadges, updateStreak, evaluateBadges, getOrCreateStreak,
+  // Bloque J: Informes de progreso y alertas
+  createProgressReport, getProgressReportsByClient, getProgressReportById,
+  createAdherenceAlert, getAlertsByTrainer, resolveAlert, getClientAdherenceByDayOfWeek,
+  getActiveClientsByTrainer,
 } from "./clientDb";
 import { storagePut } from "./storage";
 import { getFullDiet } from "./db";
+import { runAdherenceAnalysis } from "./adherenceEngine";
 
 // ── Client Router (Trainer side) ──
 export const clientRouter = router({
@@ -941,6 +946,95 @@ Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes 
       });
       return { summary: response.choices[0]?.message?.content || "No se pudo generar resumen" };
     }),
+
+  // ── Progress Reports (Trainer) ──
+  generateProgressReport: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      periodStart: z.string(), // YYYY-MM-DD
+      periodEnd: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("Cliente no encontrado");
+
+      // Calculate adherence for the period
+      const logs = await getAdherenceRange(input.clientId, input.periodStart, input.periodEnd);
+      const mealsTotal = logs.length;
+      const mealsCompleted = logs.filter((l: any) => l.completed).length;
+      const adherencePercent = mealsTotal > 0 ? Math.round((mealsCompleted / mealsTotal) * 100) : 0;
+
+      // Get weight data
+      const measurements = await getMeasurements(input.clientId);
+      const periodMeasurements = measurements.filter((m: any) => m.date >= input.periodStart && m.date <= input.periodEnd);
+      const weightStart = periodMeasurements.length > 0 ? periodMeasurements[periodMeasurements.length - 1].weight : client.weight;
+      const weightEnd = periodMeasurements.length > 0 ? periodMeasurements[0].weight : client.weight;
+
+      // Generate motivational message with AI
+      const weightChange = weightStart && weightEnd ? ((weightEnd - weightStart) / 1000).toFixed(1) : null;
+      const aiResponse = await invokeLLM({
+        messages: [
+          { role: "system", content: "Eres un entrenador nutricional motivador. Genera un mensaje breve (2-3 frases) y positivo para el cliente basado en sus resultados. Siempre encuentra algo positivo que destacar. Responde en espa\u00f1ol." },
+          { role: "user", content: `Resultados del periodo ${input.periodStart} a ${input.periodEnd}:\n- Adherencia: ${adherencePercent}%\n- Comidas completadas: ${mealsCompleted}/${mealsTotal}\n${weightChange ? `- Cambio de peso: ${weightChange}kg` : ''}\n- Nombre del cliente: ${client.name}` },
+        ],
+      });
+      const motivationalMessage = aiResponse.choices?.[0]?.message?.content as string || "\u00a1Sigue as\u00ed! Cada d\u00eda cuenta.";
+
+      // Generate highlights
+      const highlights: string[] = [];
+      if (adherencePercent >= 80) highlights.push("Adherencia excelente");
+      else if (adherencePercent >= 60) highlights.push("Buena adherencia");
+      if (weightChange && parseFloat(weightChange) < 0) highlights.push(`${Math.abs(parseFloat(weightChange))}kg perdidos`);
+      if (mealsCompleted > 0) highlights.push(`${mealsCompleted} comidas completadas`);
+
+      const report = await createProgressReport({
+        clientId: input.clientId,
+        trainerId: ctx.user.id,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        adherencePercent,
+        mealsCompleted,
+        mealsTotal,
+        weightStart: weightStart ?? null,
+        weightEnd: weightEnd ?? null,
+        motivationalMessage,
+        highlights,
+      });
+
+      return { ...report, adherencePercent, mealsCompleted, mealsTotal, weightStart, weightEnd, motivationalMessage, highlights };
+    }),
+
+  getClientReports: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("Cliente no encontrado");
+      return getProgressReportsByClient(input.clientId);
+    }),
+
+  // ── Adherence Alerts (Trainer) ──
+  getAlerts: protectedProcedure.query(async ({ ctx }) => {
+    return getAlertsByTrainer(ctx.user.id);
+  }),
+
+  resolveAdherenceAlert: protectedProcedure
+    .input(z.object({ alertId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      return resolveAlert(input.alertId, ctx.user.id);
+    }),
+
+  getClientAdherencePattern: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("Cliente no encontrado");
+      return getClientAdherenceByDayOfWeek(input.clientId);
+    }),
+
+  runAdherenceAnalysis: protectedProcedure.mutation(async ({ ctx }) => {
+    const alertsCreated = await runAdherenceAnalysis(ctx.user.id);
+    return { alertsCreated };
+  }),
 });
 
 // ── Client Portal Router (Client-facing, public with code auth) ──
@@ -1641,6 +1735,15 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
       const profile = await getPersonalizationProfile(input.clientId);
       const preferences = await getLearnedPreferences(input.clientId);
       return { profile: profile?.profileData || null, preferences };
+    }),
+
+  // ── Progress Reports (Client-facing) ──
+  getMyReports: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .query(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      return getProgressReportsByClient(input.clientId);
     }),
 });
 

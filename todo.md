@@ -398,3 +398,35 @@
 - [x] U4-3: Procedimiento recipe.toggleFavorite + toggleRecipeFavorite en db.ts
 - [x] U4-4: Botón corazón con optimistic update + tab Favoritos con contador + empty state
 - [x] U4-5: 3 tests añadidos para toggleFavorite (193 tests pasan)
+
+## TAREA-A: Generar dieta con una sola frase en lenguaje natural
+- [x] TA-1: Backend diet.interpretDescription endpoint con LLM (prompt exacto del usuario)
+- [x] TA-2: Validación automática de suma de macros = 100 (ajustar carbsPercent)
+- [x] TA-3: Frontend "Describir cliente" opción junto a IA y Manual
+- [x] TA-4: Campo de texto grande con placeholder + 3 ejemplos clicables
+- [x] TA-5: Pantalla de revisión con campos editables + reasoning de la IA
+- [x] TA-6: Botones "Ajustar parámetros" y "Confirmar y generar dieta" (usa diet.generate existente)
+- [x] TA-7: Tests vitest para interpretDescription (198→203 tests)
+
+## TAREA-B: Portal de resultados compartible con imagen descargable
+- [x] TB-1: Tabla progressReports + adherenceAlerts en schema + migración 0011 aplicada
+- [x] TB-2: Endpoint clientMgmt.generateProgressReport + clientPortal.generateReport
+- [x] TB-3: Endpoint clientPortal.getReports + clientMgmt.getClientReports
+- [x] TB-4: Endpoint trainer getClientReports integrado en clientMgmt
+- [x] TB-5: Frontend cliente: tab "Resultados" en ClientPortal con generación + historial
+- [x] TB-6: Tarjeta Instagram con métricas, arco SVG, mensaje motivacional + gradiente
+- [x] TB-7: Botón "Descargar" con html-to-image + "Compartir" con Web Share API
+- [x] TB-8: Tab "Informes" en ClientDetail con generación + historial + patrón adherencia
+- [x] TB-9: Tests vitest para progressReports (203→205 tests)
+
+## TAREA-C: Score de adherencia predictivo con alertas automáticas
+- [x] TC-1: Tabla adherenceAlerts en schema (incluida en migración 0011)
+- [x] TC-2: server/adherenceEngine.ts con 4 reglas: overall_low, drop_3days, weekend_drop, skip_meal_pattern
+- [x] TC-3: runAdherenceAnalysis() para todos los clientes activos (evita duplicados)
+- [x] TC-4: Botón manual "Analizar" en dashboard (scheduler pendiente para producción)
+- [x] TC-5: Endpoint clientMgmt.getAlerts
+- [x] TC-6: Endpoint clientMgmt.resolveAdherenceAlert
+- [x] TC-7: Endpoint clientMgmt.getClientAdherencePattern (7 barras lun-dom)
+- [x] TC-8: Panel completo en TrainerDashboard con alertas, severidad, sugerencias, resolver
+- [x] TC-9: Gráfica de barras adherencia semanal en tab Informes de ClientDetail
+- [x] TC-10: Tests vitest para adherenceEngine y alertas (205 tests pasan)

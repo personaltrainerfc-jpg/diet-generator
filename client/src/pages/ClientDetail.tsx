@@ -363,6 +363,7 @@ export default function ClientDetail() {
             <TabsTrigger value="personalization" className="rounded-lg text-[13px] gap-1.5 px-3"><Sparkles className="h-3.5 w-3.5" />Perfil</TabsTrigger>
             <TabsTrigger value="activity" className="rounded-lg text-[13px] gap-1.5 px-3"><Activity className="h-3.5 w-3.5" />Actividad</TabsTrigger>
             <TabsTrigger value="conversations" className="rounded-lg text-[13px] gap-1.5 px-3"><MessageCircle className="h-3.5 w-3.5" />Conv. IA</TabsTrigger>
+            <TabsTrigger value="reports" className="rounded-lg text-[13px] gap-1.5 px-3"><FileText className="h-3.5 w-3.5" />Informes</TabsTrigger>
           </TabsList>
         </div>
 
@@ -1060,6 +1061,11 @@ export default function ClientDetail() {
         <TabsContent value="conversations" className="space-y-4 mt-4">
           <ConversationsPanel clientId={clientId} />
         </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-4 mt-4">
+          <ReportsPanel clientId={clientId} />
+        </TabsContent>
       </Tabs>
 
       {/* Check-in Dialog */}
@@ -1751,6 +1757,130 @@ function TrainerBadgesView({ clientId }: { clientId: number }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+
+// ── Reports Panel (Trainer generates + views reports for a client) ──
+function ReportsPanel({ clientId }: { clientId: number }) {
+  const [periodStart, setPeriodStart] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().split("T")[0]);
+
+  const reportsQ = trpc.clientMgmt.getClientReports.useQuery({ clientId });
+  const generateMut = trpc.clientMgmt.generateProgressReport.useMutation({
+    onSuccess: () => {
+      reportsQ.refetch();
+      toast.success("Informe generado correctamente");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const adherenceQ = trpc.clientMgmt.getClientAdherencePattern.useQuery({ clientId });
+
+  return (
+    <div className="space-y-6">
+      {/* Generate new report */}
+      <div className="rounded-2xl bg-card border border-border/50 p-5">
+        <h3 className="text-[15px] font-bold mb-3">Generar informe de progreso</h3>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Desde</Label>
+            <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="rounded-xl text-[13px]" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Hasta</Label>
+            <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="rounded-xl text-[13px]" />
+          </div>
+        </div>
+        <Button
+          onClick={() => generateMut.mutate({ clientId, periodStart, periodEnd })}
+          disabled={generateMut.isPending}
+          className="w-full rounded-xl"
+        >
+          {generateMut.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generando...</> : <><FileText className="mr-2 h-4 w-4" />Generar informe</>}
+        </Button>
+      </div>
+
+      {/* Adherence by day of week chart */}
+      {adherenceQ.data && adherenceQ.data.some((d: any) => d.total > 0) && (
+        <div className="rounded-2xl bg-card border border-border/50 p-5">
+          <h3 className="text-[15px] font-bold mb-3">Patrón de adherencia semanal</h3>
+          <div className="flex items-end gap-2 h-32">
+            {adherenceQ.data.map((d: any) => (
+              <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
+                <span className="text-[10px] font-medium">{d.adherencePercent}%</span>
+                <div className="w-full rounded-t-lg" style={{
+                  height: `${Math.max(d.adherencePercent, 4)}%`,
+                  backgroundColor: d.adherencePercent >= 80 ? "#22c55e" : d.adherencePercent >= 60 ? "#eab308" : d.adherencePercent > 0 ? "#ef4444" : "#334155",
+                }} />
+                <span className="text-[10px] text-muted-foreground">{d.day.slice(0, 3)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Report history */}
+      <div>
+        <h3 className="text-[15px] font-bold mb-3">Historial de informes</h3>
+        {reportsQ.isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : !reportsQ.data?.length ? (
+          <div className="text-center py-8 rounded-2xl bg-card border border-border/50">
+            <FileText className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+            <p className="text-[13px] text-muted-foreground">No hay informes generados aún</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {reportsQ.data.map((report: any) => (
+              <div key={report.id} className="rounded-2xl bg-card border border-border/50 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-[13px] font-semibold">{report.periodStart} → {report.periodEnd}</p>
+                    <p className="text-[11px] text-muted-foreground">Generado el {new Date(report.createdAt).toLocaleDateString("es-ES")}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[22px] font-bold" style={{ color: report.adherencePercent >= 80 ? "#22c55e" : report.adherencePercent >= 60 ? "#eab308" : "#ef4444" }}>
+                      {report.adherencePercent}%
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center text-[12px]">
+                  <div className="rounded-xl bg-background/50 p-2">
+                    <p className="font-bold">{report.mealsCompleted}</p>
+                    <p className="text-muted-foreground text-[10px]">Comidas</p>
+                  </div>
+                  <div className="rounded-xl bg-background/50 p-2">
+                    <p className="font-bold">{report.mealsTotal}</p>
+                    <p className="text-muted-foreground text-[10px]">Objetivo</p>
+                  </div>
+                  <div className="rounded-xl bg-background/50 p-2">
+                    <p className="font-bold">
+                      {report.weightStart && report.weightEnd
+                        ? `${((report.weightEnd - report.weightStart) / 1000).toFixed(1)}kg`
+                        : "—"}
+                    </p>
+                    <p className="text-muted-foreground text-[10px]">Peso</p>
+                  </div>
+                </div>
+                {report.motivationalMessage && (
+                  <p className="text-[12px] italic text-muted-foreground mt-3 leading-relaxed">{report.motivationalMessage}</p>
+                )}
+                {report.highlights && report.highlights.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {report.highlights.map((h: string, i: number) => (
+                      <Badge key={i} variant="secondary" className="text-[10px] rounded-lg">{h}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

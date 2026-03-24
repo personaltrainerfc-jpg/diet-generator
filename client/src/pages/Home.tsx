@@ -13,7 +13,8 @@ import { toast } from "sonner";
 import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
   Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot, MessageSquare,
-  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2, Users
+  ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2, Users,
+  MessageCircle, Brain, ArrowLeft, Check, Info
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
@@ -89,6 +90,71 @@ export default function Home() {
   const [fastingProtocol, setFastingProtocol] = useState("");
 
   const recipesQuery = trpc.recipe.list.useQuery();
+
+  // ── Describe client state ──
+  const [describeMode, setDescribeMode] = useState<"input" | "review" | null>(null);
+  const [clientDescription, setClientDescription] = useState("");
+  const [interpretedParams, setInterpretedParams] = useState<any>(null);
+
+  const interpretMutation = trpc.diet.interpretDescription.useMutation({
+    onSuccess: (data) => {
+      setInterpretedParams(data);
+      setDescribeMode("review");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al interpretar la descripción");
+    },
+  });
+
+  const handleInterpret = () => {
+    if (clientDescription.trim().length < 10) {
+      toast.error("Escribe al menos 10 caracteres describiendo al cliente");
+      return;
+    }
+    interpretMutation.mutate({ description: clientDescription.trim() });
+  };
+
+  const handleConfirmInterpretation = () => {
+    if (!interpretedParams) return;
+    // Fill the main form with interpreted params
+    setName(interpretedParams.name || "Mi Dieta");
+    setTotalCalories(interpretedParams.totalCalories);
+    setProteinPercent(interpretedParams.proteinPercent);
+    setCarbsPercent(interpretedParams.carbsPercent);
+    setFatsPercent(interpretedParams.fatsPercent);
+    setMealsPerDay(interpretedParams.mealsPerDay);
+    setTotalMenus(interpretedParams.totalMenus);
+    setAvoidFoods(interpretedParams.avoidFoods || []);
+    setDietType(interpretedParams.dietType || "equilibrada");
+    setCookingLevel(interpretedParams.cookingLevel || "moderate");
+    setAllergies(interpretedParams.allergies || []);
+    setPreferredFoods(interpretedParams.preferredFoods || []);
+    setFastingProtocol(interpretedParams.fastingProtocol || "");
+    // Now generate the diet
+    generateMutation.mutate({
+      name: interpretedParams.name || "Mi Dieta",
+      totalCalories: interpretedParams.totalCalories,
+      proteinPercent: interpretedParams.proteinPercent,
+      carbsPercent: interpretedParams.carbsPercent,
+      fatsPercent: interpretedParams.fatsPercent,
+      mealsPerDay: interpretedParams.mealsPerDay,
+      totalMenus: interpretedParams.totalMenus,
+      avoidFoods: interpretedParams.avoidFoods || [],
+      dietType: interpretedParams.dietType || "equilibrada",
+      cookingLevel: interpretedParams.cookingLevel || "moderate",
+      useHomeMeasures: false,
+      preferredFoods: interpretedParams.preferredFoods || [],
+      allergies: interpretedParams.allergies || [],
+      ...(interpretedParams.fastingProtocol ? { fastingProtocol: interpretedParams.fastingProtocol } : {}),
+    });
+    setDescribeMode(null);
+  };
+
+  const EXAMPLE_DESCRIPTIONS = [
+    "María, 32 años, 65kg, quiere tonificar, vegetariana, poco tiempo para cocinar, hace pilates 4 veces por semana",
+    "Javier, 45 años, 95kg, quiere perder 10kg, trabaja en construcción, come fuera de casa a mediodía, sin restricciones",
+    "Laura, 28 años, 58kg, runner de maratón, necesita plan de carga de carbohidratos, sin gluten",
+  ];
 
   // ── Manual diet state ──
   const [manualOpen, setManualOpen] = useState(false);
@@ -268,6 +334,245 @@ export default function Home() {
   // Show skeleton screen while generating
   if (generateMutation.isPending) {
     return <DietGenerationSkeleton totalMenus={totalMenus} mealsPerDay={mealsPerDay} />;
+  }
+
+  // Show interpreting loading screen
+  if (interpretMutation.isPending) {
+    return (
+      <div className="max-w-3xl mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <div className="relative">
+          <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Brain className="h-10 w-10 text-primary animate-pulse" />
+          </div>
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-[20px] font-bold uppercase tracking-wide">Analizando descripción del cliente...</h2>
+          <p className="text-[13px] text-muted-foreground">La IA está interpretando los parámetros nutricionales</p>
+        </div>
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show describe client input screen
+  if (describeMode === "input") {
+    return (
+      <div className="max-w-3xl mx-auto space-y-5 pb-8">
+        <div className="pt-2 flex items-center gap-3">
+          <button onClick={() => setDescribeMode(null)} className="h-9 w-9 rounded-xl border border-border/50 flex items-center justify-center hover:bg-secondary transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-[28px] font-bold tracking-tight text-foreground uppercase">DESCRIBIR CLIENTE</h1>
+            <p className="text-[13px] mt-0.5 text-muted-foreground uppercase tracking-wide">La IA interpretará los parámetros automáticamente</p>
+          </div>
+        </div>
+
+        <Section>
+          <SectionTitle icon={MessageCircle} color="text-violet-500">Descripción del cliente</SectionTitle>
+          <SectionDesc>Escribe una descripción libre de tu cliente y la IA extraerá todos los parámetros necesarios.</SectionDesc>
+          <Textarea
+            value={clientDescription}
+            onChange={e => setClientDescription(e.target.value)}
+            placeholder="Describe a tu cliente... Ej: Dieta para Carlos, 38 años, 85kg, quiere perder 5kg, odia el pescado, trabaja de oficina, va al gym 3 veces por semana por la tarde, nivel de cocina básico."
+            className="min-h-[160px] text-[14px] rounded-xl resize-none"
+            maxLength={1000}
+          />
+          <p className="text-[11px] text-muted-foreground text-right mt-1">{clientDescription.length}/1000</p>
+        </Section>
+
+        <Section>
+          <SectionTitle icon={Sparkles} color="text-amber-500">Ejemplos</SectionTitle>
+          <SectionDesc>Pulsa un ejemplo para usarlo como punto de partida.</SectionDesc>
+          <div className="space-y-2">
+            {EXAMPLE_DESCRIPTIONS.map((desc, i) => (
+              <button
+                key={i}
+                onClick={() => setClientDescription(desc)}
+                className="w-full text-left p-3 rounded-xl border border-border/50 hover:bg-secondary/50 hover:border-primary/20 transition-all text-[13px] text-muted-foreground leading-relaxed"
+              >
+                “{desc}”
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        <Button
+          onClick={handleInterpret}
+          size="lg"
+          className="w-full rounded-2xl h-12 text-[15px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 uppercase tracking-wide"
+          disabled={clientDescription.trim().length < 10}
+        >
+          <Brain className="mr-2 h-5 w-5" />
+          Interpretar
+        </Button>
+      </div>
+    );
+  }
+
+  // Show review screen after interpretation
+  if (describeMode === "review" && interpretedParams) {
+    const p = interpretedParams;
+    const dietTypeLabels: Record<string, string> = { equilibrada: "Equilibrada", mediterranea: "Mediterránea", keto: "Keto", paleo: "Paleo", realfood: "Real Food", vegetariana: "Vegetariana", vegana: "Vegana" };
+    const cookingLabels: Record<string, string> = { minimal: "Mínimo", moderate: "Moderado", elaborate: "Elaborado" };
+    return (
+      <div className="max-w-3xl mx-auto space-y-5 pb-8">
+        <div className="pt-2 flex items-center gap-3">
+          <button onClick={() => setDescribeMode("input")} className="h-9 w-9 rounded-xl border border-border/50 flex items-center justify-center hover:bg-secondary transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-[28px] font-bold tracking-tight text-foreground uppercase">REVISIÓN DE PARÁMETROS</h1>
+            <p className="text-[13px] mt-0.5 text-muted-foreground uppercase tracking-wide">Verifica y ajusta antes de generar</p>
+          </div>
+        </div>
+
+        {/* AI Reasoning */}
+        <div className="rounded-2xl bg-violet-500/5 border border-violet-500/20 p-4">
+          <div className="flex items-start gap-3">
+            <Info className="h-5 w-5 text-violet-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[13px] font-semibold text-violet-600 dark:text-violet-400 mb-1">Razonamiento de la IA</p>
+              <p className="text-[13px] text-muted-foreground leading-relaxed italic">{p.reasoning}</p>
+            </div>
+          </div>
+        </div>
+
+        <Section>
+          <SectionTitle icon={Flame} color="text-orange-500">Parámetros interpretados</SectionTitle>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Nombre del plan</Label>
+                <Input value={p.name} onChange={e => setInterpretedParams({...p, name: e.target.value})} className="mt-1 rounded-xl" />
+              </div>
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Calorías</Label>
+                <Input type="number" value={p.totalCalories} onChange={e => setInterpretedParams({...p, totalCalories: Number(e.target.value)})} className="mt-1 rounded-xl" />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 block">Macronutrientes</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center">
+                  <div className="text-[11px] text-muted-foreground mb-1">Proteína</div>
+                  <Slider value={[p.proteinPercent]} onValueChange={v => {
+                    const newP = v[0];
+                    const remaining = 100 - newP;
+                    const ratio = p.carbsPercent + p.fatsPercent > 0 ? p.carbsPercent / (p.carbsPercent + p.fatsPercent) : 0.5;
+                    setInterpretedParams({...p, proteinPercent: newP, carbsPercent: Math.round(remaining * ratio), fatsPercent: remaining - Math.round(remaining * ratio)});
+                  }} min={10} max={60} step={1} />
+                  <div className="text-[15px] font-bold mt-1">{p.proteinPercent}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[11px] text-muted-foreground mb-1">Carbohidratos</div>
+                  <Slider value={[p.carbsPercent]} onValueChange={v => {
+                    const newC = v[0];
+                    const remaining = 100 - newC;
+                    const ratio = p.proteinPercent + p.fatsPercent > 0 ? p.proteinPercent / (p.proteinPercent + p.fatsPercent) : 0.5;
+                    setInterpretedParams({...p, carbsPercent: newC, proteinPercent: Math.round(remaining * ratio), fatsPercent: remaining - Math.round(remaining * ratio)});
+                  }} min={5} max={70} step={1} />
+                  <div className="text-[15px] font-bold mt-1">{p.carbsPercent}%</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[11px] text-muted-foreground mb-1">Grasas</div>
+                  <Slider value={[p.fatsPercent]} onValueChange={v => {
+                    const newF = v[0];
+                    const remaining = 100 - newF;
+                    const ratio = p.proteinPercent + p.carbsPercent > 0 ? p.proteinPercent / (p.proteinPercent + p.carbsPercent) : 0.5;
+                    setInterpretedParams({...p, fatsPercent: newF, proteinPercent: Math.round(remaining * ratio), carbsPercent: remaining - Math.round(remaining * ratio)});
+                  }} min={10} max={60} step={1} />
+                  <div className="text-[15px] font-bold mt-1">{p.fatsPercent}%</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Comidas/día</Label>
+                <Input type="number" value={p.mealsPerDay} onChange={e => setInterpretedParams({...p, mealsPerDay: Math.max(3, Math.min(6, Number(e.target.value)))})} className="mt-1 rounded-xl" min={3} max={6} />
+              </div>
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Menús</Label>
+                <Input type="number" value={p.totalMenus} onChange={e => setInterpretedParams({...p, totalMenus: Math.max(1, Math.min(14, Number(e.target.value)))})} className="mt-1 rounded-xl" min={1} max={14} />
+              </div>
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Tipo de dieta</Label>
+                <p className="mt-1 text-[14px] font-medium">{dietTypeLabels[p.dietType] || p.dietType}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Nivel cocina</Label>
+                <p className="mt-1 text-[14px] font-medium">{cookingLabels[p.cookingLevel] || p.cookingLevel}</p>
+              </div>
+              {p.fastingProtocol && (
+                <div>
+                  <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Ayuno</Label>
+                  <p className="mt-1 text-[14px] font-medium">{p.fastingProtocol}</p>
+                </div>
+              )}
+            </div>
+
+            {p.avoidFoods?.length > 0 && (
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 block">Alimentos a evitar</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.avoidFoods.map((f: string, i: number) => (
+                    <Badge key={i} variant="destructive" className="text-[12px] rounded-lg">{f}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {p.preferredFoods?.length > 0 && (
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 block">Alimentos preferidos</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.preferredFoods.map((f: string, i: number) => (
+                    <Badge key={i} variant="secondary" className="text-[12px] rounded-lg">{f}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {p.allergies?.length > 0 && (
+              <div>
+                <Label className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 block">Alergias</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.allergies.map((a: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-[12px] rounded-lg border-amber-500/50 text-amber-600">{a}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 rounded-2xl h-12 text-[14px] font-semibold uppercase tracking-wide"
+            onClick={() => setDescribeMode("input")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Ajustar descripción
+          </Button>
+          <Button
+            size="lg"
+            className="flex-1 rounded-2xl h-12 text-[14px] font-semibold shadow-sm hover:shadow-md transition-all duration-200 uppercase tracking-wide"
+            onClick={handleConfirmInterpretation}
+            disabled={generateMutation.isPending}
+          >
+            <Check className="mr-2 h-5 w-5" />
+            Confirmar y generar dieta
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -797,6 +1102,17 @@ export default function Home() {
           >
             <PenLine className="mr-2 h-5 w-5" />
             Crear Dieta Manual
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full rounded-2xl h-12 text-[15px] font-semibold transition-all duration-200 uppercase tracking-wide border-violet-500/30 text-violet-600 dark:text-violet-400 hover:bg-violet-500/5 hover:border-violet-500/50"
+            onClick={() => { setDescribeMode("input"); setClientDescription(""); setInterpretedParams(null); }}
+          >
+            <MessageCircle className="mr-2 h-5 w-5" />
+            Describir Cliente
           </Button>
         </div>
       </form>

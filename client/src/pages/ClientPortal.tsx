@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown, Bot, Activity } from "lucide-react";
+import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown, Bot, Activity, BarChart3, Download, Share2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -141,6 +141,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
     { id: "chat", label: "Chat", icon: MessageSquare },
     { id: "assistant", label: "Asistente", icon: Bot },
     { id: "activity", label: "Actividad", icon: Activity },
+    { id: "results", label: "Resultados", icon: BarChart3 },
   ];
 
   return (
@@ -209,6 +210,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
         {tab === "chat" && <ChatTab session={session} />}
         {tab === "assistant" && <AssistantTab session={session} archetype={archetype} accentColor={accentColor} />}
         {tab === "activity" && <ActivityTab session={session} accentColor={accentColor} />}
+        {tab === "results" && <ResultsTab session={session} accentColor={accentColor} />}
       </div>
 
       {/* Mobile bottom nav with archetype accent */}
@@ -2066,5 +2068,190 @@ function BadgesSection({ session, accentColor }: { session: { clientId: number; 
         )}
       </div>
     </>
+  );
+}
+
+
+// ── Results Tab ──
+function ResultsTab({ session, accentColor }: { session: { clientId: number; name: string; accessCode: string }; accentColor: string }) {
+  const reportsQ = trpc.clientPortal.getMyReports.useQuery({ clientId: session.clientId, accessCode: session.accessCode });
+  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = async () => {
+    if (!cardRef.current) return;
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(cardRef.current, { quality: 1, pixelRatio: 2, width: 1080, height: 1080 });
+      const link = document.createElement("a");
+      link.download = `nutriflow-resultados-${session.name.replace(/\s+/g, "-")}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("Imagen descargada");
+    } catch {
+      toast.error("Error al descargar la imagen");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!cardRef.current) return;
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(cardRef.current, { quality: 1, pixelRatio: 2, width: 1080, height: 1080 });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "nutriflow-resultados.png", { type: "image/png" });
+      if (navigator.share) {
+        await navigator.share({ files: [file], title: "Mis resultados NutriFlow" });
+      } else {
+        toast.error("Compartir no disponible en este navegador");
+      }
+    } catch {
+      toast.error("Error al compartir");
+    }
+  };
+
+  if (reportsQ.isLoading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  const reports = reportsQ.data || [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-[17px] font-bold uppercase tracking-wide">Mis Resultados</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Tus informes de progreso generados por tu entrenador</p>
+      </div>
+
+      {reports.length === 0 ? (
+        <div className="text-center py-12 rounded-2xl bg-card border border-border/50">
+          <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+          <p className="text-[14px] text-muted-foreground">Aún no tienes informes de progreso</p>
+          <p className="text-[12px] text-muted-foreground/70 mt-1">Tu entrenador los generará periódicamente</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {reports.map((report: any) => (
+            <button
+              key={report.id}
+              onClick={() => setSelectedReport(report)}
+              className="w-full text-left rounded-2xl bg-card border border-border/50 p-4 hover:border-primary/30 transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[14px] font-semibold">{report.periodStart} → {report.periodEnd}</p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{report.mealsCompleted}/{report.mealsTotal} comidas</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-[24px] font-bold" style={{ color: report.adherencePercent >= 80 ? "#22c55e" : report.adherencePercent >= 60 ? "#eab308" : "#ef4444" }}>
+                    {report.adherencePercent}%
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">adherencia</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Instagram Card Dialog */}
+      {selectedReport && (
+        <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
+          <DialogContent className="max-w-lg p-0 rounded-2xl overflow-hidden">
+            <div className="p-4">
+              <DialogHeader>
+                <DialogTitle className="text-[16px] font-bold uppercase tracking-wide">Tu informe de progreso</DialogTitle>
+              </DialogHeader>
+            </div>
+
+            {/* Instagram Card 1080x1080 (scaled down) */}
+            <div className="px-4">
+              <div
+                ref={cardRef}
+                className="relative w-full aspect-square rounded-2xl overflow-hidden"
+                style={{
+                  background: `linear-gradient(135deg, ${accentColor}20, #0b0d1810, ${accentColor}10)`,
+                  border: `2px solid ${accentColor}30`,
+                }}
+              >
+                <div className="absolute inset-0 flex flex-col justify-between p-8">
+                  {/* Top: Logo + Name */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" alt="NutriFlow" className="h-8 object-contain" />
+                      <span className="text-[14px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>NutriFlow</span>
+                    </div>
+                    <span className="text-[12px] text-muted-foreground">{selectedReport.periodStart} → {selectedReport.periodEnd}</span>
+                  </div>
+
+                  {/* Center: Big adherence arc */}
+                  <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                    <p className="text-[14px] font-semibold uppercase tracking-wider text-muted-foreground">Adherencia</p>
+                    <div className="relative">
+                      <svg viewBox="0 0 120 120" className="w-40 h-40">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="8" className="text-border/30" />
+                        <circle
+                          cx="60" cy="60" r="52" fill="none"
+                          stroke={selectedReport.adherencePercent >= 80 ? "#22c55e" : selectedReport.adherencePercent >= 60 ? "#eab308" : "#ef4444"}
+                          strokeWidth="8"
+                          strokeLinecap="round"
+                          strokeDasharray={`${(selectedReport.adherencePercent / 100) * 327} 327`}
+                          transform="rotate(-90 60 60)"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[36px] font-bold">{selectedReport.adherencePercent}%</span>
+                      </div>
+                    </div>
+                    <p className="text-[13px] font-medium text-center">{session.name}</p>
+                  </div>
+
+                  {/* Bottom: Metrics */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center rounded-xl bg-background/50 p-3">
+                        <p className="text-[20px] font-bold">{selectedReport.mealsCompleted}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Comidas</p>
+                      </div>
+                      <div className="text-center rounded-xl bg-background/50 p-3">
+                        <p className="text-[20px] font-bold">{selectedReport.mealsTotal}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Objetivo</p>
+                      </div>
+                      <div className="text-center rounded-xl bg-background/50 p-3">
+                        <p className="text-[20px] font-bold">
+                          {selectedReport.weightStart && selectedReport.weightEnd
+                            ? `${((selectedReport.weightEnd - selectedReport.weightStart) / 1000).toFixed(1)}kg`
+                            : "—"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground uppercase">Peso</p>
+                      </div>
+                    </div>
+
+                    {/* Motivational message */}
+                    {selectedReport.motivationalMessage && (
+                      <div className="rounded-xl bg-background/50 p-3">
+                        <p className="text-[12px] text-center italic leading-relaxed">{selectedReport.motivationalMessage}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="p-4 flex gap-3">
+              <Button onClick={handleDownload} className="flex-1 rounded-xl" style={{ backgroundColor: accentColor }}>
+                <Download className="mr-2 h-4 w-4" />
+                Descargar imagen
+              </Button>
+              <Button onClick={handleShare} variant="outline" className="flex-1 rounded-xl">
+                <Share2 className="mr-2 h-4 w-4" />
+                Compartir
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }
