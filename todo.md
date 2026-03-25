@@ -437,3 +437,8 @@
 - [x] U5-3: seed-system-recipes.mjs actualizado con 300 recetas + 7 nuevos fallback nutricionales + ejecutado
 - [x] U5-4: 300 recetas verificadas en BD (60 por categoría) + servidor reiniciado
 - [x] U5-5: 205 tests pasan + checkpoint guardado
+
+## U6: Añadir 150 recetas adicionales (total 450)
+- [x] U6-1: Parseadas 150 recetas nuevas (30 por categoría)
+- [x] U6-2: seed-system-recipes.mjs actualizado con 450 recetas + 5 nuevos fallback + ejecutado
+- [x] U6-3: 450 recetas verificadas (90 por categoría) + servidor reiniciado + 205 tests pasan
