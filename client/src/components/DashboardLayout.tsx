@@ -19,7 +19,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays, Bot } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -68,31 +67,9 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-8 p-10 max-w-sm w-full">
-          <div className="flex flex-col items-center gap-6">
-            <img
-              src={NUTRIFLOW_LOGO}
-              alt="NutriFlow"
-              className="h-24 object-contain"
-            />
-            <p className="text-[15px] text-muted-foreground text-center leading-relaxed">
-              Crea planes nutricionales personalizados con inteligencia artificial.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full rounded-full h-12 text-[15px] font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            Iniciar sesion
-          </Button>
-        </div>
-      </div>
-    );
+    // Redirect to login page
+    window.location.href = "/login";
+    return <DashboardLayoutSkeleton />;
   }
 
   return (

@@ -85,6 +85,13 @@
       "when": 1774381486734,
       "tag": "0011_dizzy_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1774437594423,
+      "tag": "0012_cynical_dragon_man",
+      "breakpoints": true
     }
   ]
 }

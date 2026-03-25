@@ -5,7 +5,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { getLoginUrl } from "./const";
+
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -27,7 +27,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // Don't redirect if already on an auth page
+  const authPages = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email", "/portal"];
+  if (authPages.some(p => window.location.pathname.startsWith(p))) return;
+  window.location.href = "/login";
 };
 
 queryClient.getQueryCache().subscribe(event => {

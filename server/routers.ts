@@ -1,7 +1,8 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { z } from "zod";
@@ -31,6 +32,13 @@ import { searchFoods, getFoodDatabaseSummary, foodDatabase } from "@shared/foodD
 import { MEAL_PHILOSOPHY } from "@shared/mealPhilosophy";
 import { clientRouter, clientPortalRouter } from "./clientRouters";
 import { assignDietToClient, getClientById } from "./clientDb";
+import {
+  hashPassword, verifyPassword, generateSecureToken,
+  validatePassword, validateEmail,
+  createEmailSessionToken,
+  sendVerificationEmail, sendPasswordResetEmail,
+} from "./auth";
+import { getUserByEmail, createUser, getUserByVerificationToken, getUserByResetToken, updateUser } from "./db";
 
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
@@ -445,6 +453,215 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+
+    register: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(8).max(128),
+        name: z.string().min(2).max(255),
+        trainerName: z.string().max(255).optional(),
+        origin: z.string().url(),
+      }))
+      .mutation(async ({ input }) => {
+        // Validate email format
+        if (!validateEmail(input.email)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Email no válido." });
+        }
+
+        // Validate password strength
+        const pwCheck = validatePassword(input.password);
+        if (!pwCheck.valid) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: pwCheck.message });
+        }
+
+        // Check if email already exists
+        const existing = await getUserByEmail(input.email.toLowerCase().trim());
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "Ya existe una cuenta con este email." });
+        }
+
+        // Hash password and create user
+        const passwordHash = await hashPassword(input.password);
+        const verificationToken = generateSecureToken();
+
+        const userId = await createUser({
+          email: input.email.toLowerCase().trim(),
+          passwordHash,
+          name: input.name.trim(),
+          trainerName: input.trainerName?.trim(),
+          emailVerificationToken: verificationToken,
+        });
+
+        // Send verification email
+        await sendVerificationEmail(input.email.toLowerCase().trim(), verificationToken, input.origin);
+
+        return { success: true, message: "Cuenta creada. Revisa tu email para verificarla." };
+      }),
+
+    login: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Email o contraseña incorrectos." });
+        }
+
+        if (!user.isActive) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Tu cuenta está desactivada. Contacta al administrador." });
+        }
+
+        const valid = await verifyPassword(input.password, user.passwordHash);
+        if (!valid) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Email o contraseña incorrectos." });
+        }
+
+        // Create session token
+        const sessionToken = await createEmailSessionToken(user.id, user.email);
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        // Update last signed in
+        await updateUser(user.id, { lastSignedIn: new Date() });
+
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            emailVerified: user.emailVerified,
+          },
+        };
+      }),
+
+    verifyEmail: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByVerificationToken(input.token);
+
+        if (!user) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Token de verificación no válido o expirado." });
+        }
+
+        if (user.emailVerified) {
+          return { success: true, message: "Email ya verificado." };
+        }
+
+        await updateUser(user.id, {
+          emailVerified: 1,
+          emailVerificationToken: null,
+        });
+
+        return { success: true, message: "Email verificado correctamente. Ya puedes iniciar sesión." };
+      }),
+
+    forgotPassword: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        origin: z.string().url(),
+      }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+
+        // Always return success to prevent email enumeration
+        if (!user || user.loginMethod !== 'email') {
+          return { success: true, message: "Si el email existe, recibirás un enlace para restablecer tu contraseña." };
+        }
+
+        const resetToken = generateSecureToken();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await updateUser(user.id, {
+          passwordResetToken: resetToken,
+          passwordResetExpiresAt: expiresAt,
+        });
+
+        await sendPasswordResetEmail(user.email, resetToken, input.origin);
+
+        return { success: true, message: "Si el email existe, recibirás un enlace para restablecer tu contraseña." };
+      }),
+
+    resetPassword: publicProcedure
+      .input(z.object({
+        token: z.string().min(1),
+        newPassword: z.string().min(8).max(128),
+      }))
+      .mutation(async ({ input }) => {
+        const pwCheck = validatePassword(input.newPassword);
+        if (!pwCheck.valid) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: pwCheck.message });
+        }
+
+        const user = await getUserByResetToken(input.token);
+
+        if (!user) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Token no válido o expirado." });
+        }
+
+        if (user.passwordResetExpiresAt && new Date() > user.passwordResetExpiresAt) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "El enlace ha expirado. Solicita uno nuevo." });
+        }
+
+        const passwordHash = await hashPassword(input.newPassword);
+
+        await updateUser(user.id, {
+          passwordHash,
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        });
+
+        return { success: true, message: "Contraseña actualizada correctamente." };
+      }),
+
+    updateProfile: protectedProcedure
+      .input(z.object({
+        name: z.string().min(2).max(255).optional(),
+        trainerName: z.string().max(255).optional(),
+        logoUrl: z.string().url().optional().nullable(),
+        primaryColor: z.string().max(20).optional(),
+        currentPassword: z.string().optional(),
+        newPassword: z.string().min(8).max(128).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const updates: Record<string, unknown> = {};
+
+        if (input.name) updates.name = input.name.trim();
+        if (input.trainerName !== undefined) updates.trainerName = input.trainerName.trim() || null;
+        if (input.logoUrl !== undefined) updates.logoUrl = input.logoUrl;
+        if (input.primaryColor) updates.primaryColor = input.primaryColor;
+
+        // Password change
+        if (input.newPassword) {
+          if (!input.currentPassword) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Debes proporcionar tu contraseña actual." });
+          }
+
+          const pwCheck = validatePassword(input.newPassword);
+          if (!pwCheck.valid) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: pwCheck.message });
+          }
+
+          if (ctx.user.passwordHash) {
+            const valid = await verifyPassword(input.currentPassword, ctx.user.passwordHash);
+            if (!valid) {
+              throw new TRPCError({ code: "UNAUTHORIZED", message: "Contraseña actual incorrecta." });
+            }
+          }
+
+          updates.passwordHash = await hashPassword(input.newPassword);
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await updateUser(ctx.user.id, updates as any);
+        }
+
+        return { success: true };
+      }),
   }),
 
   // ── Food database search ──

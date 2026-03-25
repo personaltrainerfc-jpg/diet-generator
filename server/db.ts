@@ -56,10 +56,6 @@ export async function getDb() {
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot upsert user: database not available");
@@ -67,42 +63,43 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
+    // Build the update set first
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
+    // Always include name and email in updates if provided
+    if (user.name) updateSet.name = user.name;
+    if (user.email) updateSet.email = user.email;
 
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
+    // Copy optional fields
+    const optionalFields = ["openId", "loginMethod", "passwordHash", "trainerName", "logoUrl", "primaryColor"] as const;
+    for (const field of optionalFields) {
+      if (user[field] !== undefined) {
+        updateSet[field] = user[field];
+      }
+    }
 
     if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
     if (user.role !== undefined) {
-      values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
+    } else if (user.openId && user.openId === ENV.ownerOpenId) {
       updateSet.role = 'admin';
     }
 
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
+    if (!updateSet.lastSignedIn) {
+      updateSet.lastSignedIn = new Date();
     }
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
+    // Build insert values - email and name are required for INSERT
+    const values: InsertUser = {
+      email: user.email || `${user.openId || 'unknown'}@placeholder.local`,
+      name: user.name || user.openId || 'User',
+    };
+
+    // Copy all updateSet fields into values for the INSERT part
+    for (const [key, val] of Object.entries(updateSet)) {
+      (values as any)[key] = val;
     }
 
     await db.insert(users).values(values).onDuplicateKeyUpdate({
@@ -112,6 +109,66 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
   }
+}
+
+// ── Email/Password auth helpers ──
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createUser(data: {
+  email: string;
+  passwordHash: string;
+  name: string;
+  trainerName?: string;
+  emailVerificationToken?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(users).values({
+    email: data.email,
+    passwordHash: data.passwordHash,
+    name: data.name,
+    trainerName: data.trainerName || null,
+    loginMethod: 'email',
+    role: 'trainer',
+    emailVerified: 0,
+    emailVerificationToken: data.emailVerificationToken || null,
+    isActive: 1,
+    lastSignedIn: new Date(),
+  });
+  return result[0].insertId;
+}
+
+export async function getUserByVerificationToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.emailVerificationToken, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByResetToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.passwordResetToken, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateUser(id: number, data: Partial<InsertUser>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set(data).where(eq(users.id, id));
 }
 
 export async function getUserByOpenId(openId: string) {

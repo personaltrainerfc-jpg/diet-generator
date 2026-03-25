@@ -2,11 +2,24 @@ import { int, json, mysqlEnum, mysqlTable, text, timestamp, tinyint, varchar } f
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  openId: varchar("openId", { length: 64 }).unique(), // nullable for email/password users
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }), // null for OAuth users
+  name: varchar("name", { length: 255 }).notNull(),
+  loginMethod: varchar("loginMethod", { length: 64 }), // 'email', 'oauth', etc.
+  role: mysqlEnum("role", ["trainer", "client", "admin"]).default("trainer").notNull(),
+  plan: mysqlEnum("plan", ["basic", "pro", "centers"]).default("basic").notNull(),
+  trainerName: varchar("trainerName", { length: 255 }), // nombre comercial
+  logoUrl: varchar("logoUrl", { length: 500 }),
+  primaryColor: varchar("primaryColor", { length: 7 }).default("#16a34a"),
+  isActive: int("isActive").default(1).notNull(), // 1=active, 0=disabled
+  emailVerified: int("emailVerified").default(0).notNull(), // 1=verified
+  emailVerificationToken: varchar("emailVerificationToken", { length: 64 }),
+  passwordResetToken: varchar("passwordResetToken", { length: 64 }),
+  passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),
+  trainerId: int("trainerId"), // for client users: reference to their trainer
+  invitationToken: varchar("invitationToken", { length: 64 }),
+  invitationExpiresAt: timestamp("invitationExpiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

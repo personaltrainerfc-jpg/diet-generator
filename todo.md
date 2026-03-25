@@ -442,3 +442,28 @@
 - [x] U6-1: Parseadas 150 recetas nuevas (30 por categoría)
 - [x] U6-2: seed-system-recipes.mjs actualizado con 450 recetas + 5 nuevos fallback + ejecutado
 - [x] U6-3: 450 recetas verificadas (90 por categoría) + servidor reiniciado + 205 tests pasan
+
+## AUTH: Sistema completo de registro y autenticación multi-entrenador
+- [x] AUTH-1: Modificar tabla users: añadir passwordHash, plan, trainerName, logoUrl, primaryColor, isActive, emailVerified, emailVerificationToken, passwordResetToken, passwordResetExpiresAt, trainerId, invitationToken, invitationExpiresAt. Eliminar openId y loginMethod.
+- [x] AUTH-2: Generar migración drizzle y aplicar SQL (migrar datos existentes)
+- [x] AUTH-3: Crear server/auth.ts con hashPassword, verifyPassword, generateSecureToken, sendVerificationEmail, sendPasswordResetEmail
+- [x] AUTH-4: Endpoint auth.register (público): validaciones, bcrypt hash, token verificación, envío email
+- [x] AUTH-5: Endpoint auth.verifyEmail (público): validar token, marcar emailVerified, iniciar sesión auto
+- [x] AUTH-6: Endpoint auth.login (público): verificar email+password, comprobar emailVerified e isActive, cookie JWT
+- [x] AUTH-7: Endpoint auth.forgotPassword (público): generar token reset, enviar email (mismo mensaje si existe o no)
+- [x] AUTH-8: Endpoint auth.resetPassword (público): validar token, hashear nueva password, iniciar sesión auto
+- [x] AUTH-9: Endpoint auth.updateProfile (protegido): actualizar name, trainerName, primaryColor
+- [x] AUTH-10: Auditar TODOS los endpoints existentes para aislamiento de datos (userId check)
+- [x] AUTH-11: Frontend Register.tsx con indicador seguridad contraseña, confirmación email
+- [x] AUTH-12: Frontend Login.tsx con mostrar/ocultar contraseña, recordarme, errores inline
+- [x] AUTH-13: Frontend ForgotPassword.tsx
+- [x] AUTH-14: Frontend ResetPassword.tsx con token en URL, inicio sesión auto
+- [x] AUTH-15: Frontend VerifyEmail.tsx con estado carga, reenviar verificación
+- [x] AUTH-16: Rutas públicas/protegidas en App.tsx con redirecciones
+- [x] AUTH-17: Diseño centrado en auth pages con logo NutriFlow + formulario limpio
+- [x] AUTH-18: Tests vitest para auth endpoints (13 tests: password hashing, register, login, verify email, forgot password, reset password, profile update, validation)
+
+## AUTH-FIX: Corregir acceso para usuarios OAuth existentes
+- [x] AUTHFIX-1: Añadir botón "Iniciar sesión con Manus" en Login.tsx para usuarios OAuth
+- [x] AUTHFIX-2: Corregir bug upsertUser que falla con "Field 'email' doesn't have a default value"
+- [x] AUTHFIX-3: Verificar que usuarios OAuth pueden acceder sin quedar bloqueados en /login

@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { verifyEmailSession } from "../auth";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -257,9 +258,19 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
+
+    // Try email/password session first
+    const emailSession = await verifyEmailSession(sessionCookie);
+    if (emailSession) {
+      const user = await db.getUserById(emailSession.userId);
+      if (!user) throw ForbiddenError("User not found");
+      if (!user.isActive) throw ForbiddenError("Account is deactivated");
+      return user;
+    }
+
+    // Fall back to OAuth session
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
@@ -276,9 +287,9 @@ class SDKServer {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({
           openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          name: userInfo.name || userInfo.openId || 'User',
+          email: userInfo.email || `${userInfo.openId}@oauth.local`,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? 'oauth',
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
@@ -293,7 +304,9 @@ class SDKServer {
     }
 
     await db.upsertUser({
-      openId: user.openId,
+      openId: user.openId || undefined,
+      email: user.email,
+      name: user.name,
       lastSignedIn: signedInAt,
     });
 

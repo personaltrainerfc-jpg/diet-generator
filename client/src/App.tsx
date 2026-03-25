@@ -17,6 +17,11 @@ import ClientPortal from "./pages/ClientPortal";
 import Templates from "./pages/Templates";
 import CalendarView from "./pages/CalendarView";
 import AiConfig from "./pages/AiConfig";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
 
 function DashboardRouter() {
   return (
@@ -47,7 +52,15 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Switch>
+            {/* Public auth routes */}
+            <Route path="/login" component={Login} />
+            <Route path="/register" component={Register} />
+            <Route path="/forgot-password" component={ForgotPassword} />
+            <Route path="/reset-password" component={ResetPassword} />
+            <Route path="/verify-email" component={VerifyEmail} />
+            {/* Client portal */}
             <Route path="/portal" component={ClientPortal} />
+            {/* Protected dashboard (DashboardLayout handles auth check) */}
             <Route>{() => <DashboardRouter />}</Route>
           </Switch>
         </TooltipProvider>
