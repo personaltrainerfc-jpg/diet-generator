@@ -495,3 +495,17 @@
 - [x] CORR6-2: Frontend: previsualización editable con campos inline editables (mensaje, notas, destacados)
 - [x] CORR6-3: Botones "Guardar cambios" y "Enviar al cliente" en informes borrador
 - [x] CORR6-4: Cliente solo ve informes con status "sent" (filtrado en getMyReports)
+
+## ADMIN: Panel de administración para el owner
+
+- [x] ADMIN-1: Backend: adminProcedure ya existe en _core/trpc.ts (role=admin check)
+- [x] ADMIN-2: Backend: endpoint admin.getStats con métricas completas
+- [x] ADMIN-3: Backend: endpoint admin.listTrainers con búsqueda, filtros, paginación y métricas
+- [x] ADMIN-4: Backend: endpoint admin.toggleTrainerActive
+- [x] ADMIN-5: Backend: endpoint admin.getTrainerDetail con clientes, dietas recientes, conteos
+- [x] ADMIN-6: Backend: endpoint admin.changePlan
+- [x] ADMIN-7: Frontend: AdminPanel.tsx con 8 stat cards + distribución por plan
+- [x] ADMIN-8: Frontend: tabla de entrenadores con búsqueda, filtros plan/estado, paginación, cambio plan inline
+- [x] ADMIN-9: Frontend: dialog detalle entrenador con clientes, dietas recientes, conteos
+- [x] ADMIN-10: Frontend: ruta /admin en App.tsx + check role=admin en AdminPanel
+- [x] ADMIN-11: Frontend: botón Admin con corona dorada en sidebar footer (solo role=admin)

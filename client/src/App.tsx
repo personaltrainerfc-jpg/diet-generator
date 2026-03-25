@@ -22,6 +22,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
+import AdminPanel from "./pages/AdminPanel";
 
 function DashboardRouter() {
   return (
@@ -60,6 +61,8 @@ function App() {
             <Route path="/verify-email" component={VerifyEmail} />
             {/* Client portal */}
             <Route path="/portal" component={ClientPortal} />
+            {/* Admin panel */}
+            <Route path="/admin" component={AdminPanel} />
             {/* Protected dashboard (DashboardLayout handles auth check) */}
             <Route>{() => <DashboardRouter />}</Route>
           </Switch>

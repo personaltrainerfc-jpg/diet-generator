@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays, Bot } from "lucide-react";
+import { UtensilsCrossed, History, PlusCircle, LogOut, PanelLeft, Sun, Moon, BookOpen, Apple, Users, LayoutDashboard, FileStack, CalendarDays, Bot, Crown } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -232,6 +232,22 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3 space-y-1">
+            {user?.role === "admin" && (
+              <button
+                onClick={() => setLocation("/admin")}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-amber-500/10 transition-colors duration-200 w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="Panel de Administraci\u00f3n"
+              >
+                <div className="h-5 w-5 flex items-center justify-center shrink-0">
+                  <Crown className="h-[18px] w-[18px] text-amber-500" />
+                </div>
+                {!isCollapsed && (
+                  <span className="text-[13px] text-amber-500 font-medium">
+                    Admin
+                  </span>
+                )}
+              </button>
+            )}
             <ThemeToggleButton isCollapsed={isCollapsed} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

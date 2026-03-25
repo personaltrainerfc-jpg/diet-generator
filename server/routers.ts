@@ -1,7 +1,8 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { getAdminStats, listTrainers, getTrainerDetail, toggleTrainerActive, changeTrainerPlan } from "./adminDb";
 import { TRPCError } from "@trpc/server";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
@@ -2853,6 +2854,54 @@ Responde SOLO con JSON.`;
         if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
         await toggleMealEnabled(input.mealId, input.enabled);
         return { success: true };
+      }),
+  }),
+
+  // ── Admin Panel ──
+  admin: router({
+    getStats: adminProcedure.query(async () => {
+      const stats = await getAdminStats();
+      if (!stats) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo obtener estadísticas" });
+      return stats;
+    }),
+
+    listTrainers: adminProcedure
+      .input(z.object({
+        search: z.string().optional(),
+        plan: z.string().optional(),
+        status: z.string().optional(),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(100).default(20),
+      }))
+      .query(async ({ input }) => {
+        return listTrainers(input);
+      }),
+
+    getTrainerDetail: adminProcedure
+      .input(z.object({ trainerId: z.number() }))
+      .query(async ({ input }) => {
+        const detail = await getTrainerDetail(input.trainerId);
+        if (!detail) throw new TRPCError({ code: "NOT_FOUND", message: "Entrenador no encontrado" });
+        return detail;
+      }),
+
+    toggleTrainerActive: adminProcedure
+      .input(z.object({ trainerId: z.number() }))
+      .mutation(async ({ input }) => {
+        const result = await toggleTrainerActive(input.trainerId);
+        if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Entrenador no encontrado" });
+        return result;
+      }),
+
+    changePlan: adminProcedure
+      .input(z.object({
+        trainerId: z.number(),
+        plan: z.enum(["basic", "pro", "centers"]),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await changeTrainerPlan(input.trainerId, input.plan);
+        if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Entrenador no encontrado" });
+        return result;
       }),
   }),
 });
