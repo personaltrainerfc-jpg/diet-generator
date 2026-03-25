@@ -510,3 +510,15 @@
 - [x] ADMIN-10: Frontend: ruta /admin en App.tsx + check role=admin en AdminPanel
 - [x] ADMIN-11: Frontend: botón Admin con corona dorada en sidebar footer (solo role=admin)
 - [x] ADMIN-BUG: Corregir nombres de columnas SQL en subqueries de listTrainers (trainer_id→trainerId, user_id→userId, is_system→isSystem)
+
+## CORR-7: Exportar dieta en PDF en lugar de HTML
+
+- [x] CORR7-1: Instalar html2pdf.js
+- [x] CORR7-2: Reemplazar exportación HTML por generación PDF (A4, márgenes 10mm, logo, cabecera, pie de página)
+- [x] CORR7-3: Nombre archivo: dieta-[nombre-plan]-[fecha].pdf
+- [x] CORR7-4: Paginación automática sin cortar comidas (page-break-inside:avoid)
+
+## CORR-8: Navegación app cliente en negrita y línea indicadora centrada
+
+- [x] CORR8-1: Texto de todos los tabs en font-bold (font-weight: 700)
+- [x] CORR8-2: Línea indicadora centrada bajo el texto con left-1/2 -translate-x-1/2

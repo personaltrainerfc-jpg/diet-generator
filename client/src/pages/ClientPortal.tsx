@@ -188,13 +188,21 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
-                tab === t.id ? "text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              className={`relative flex flex-col items-center px-3 py-2.5 transition-colors whitespace-nowrap ${
+                tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
-              style={tab === t.id ? { borderBottomColor: accentColor, color: accentColor } : undefined}
+              style={tab === t.id ? { color: accentColor } : undefined}
             >
-              <t.icon className="h-3.5 w-3.5" />
-              {t.label}
+              <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                <t.icon className="h-3.5 w-3.5" />
+                {t.label}
+              </span>
+              {tab === t.id && (
+                <span
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-[2.5px] rounded-full"
+                  style={{ backgroundColor: accentColor }}
+                />
+              )}
             </button>
           ))}
         </div>
@@ -224,7 +232,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
               style={{ color: tab === t.id ? accentColor : undefined }}
             >
               <t.icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium">{t.label}</span>
+              <span className="text-[10px] font-bold">{t.label}</span>
             </button>
           ))}
         </div>
@@ -356,39 +364,93 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
       {/* Export PDF button */}
       <Button
         variant="outline" className="w-full gap-2 rounded-xl h-11 mt-4"
-        onClick={() => {
+        onClick={async () => {
           setExportingPdf(true);
           try {
+            const html2pdf = (await import('html2pdf.js')).default;
             const d = diet;
-            let html = `<html><head><meta charset="utf-8"><style>body{font-family:'Plus Jakarta Sans',sans-serif;padding:20px;color:#1a1a2e}h1{color:#6BCB77;font-size:24px}h2{color:#333;font-size:18px;margin-top:20px}h3{font-size:15px;margin-top:12px;color:#555}.meal{background:#f8f9fa;border-radius:8px;padding:12px;margin:8px 0}.food{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid #eee}.macros{display:flex;gap:16px;font-size:12px;color:#666;margin-top:8px;padding-top:8px;border-top:1px solid #ddd}.header-info{display:flex;gap:24px;font-size:14px;color:#555;margin-bottom:16px}</style></head><body>`;
-            html += `<h1>NUTRIFLOW - ${d.name}</h1>`;
-            html += `<div class="header-info"><span>${d.totalCalories} kcal/día</span><span>${d.mealsPerDay} comidas/día</span><span>P:${d.proteinPercent}% C:${d.carbsPercent}% G:${d.fatsPercent}%</span></div>`;
+            const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const fileName = `dieta-${d.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`;
+
+            // Build hidden HTML element for PDF rendering
+            const container = document.createElement('div');
+            container.style.cssText = 'position:absolute;left:-9999px;top:0;width:700px;font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;font-size:13px;line-height:1.5;';
+
+            let content = '';
+            // Header with logo
+            content += `<div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #16a34a;">`;
+            content += `<img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" style="height:50px;margin-bottom:8px;" crossorigin="anonymous" />`;
+            content += `<h1 style="font-size:22px;color:#16a34a;margin:0;font-weight:700;">${d.name}</h1>`;
+            content += `<div style="display:flex;justify-content:center;gap:24px;margin-top:8px;font-size:13px;color:#555;">`;
+            content += `<span><strong>${d.totalCalories}</strong> kcal/dia</span>`;
+            content += `<span><strong>${d.mealsPerDay}</strong> comidas/dia</span>`;
+            content += `<span>P:${d.proteinPercent}% C:${d.carbsPercent}% G:${d.fatsPercent}%</span>`;
+            content += `</div>`;
+            if (d.macros) {
+              content += `<div style="display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:12px;">`;
+              content += `<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:12px;">Proteina: ${d.macros.protein}g</span>`;
+              content += `<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:12px;">Carbos: ${d.macros.carbs}g</span>`;
+              content += `<span style="background:#ffe4e6;color:#9f1239;padding:2px 10px;border-radius:12px;">Grasas: ${d.macros.fat}g</span>`;
+              content += `</div>`;
+            }
+            content += `</div>`;
+
+            // Days and meals
             for (const menu of d.menus || []) {
-              html += `<h2>Día ${menu.menuNumber}</h2>`;
+              content += `<div style="page-break-inside:avoid;margin-bottom:16px;">`;
+              content += `<h2 style="font-size:17px;color:#16a34a;margin:16px 0 8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border-left:4px solid #16a34a;">Dia ${menu.menuNumber}</h2>`;
               for (const meal of menu.meals || []) {
                 const totals = (meal.foods || []).reduce((a: any, f: any) => ({ cal: a.cal + (f.calories||0), p: a.p + (f.protein||0), c: a.c + (f.carbs||0), g: a.g + (f.fats||0) }), { cal:0, p:0, c:0, g:0 });
-                html += `<div class="meal"><h3>${meal.mealName} (${totals.cal} kcal)</h3>`;
+                content += `<div style="page-break-inside:avoid;background:#f8f9fa;border-radius:8px;padding:10px 14px;margin:6px 0;border:1px solid #e5e7eb;">`;
+                content += `<h3 style="font-size:14px;margin:0 0 6px;color:#333;font-weight:700;">${meal.mealName} <span style="font-weight:400;color:#888;font-size:12px;">(${totals.cal} kcal)</span></h3>`;
                 for (const food of meal.foods || []) {
-                  html += `<div class="food"><span>${food.name}</span><span>${food.quantity} | ${food.calories}kcal</span></div>`;
-                  if (food.alternativeName) html += `<div class="food" style="color:#888;font-style:italic"><span>↻ ${food.alternativeName}</span><span>${food.alternativeQuantity}</span></div>`;
+                  content += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #eee;">`;
+                  content += `<span>${food.name}</span>`;
+                  content += `<span style="color:#666;white-space:nowrap;">${food.quantity} · ${food.calories} kcal</span>`;
+                  content += `</div>`;
+                  if (food.alternativeName) {
+                    content += `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 16px;font-size:11px;color:#888;font-style:italic;">`;
+                    content += `<span>Alternativa: ${food.alternativeName}</span>`;
+                    content += `<span>${food.alternativeQuantity || ''}</span>`;
+                    content += `</div>`;
+                  }
                 }
-                html += `<div class="macros"><span>Proteína: ${totals.p}g</span><span>Carbos: ${totals.c}g</span><span>Grasas: ${totals.g}g</span></div></div>`;
+                content += `<div style="display:flex;gap:16px;font-size:11px;color:#666;margin-top:6px;padding-top:6px;border-top:1px solid #ddd;">`;
+                content += `<span>P: ${totals.p}g</span><span>C: ${totals.c}g</span><span>G: ${totals.g}g</span>`;
+                content += `</div></div>`;
               }
+              content += `</div>`;
             }
-            html += `<p style="text-align:center;color:#999;margin-top:32px;font-size:11px">Generado con NutriFlow</p></body></html>`;
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `${d.name.replace(/\s+/g, '_')}_NutriFlow.html`; a.click();
-            URL.revokeObjectURL(url);
-            toast.success("Dieta exportada");
-          } catch { toast.error("Error al exportar"); }
+
+            // Footer
+            content += `<div style="text-align:center;color:#999;margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;">`;
+            content += `Generado con NutriFlow · ${today}`;
+            content += `</div>`;
+
+            container.innerHTML = content;
+            document.body.appendChild(container);
+
+            await html2pdf().set({
+              margin: [10, 10, 10, 10],
+              filename: fileName,
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+            } as any).from(container).save();
+
+            document.body.removeChild(container);
+            toast.success("PDF exportado correctamente");
+          } catch (err) {
+            console.error('PDF export error:', err);
+            toast.error("Error al exportar PDF");
+          }
           setExportingPdf(false);
         }}
         disabled={exportingPdf}
       >
-        <FileDown className="h-4 w-4" />
-        Exportar Dieta
+        {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+        {exportingPdf ? 'Generando PDF...' : 'Exportar Dieta (PDF)'}
       </Button>
 
       {/* Recipe Steps Dialog */}
