@@ -522,3 +522,9 @@
 
 - [x] CORR8-1: Texto de todos los tabs en font-bold (font-weight: 700)
 - [x] CORR8-2: Línea indicadora centrada bajo el texto con left-1/2 -translate-x-1/2
+
+## CORR-9: Navegación tabs completamente rota - reconstruir
+
+- [x] CORR9-1: Reconstruir tabs desktop: flex-col, icono arriba (20x20 fijo), texto abajo (11px bold), flex-shrink-0
+- [x] CORR9-2: Línea indicadora centrada con absolute bottom-0 left-1/2 -translate-x-1/2 (24px ancho)
+- [x] CORR9-3: Reconstruir tabs mobile bottom nav con misma estructura (20x20 iconos, 9px bold texto)

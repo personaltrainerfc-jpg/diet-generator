@@ -182,29 +182,35 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       )}
 
       {/* Tab bar */}
-      <div className="sticky top-[57px] z-30 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
-        <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`relative flex flex-col items-center px-3 py-2.5 transition-colors whitespace-nowrap ${
-                tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-              style={tab === t.id ? { color: accentColor } : undefined}
-            >
-              <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                <t.icon className="h-3.5 w-3.5" />
-                {t.label}
-              </span>
-              {tab === t.id && (
+      <div className="sticky top-[57px] z-30 border-b border-border/50" style={{ backgroundColor: "rgba(255,255,255,0.97)" }}>
+        <div className="max-w-2xl mx-auto px-2 flex flex-row overflow-x-auto" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+          {tabs.map((t) => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className="relative flex flex-col items-center justify-center gap-0.5 px-3 py-2 flex-shrink-0 bg-transparent border-none cursor-pointer transition-colors"
+                style={{ minWidth: 'fit-content' }}
+              >
+                <span className="flex items-center justify-center w-5 h-5 flex-shrink-0 overflow-hidden">
+                  <t.icon size={20} className="flex-shrink-0" style={{ width: 20, height: 20, color: isActive ? accentColor : undefined }} />
+                </span>
                 <span
-                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-[2.5px] rounded-full"
-                  style={{ backgroundColor: accentColor }}
-                />
-              )}
-            </button>
-          ))}
+                  className={`text-[11px] font-bold whitespace-nowrap leading-none ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+                  style={isActive ? { color: accentColor } : undefined}
+                >
+                  {t.label}
+                </span>
+                {isActive && (
+                  <span
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full"
+                    style={{ width: 24, backgroundColor: accentColor }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -222,19 +228,28 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       </div>
 
       {/* Mobile bottom nav with archetype accent */}
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom bg-background/95" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
-        <div className="flex justify-around py-2">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${tab !== t.id ? "text-muted-foreground" : ""}`}
-              style={{ color: tab === t.id ? accentColor : undefined }}
-            >
-              <t.icon className="h-5 w-5" />
-              <span className="text-[10px] font-bold">{t.label}</span>
-            </button>
-          ))}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border/50 md:hidden safe-area-bottom" style={{ backgroundColor: "rgba(255,255,255,0.97)" }}>
+        <div className="flex justify-around py-1.5">
+          {tabs.map((t) => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className="relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 flex-shrink-0 bg-transparent border-none cursor-pointer transition-colors"
+              >
+                <span className="flex items-center justify-center w-5 h-5 flex-shrink-0 overflow-hidden">
+                  <t.icon size={20} className="flex-shrink-0" style={{ width: 20, height: 20, color: isActive ? accentColor : undefined }} />
+                </span>
+                <span
+                  className={`text-[9px] font-bold whitespace-nowrap leading-none ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+                  style={isActive ? { color: accentColor } : undefined}
+                >
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
