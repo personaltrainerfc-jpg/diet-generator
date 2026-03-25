@@ -467,3 +467,31 @@
 - [x] AUTHFIX-1: Añadir botón "Iniciar sesión con Manus" en Login.tsx para usuarios OAuth
 - [x] AUTHFIX-2: Corregir bug upsertUser que falla con "Field 'email' doesn't have a default value"
 - [x] AUTHFIX-3: Verificar que usuarios OAuth pueden acceder sin quedar bloqueados en /login
+
+## CORR-1: Sustitutos incorrectos en recetas manuales
+- [x] CORR1-1: Modificar endpoint diet.addRecipeToMeal para generar alternativas automáticas para cada ingrediente
+- [x] CORR1-2: Reutilizar lógica de alternativas de diet.addFood (aceites/condimentos sin alternativa)
+
+## CORR-2: Email de verificación no llega al registrarse
+- [x] CORR2-1: Instalar nodemailer y configurar SMTP con variables de entorno
+- [x] CORR2-2: Reescribir sendVerificationEmail y sendPasswordResetEmail con nodemailer
+- [x] CORR2-3: Manejar error de envío en auth.register sin fallar el registro
+- [x] CORR2-4: Crear endpoint auth.resendVerification
+- [x] CORR2-5: Añadir botón reenviar verificación en Register.tsx tras registro exitoso
+
+## CORR-3: App del cliente con fondo blanco y letras negras
+- [x] CORR3-1: Corregir contraste en todas las secciones del portal cliente (Mi Dieta, Seguimiento, Bienestar, Fin de Semana, Compra, Chat, Asistente, Actividad, Resultados)
+
+## CORR-4: Cambiar texto botón valoración fin de semana
+- [x] CORR4-1: Cambiar "OBTENER VALORACIÓN IA" por "OBTENER INSTRUCCIONES"
+
+## CORR-5: Check-in bienestar visible en panel entrenador
+- [x] CORR5-1: Verificar/crear endpoint clientMgmt.getClientWellnessData (hidratación, sueño, bienestar)
+- [x] CORR5-2: Añadir pestaña Bienestar en ClientDetail.tsx con WellnessPanel (hidratación, sueño, bienestar general + resumen)
+- [ ] CORR5-3: Notificación al entrenador cuando cliente hace check-in
+
+## CORR-6: Informe del cliente editable antes de enviarlo
+- [x] CORR6-1: Backend: generar informe como borrador (status draft/sent), endpoints updateReport y sendReport
+- [x] CORR6-2: Frontend: previsualización editable con campos inline editables (mensaje, notas, destacados)
+- [x] CORR6-3: Botones "Guardar cambios" y "Enviar al cliente" en informes borrador
+- [x] CORR6-4: Cliente solo ve informes con status "sent" (filtrado en getMyReports)

@@ -1,9 +1,9 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { SignJWT, jwtVerify } from "jose";
+import nodemailer from "nodemailer";
 import { ENV } from "./_core/env";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { notifyOwner } from "./_core/notification";
 
 const SALT_ROUNDS = 12;
 
@@ -45,12 +45,11 @@ export function validateEmail(email: string): boolean {
 }
 
 // ── JWT Session for email/password users ──
-// Uses a different payload shape (userId instead of openId) to distinguish from OAuth sessions
 
 type EmailSessionPayload = {
   userId: number;
   email: string;
-  type: "email"; // distinguishes from OAuth sessions
+  type: "email";
 };
 
 function getSessionSecret() {
@@ -98,63 +97,141 @@ export async function verifyEmailSession(
   }
 }
 
-// ── Email sending (uses notifyOwner as fallback, logs for dev) ──
+// ── SMTP Email Transport ──
 
-export async function sendVerificationEmail(email: string, token: string, origin: string): Promise<void> {
-  const verifyUrl = `${origin}/verify-email?token=${token}`;
-  const subject = "NutriFlow — Verifica tu email";
-  const body = `
-Hola,
+function createTransporter() {
+  if (!ENV.smtpHost || !ENV.smtpUser || !ENV.smtpPass) {
+    console.warn("[Email] SMTP not configured. Emails will be logged only.");
+    return null;
+  }
 
-Gracias por registrarte en NutriFlow. Para activar tu cuenta, haz clic en el siguiente enlace:
+  return nodemailer.createTransport({
+    host: ENV.smtpHost,
+    port: ENV.smtpPort,
+    secure: ENV.smtpPort === 465, // true for 465, false for other ports
+    auth: {
+      user: ENV.smtpUser,
+      pass: ENV.smtpPass,
+    },
+  });
+}
 
-${verifyUrl}
+// ── Send Verification Email ──
 
-Este enlace es válido durante 48 horas.
+export async function sendVerificationEmail(
+  email: string,
+  token: string,
+  origin: string,
+  name?: string
+): Promise<{ sent: boolean; error?: string }> {
+  const verificationUrl = `${origin}/verify-email?token=${token}`;
+  const displayName = name || email.split("@")[0];
 
-Si no has creado esta cuenta, puedes ignorar este email.
+  console.log(`[Email] Verification email for ${email}: ${verificationUrl}`);
 
-— El equipo de NutriFlow
-  `.trim();
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.warn("[Email] No SMTP configured, skipping email send");
+    return { sent: false, error: "SMTP no configurado" };
+  }
 
-  console.log(`[Auth] Verification email for ${email}: ${verifyUrl}`);
-
-  // Use the notification system to alert the owner about new registrations
   try {
-    await notifyOwner({
-      title: `Nuevo registro: ${email}`,
-      content: `Un nuevo entrenador se ha registrado con el email ${email}.\n\nEnlace de verificación: ${verifyUrl}`,
+    await transporter.sendMail({
+      from: ENV.smtpFrom || `NutriFlow <${ENV.smtpUser}>`,
+      to: email,
+      subject: "Activa tu cuenta en NutriFlow",
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #16a34a; margin: 0;">NutriFlow</h1>
+          </div>
+          <h2 style="color: #1a1a1a;">Bienvenido, ${displayName}</h2>
+          <p style="color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+            Gracias por registrarte en NutriFlow. Para activar tu cuenta, haz clic en el siguiente boton:
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${verificationUrl}" 
+               style="background: #16a34a; color: white; padding: 14px 28px; 
+                      border-radius: 8px; text-decoration: none; display: inline-block;
+                      font-size: 16px; font-weight: 600;">
+              Activar mi cuenta
+            </a>
+          </div>
+          <p style="color: #888; font-size: 14px; line-height: 1.5;">
+            Si no has creado una cuenta en NutriFlow, ignora este email.<br>
+            El enlace caduca en 48 horas.
+          </p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+          <p style="color: #aaa; font-size: 12px; text-align: center;">
+            NutriFlow — Nutricion inteligente para profesionales
+          </p>
+        </div>
+      `,
     });
+
+    console.log(`[Email] Verification email sent successfully to ${email}`);
+    return { sent: true };
   } catch (err) {
-    console.warn("[Auth] Failed to notify owner about new registration:", err);
+    console.error(`[Email] Failed to send verification email to ${email}:`, err);
+    return { sent: false, error: String(err) };
   }
 }
 
-export async function sendPasswordResetEmail(email: string, token: string, origin: string): Promise<void> {
+// ── Send Password Reset Email ──
+
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  origin: string
+): Promise<{ sent: boolean; error?: string }> {
   const resetUrl = `${origin}/reset-password?token=${token}`;
-  const subject = "NutriFlow — Restablecer contraseña";
-  const body = `
-Hola,
 
-Has solicitado restablecer tu contraseña en NutriFlow. Haz clic en el siguiente enlace:
+  console.log(`[Email] Password reset email for ${email}: ${resetUrl}`);
 
-${resetUrl}
-
-Este enlace es válido durante 1 hora.
-
-Si no has solicitado este cambio, puedes ignorar este email.
-
-— El equipo de NutriFlow
-  `.trim();
-
-  console.log(`[Auth] Password reset email for ${email}: ${resetUrl}`);
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.warn("[Email] No SMTP configured, skipping email send");
+    return { sent: false, error: "SMTP no configurado" };
+  }
 
   try {
-    await notifyOwner({
-      title: `Reset de contraseña: ${email}`,
-      content: `El entrenador ${email} ha solicitado restablecer su contraseña.\n\nEnlace de reset: ${resetUrl}`,
+    await transporter.sendMail({
+      from: ENV.smtpFrom || `NutriFlow <${ENV.smtpUser}>`,
+      to: email,
+      subject: "Restablecer contrasena — NutriFlow",
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #16a34a; margin: 0;">NutriFlow</h1>
+          </div>
+          <h2 style="color: #1a1a1a;">Restablecer contrasena</h2>
+          <p style="color: #4a4a4a; font-size: 16px; line-height: 1.5;">
+            Has solicitado restablecer tu contrasena en NutriFlow. Haz clic en el siguiente boton:
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" 
+               style="background: #16a34a; color: white; padding: 14px 28px; 
+                      border-radius: 8px; text-decoration: none; display: inline-block;
+                      font-size: 16px; font-weight: 600;">
+              Restablecer contrasena
+            </a>
+          </div>
+          <p style="color: #888; font-size: 14px; line-height: 1.5;">
+            Si no has solicitado este cambio, puedes ignorar este email.<br>
+            El enlace es valido durante 1 hora.
+          </p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+          <p style="color: #aaa; font-size: 12px; text-align: center;">
+            NutriFlow — Nutricion inteligente para profesionales
+          </p>
+        </div>
+      `,
     });
+
+    console.log(`[Email] Password reset email sent successfully to ${email}`);
+    return { sent: true };
   } catch (err) {
-    console.warn("[Auth] Failed to notify owner about password reset:", err);
+    console.error(`[Email] Failed to send password reset email to ${email}:`, err);
+    return { sent: false, error: String(err) };
   }
 }

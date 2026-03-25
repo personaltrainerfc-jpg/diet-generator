@@ -41,7 +41,7 @@ import {
   // Bloque I: Gamificación
   getAllActivityBadges, getClientActivityBadges, updateStreak, evaluateBadges, getOrCreateStreak,
   // Bloque J: Informes de progreso y alertas
-  createProgressReport, getProgressReportsByClient, getProgressReportById,
+  createProgressReport, getProgressReportsByClient, getProgressReportById, updateProgressReport, sendProgressReport,
   createAdherenceAlert, getAlertsByTrainer, resolveAlert, getClientAdherenceByDayOfWeek,
   getActiveClientsByTrainer,
 } from "./clientDb";
@@ -1012,6 +1012,33 @@ Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes 
       return getProgressReportsByClient(input.clientId);
     }),
 
+  updateReport: protectedProcedure
+    .input(z.object({
+      reportId: z.number(),
+      motivationalMessage: z.string().optional(),
+      trainerNotes: z.string().optional(),
+      highlights: z.array(z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const report = await getProgressReportById(input.reportId);
+      if (!report || report.trainerId !== ctx.user.id) throw new Error("Informe no encontrado");
+      if (report.status === "sent") throw new Error("No se puede editar un informe ya enviado");
+      return updateProgressReport(input.reportId, {
+        motivationalMessage: input.motivationalMessage,
+        trainerNotes: input.trainerNotes,
+        highlights: input.highlights,
+      });
+    }),
+
+  sendReport: protectedProcedure
+    .input(z.object({ reportId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const report = await getProgressReportById(input.reportId);
+      if (!report || report.trainerId !== ctx.user.id) throw new Error("Informe no encontrado");
+      if (report.status === "sent") throw new Error("Este informe ya fue enviado");
+      return sendProgressReport(input.reportId);
+    }),
+
   // ── Adherence Alerts (Trainer) ──
   getAlerts: protectedProcedure.query(async ({ ctx }) => {
     return getAlertsByTrainer(ctx.user.id);
@@ -1035,6 +1062,20 @@ Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes 
     const alertsCreated = await runAdherenceAnalysis(ctx.user.id);
     return { alertsCreated };
   }),
+
+  // ── Wellness data visible to trainer ──
+  getClientWellnessData: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("Cliente no encontrado");
+      const [hydration, sleep, wellness] = await Promise.all([
+        getHydrationLogs(input.clientId, undefined, undefined),
+        getSleepLogs(input.clientId, 30),
+        getWellnessLogs(input.clientId, 30),
+      ]);
+      return { hydration, sleep, wellness };
+    }),
 });
 
 // ── Client Portal Router (Client-facing, public with code auth) ──
@@ -1743,7 +1784,9 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
     .query(async ({ input }) => {
       const client = await getClientByAccessCode(input.accessCode);
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
-      return getProgressReportsByClient(input.clientId);
+      const all = await getProgressReportsByClient(input.clientId);
+      // Only show sent reports to the client
+      return all.filter((r: any) => r.status === "sent");
     }),
 });
 

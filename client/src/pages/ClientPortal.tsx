@@ -147,7 +147,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
   return (
     <div className="min-h-screen bg-background" data-archetype={archetype || undefined}>
       {/* Header with mascot */}
-      <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-border/50 bg-background/95">
+      <div className="sticky top-0 z-40 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {archetypeData ? (
@@ -182,7 +182,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       )}
 
       {/* Tab bar */}
-      <div className="sticky top-[57px] z-30 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(11,13,24,0.85)" }}>
+      <div className="sticky top-[57px] z-30 backdrop-blur-xl border-b border-border/50" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
         <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <button
@@ -214,7 +214,7 @@ function ClientDashboard({ session, onLogout }: { session: { clientId: number; n
       </div>
 
       {/* Mobile bottom nav with archetype accent */}
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom bg-background/95">
+      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom bg-background/95" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
         <div className="flex justify-around py-2">
           {tabs.map((t) => (
             <button
@@ -1520,8 +1520,8 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
           else toast.info("Registra comidas primero para obtener tu valoración IA");
         }} className="bg-card rounded-2xl border border-border/50 p-4 text-left hover:bg-accent/30 transition-colors">
           <Award className="h-5 w-5 text-amber-500 mb-2" />
-          <p className="text-[13px] font-semibold">Valoración IA</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Análisis y ajustes</p>
+          <p className="text-[13px] font-semibold">Instrucciones IA</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Recomendaciones personalizadas</p>
         </button>
       </div>
 
@@ -1555,9 +1555,9 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
         <div id="ai-feedback-section" className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl border border-primary/20 p-5">
           <div className="flex items-center gap-3 mb-2">
             <Award className="h-5 w-5 text-primary" />
-            <h3 className="text-[15px] font-semibold">Obtener Valoración IA</h3>
+            <h3 className="text-[15px] font-semibold">Obtener Instrucciones</h3>
           </div>
-          <p className="text-[13px] text-muted-foreground mb-3">Basada en tus comidas registradas, la IA analizará tu fin de semana y te dará recomendaciones personalizadas para los próximos días.</p>
+          <p className="text-[13px] text-muted-foreground mb-3">Basada en tus comidas registradas, la IA analizará tu fin de semana y te dará instrucciones personalizadas para los próximos días.</p>
           <div className="space-y-2 mb-3">
             <Label className="text-[13px]">Notas sobre tu fin de semana (opcional)</Label>
             <Textarea value={feedbackForm.notes} onChange={(e) => setFeedbackForm(f => ({ ...f, notes: e.target.value }))} placeholder="¿Cómo te has sentido? ¿Alguna comida fuera de lo habitual? ¿Evento social?" rows={2} className="rounded-xl text-[13px]" />
@@ -1566,16 +1566,16 @@ function WeekendTab({ session }: { session: { clientId: number; name: string; ac
             addFeedbackMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, weekendDate: feedbackForm.date, clientNotes: feedbackForm.notes || undefined });
           }} disabled={addFeedbackMut.isPending} className="w-full rounded-xl h-11">
             {addFeedbackMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-            {addFeedbackMut.isPending ? "Analizando tu fin de semana..." : "Obtener Valoración y Ajustes"}
+            {addFeedbackMut.isPending ? "Analizando tu fin de semana..." : "Obtener Instrucciones"}
           </Button>
         </div>
       )}
 
       {/* Weekend feedback history with AI analysis */}
       <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
-        <h3 className="text-[15px] font-semibold">Valoraciones y Ajustes</h3>
+        <h3 className="text-[15px] font-semibold">Instrucciones Recibidas</h3>
         {(feedbackQ.data || []).length === 0 ? (
-          <p className="text-[13px] text-muted-foreground text-center py-6">Sin valoraciones aún. Registra tus comidas y solicita una valoración IA.</p>
+          <p className="text-[13px] text-muted-foreground text-center py-6">Sin instrucciones aún. Registra tus comidas y solicita instrucciones personalizadas.</p>
         ) : (
           <div className="space-y-4">
             {(feedbackQ.data || []).slice(0, 10).map((fb: any) => (

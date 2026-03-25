@@ -20,9 +20,21 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [registered, setRegistered] = useState(false);
 
+  const [emailSentOk, setEmailSentOk] = useState(true);
+
   const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       setRegistered(true);
+      setEmailSentOk(data.emailSent);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const resendMutation = trpc.auth.resendVerification.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
     },
     onError: (err) => {
       toast.error(err.message);
@@ -61,13 +73,30 @@ export default function Register() {
             <div className="text-center space-y-2">
               <h2 className="text-xl font-semibold">Cuenta creada</h2>
               <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">
-                Hemos enviado un enlace de verificacion a <strong>{email}</strong>.
-                Revisa tu bandeja de entrada (y spam) para activar tu cuenta.
+                {emailSentOk
+                  ? <>Hemos enviado un enlace de verificacion a <strong>{email}</strong>. Revisa tu bandeja de entrada (y spam) para activar tu cuenta.</>
+                  : <>Tu cuenta ha sido creada, pero hubo un problema al enviar el email de verificacion. Pulsa el boton de abajo para reenviar.</>
+                }
               </p>
             </div>
-            <Button onClick={() => navigate("/login")} className="w-full" size="lg">
-              Ir a iniciar sesion
-            </Button>
+            <div className="w-full space-y-3">
+              <Button onClick={() => navigate("/login")} className="w-full" size="lg">
+                Ir a iniciar sesion
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                size="lg"
+                disabled={resendMutation.isPending}
+                onClick={() => resendMutation.mutate({ email: email.trim(), origin: window.location.origin })}
+              >
+                {resendMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reenviando...</>
+                ) : (
+                  <><Mail className="mr-2 h-4 w-4" /> Reenviar email de verificacion</>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

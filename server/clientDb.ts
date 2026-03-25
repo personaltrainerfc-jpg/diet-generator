@@ -1048,6 +1048,29 @@ export async function getProgressReportById(id: number) {
   return report || null;
 }
 
+export async function updateProgressReport(id: number, data: {
+  motivationalMessage?: string;
+  trainerNotes?: string;
+  highlights?: string[];
+}) {
+  const db = await getDb(); assertDb(db);
+  await db.update(progressReports).set({
+    ...(data.motivationalMessage !== undefined && { motivationalMessage: data.motivationalMessage }),
+    ...(data.trainerNotes !== undefined && { trainerNotes: data.trainerNotes }),
+    ...(data.highlights !== undefined && { highlights: data.highlights }),
+  }).where(eq(progressReports.id, id));
+  return getProgressReportById(id);
+}
+
+export async function sendProgressReport(id: number) {
+  const db = await getDb(); assertDb(db);
+  await db.update(progressReports).set({
+    status: "sent",
+    sentAt: new Date(),
+  }).where(eq(progressReports.id, id));
+  return getProgressReportById(id);
+}
+
 // ── Adherence Alerts ──
 export async function createAdherenceAlert(data: {
   clientId: number; trainerId: number;

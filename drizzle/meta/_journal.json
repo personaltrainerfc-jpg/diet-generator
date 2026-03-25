@@ -92,6 +92,13 @@
       "when": 1774437594423,
       "tag": "0012_cynical_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1774461895009,
+      "tag": "0013_new_richard_fisk",
+      "breakpoints": true
     }
   ]
 }

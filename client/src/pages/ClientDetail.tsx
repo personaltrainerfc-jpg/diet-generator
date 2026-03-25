@@ -18,7 +18,7 @@ import {
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
   Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
   TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink,
-  Tag, Heart, Copy, Search, Bot
+  Tag, Heart, Copy, Search, Bot, Droplets, Moon
 } from "lucide-react";
 import { ARCHETYPES } from "@shared/constants";
 
@@ -364,6 +364,7 @@ export default function ClientDetail() {
             <TabsTrigger value="activity" className="rounded-lg text-[13px] gap-1.5 px-3"><Activity className="h-3.5 w-3.5" />Actividad</TabsTrigger>
             <TabsTrigger value="conversations" className="rounded-lg text-[13px] gap-1.5 px-3"><MessageCircle className="h-3.5 w-3.5" />Conv. IA</TabsTrigger>
             <TabsTrigger value="reports" className="rounded-lg text-[13px] gap-1.5 px-3"><FileText className="h-3.5 w-3.5" />Informes</TabsTrigger>
+            <TabsTrigger value="wellness" className="rounded-lg text-[13px] gap-1.5 px-3"><Heart className="h-3.5 w-3.5" />Bienestar</TabsTrigger>
           </TabsList>
         </div>
 
@@ -1065,6 +1066,11 @@ export default function ClientDetail() {
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4 mt-4">
           <ReportsPanel clientId={clientId} />
+        </TabsContent>
+
+        {/* Wellness Tab - Client daily check-ins visible to trainer */}
+        <TabsContent value="wellness" className="space-y-4 mt-4">
+          <WellnessPanel clientId={clientId} />
         </TabsContent>
       </Tabs>
 
@@ -1770,22 +1776,49 @@ function ReportsPanel({ clientId }: { clientId: number }) {
     return d.toISOString().split("T")[0];
   });
   const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().split("T")[0]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ motivationalMessage: "", trainerNotes: "", highlights: "" });
 
   const reportsQ = trpc.clientMgmt.getClientReports.useQuery({ clientId });
   const generateMut = trpc.clientMgmt.generateProgressReport.useMutation({
     onSuccess: () => {
       reportsQ.refetch();
-      toast.success("Informe generado correctamente");
+      toast.success("Informe generado como borrador. Revísalo y envíalo al cliente.");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateMut = trpc.clientMgmt.updateReport.useMutation({
+    onSuccess: () => {
+      reportsQ.refetch();
+      setEditingId(null);
+      toast.success("Informe actualizado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sendMut = trpc.clientMgmt.sendReport.useMutation({
+    onSuccess: () => {
+      reportsQ.refetch();
+      toast.success("Informe enviado al cliente");
     },
     onError: (e: any) => toast.error(e.message),
   });
   const adherenceQ = trpc.clientMgmt.getClientAdherencePattern.useQuery({ clientId });
+
+  const startEditing = (report: any) => {
+    setEditingId(report.id);
+    setEditForm({
+      motivationalMessage: report.motivationalMessage || "",
+      trainerNotes: report.trainerNotes || "",
+      highlights: (report.highlights || []).join(", "),
+    });
+  };
 
   return (
     <div className="space-y-6">
       {/* Generate new report */}
       <div className="rounded-2xl bg-card border border-border/50 p-5">
         <h3 className="text-[15px] font-bold mb-3">Generar informe de progreso</h3>
+        <p className="text-[12px] text-muted-foreground mb-3">El informe se generará como borrador. Podrás revisarlo y editarlo antes de enviarlo al cliente.</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="space-y-1.5">
             <Label className="text-[12px]">Desde</Label>
@@ -1801,7 +1834,7 @@ function ReportsPanel({ clientId }: { clientId: number }) {
           disabled={generateMut.isPending}
           className="w-full rounded-xl"
         >
-          {generateMut.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generando...</> : <><FileText className="mr-2 h-4 w-4" />Generar informe</>}
+          {generateMut.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generando borrador...</> : <><FileText className="mr-2 h-4 w-4" />Generar borrador de informe</>}
         </Button>
       </div>
 
@@ -1835,13 +1868,16 @@ function ReportsPanel({ clientId }: { clientId: number }) {
             <p className="text-[13px] text-muted-foreground">No hay informes generados aún</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {reportsQ.data.map((report: any) => (
-              <div key={report.id} className="rounded-2xl bg-card border border-border/50 p-4">
+              <div key={report.id} className={`rounded-2xl bg-card border p-4 ${report.status === "draft" ? "border-amber-300/50" : "border-border/50"}`}>
+                {/* Status badge */}
                 <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-[13px] font-semibold">{report.periodStart} → {report.periodEnd}</p>
-                    <p className="text-[11px] text-muted-foreground">Generado el {new Date(report.createdAt).toLocaleDateString("es-ES")}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={report.status === "draft" ? "outline" : "secondary"} className={`text-[10px] rounded-lg ${report.status === "draft" ? "border-amber-400 text-amber-600" : "bg-green-100 text-green-700"}`}>
+                      {report.status === "draft" ? "Borrador" : "Enviado"}
+                    </Badge>
+                    <p className="text-[13px] font-semibold">{report.periodStart} \u2192 {report.periodEnd}</p>
                   </div>
                   <div className="text-right">
                     <div className="text-[22px] font-bold" style={{ color: report.adherencePercent >= 80 ? "#22c55e" : report.adherencePercent >= 60 ? "#eab308" : "#ef4444" }}>
@@ -1849,39 +1885,277 @@ function ReportsPanel({ clientId }: { clientId: number }) {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-[12px]">
-                  <div className="rounded-xl bg-background/50 p-2">
+
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Generado el {new Date(report.createdAt).toLocaleDateString("es-ES")}
+                  {report.sentAt && ` \u00b7 Enviado el ${new Date(report.sentAt).toLocaleDateString("es-ES")}`}
+                </p>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-[12px] mb-3">
+                  <div className="rounded-xl bg-secondary/50 p-2">
                     <p className="font-bold">{report.mealsCompleted}</p>
                     <p className="text-muted-foreground text-[10px]">Comidas</p>
                   </div>
-                  <div className="rounded-xl bg-background/50 p-2">
+                  <div className="rounded-xl bg-secondary/50 p-2">
                     <p className="font-bold">{report.mealsTotal}</p>
                     <p className="text-muted-foreground text-[10px]">Objetivo</p>
                   </div>
-                  <div className="rounded-xl bg-background/50 p-2">
+                  <div className="rounded-xl bg-secondary/50 p-2">
                     <p className="font-bold">
                       {report.weightStart && report.weightEnd
                         ? `${((report.weightEnd - report.weightStart) / 1000).toFixed(1)}kg`
-                        : "—"}
+                        : "\u2014"}
                     </p>
                     <p className="text-muted-foreground text-[10px]">Peso</p>
                   </div>
                 </div>
-                {report.motivationalMessage && (
-                  <p className="text-[12px] italic text-muted-foreground mt-3 leading-relaxed">{report.motivationalMessage}</p>
-                )}
-                {report.highlights && report.highlights.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {report.highlights.map((h: string, i: number) => (
-                      <Badge key={i} variant="secondary" className="text-[10px] rounded-lg">{h}</Badge>
-                    ))}
+
+                {/* Edit mode */}
+                {editingId === report.id ? (
+                  <div className="space-y-3 mt-3 p-3 rounded-xl bg-secondary/30 border border-border/50">
+                    <div className="space-y-1.5">
+                      <Label className="text-[12px]">Mensaje motivacional</Label>
+                      <Textarea
+                        value={editForm.motivationalMessage}
+                        onChange={(e) => setEditForm(f => ({ ...f, motivationalMessage: e.target.value }))}
+                        rows={3}
+                        className="rounded-xl text-[13px]"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[12px]">Notas del entrenador (visibles para el cliente)</Label>
+                      <Textarea
+                        value={editForm.trainerNotes}
+                        onChange={(e) => setEditForm(f => ({ ...f, trainerNotes: e.target.value }))}
+                        rows={3}
+                        placeholder="A\u00f1ade tus observaciones personales, recomendaciones espec\u00edficas..."
+                        className="rounded-xl text-[13px]"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[12px]">Destacados (separados por coma)</Label>
+                      <Input
+                        value={editForm.highlights}
+                        onChange={(e) => setEditForm(f => ({ ...f, highlights: e.target.value }))}
+                        placeholder="Adherencia excelente, 2kg perdidos, ..."
+                        className="rounded-xl text-[13px]"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => updateMut.mutate({
+                          reportId: report.id,
+                          motivationalMessage: editForm.motivationalMessage,
+                          trainerNotes: editForm.trainerNotes,
+                          highlights: editForm.highlights.split(",").map((h: string) => h.trim()).filter(Boolean),
+                        })}
+                        disabled={updateMut.isPending}
+                        className="flex-1 rounded-xl h-9 text-[13px]"
+                      >
+                        {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                        Guardar cambios
+                      </Button>
+                      <Button variant="outline" onClick={() => setEditingId(null)} className="rounded-xl h-9 text-[13px]">
+                        <X className="h-3.5 w-3.5 mr-1.5" />Cancelar
+                      </Button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Display content */}
+                    {report.motivationalMessage && (
+                      <div className="mt-2">
+                        <p className="text-[11px] text-muted-foreground font-medium mb-1">Mensaje motivacional:</p>
+                        <p className="text-[12px] italic text-foreground/80 leading-relaxed">{report.motivationalMessage}</p>
+                      </div>
+                    )}
+                    {report.trainerNotes && (
+                      <div className="mt-2">
+                        <p className="text-[11px] text-muted-foreground font-medium mb-1">Notas del entrenador:</p>
+                        <p className="text-[12px] text-foreground/80 leading-relaxed">{report.trainerNotes}</p>
+                      </div>
+                    )}
+                    {report.highlights && report.highlights.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {report.highlights.map((h: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-[10px] rounded-lg">{h}</Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    {report.status === "draft" && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-border/30">
+                        <Button
+                          variant="outline"
+                          onClick={() => startEditing(report)}
+                          className="flex-1 rounded-xl h-9 text-[13px]"
+                        >
+                          <Edit2 className="h-3.5 w-3.5 mr-1.5" />Editar informe
+                        </Button>
+                        <Button
+                          onClick={() => sendMut.mutate({ reportId: report.id })}
+                          disabled={sendMut.isPending}
+                          className="flex-1 rounded-xl h-9 text-[13px]"
+                        >
+                          {sendMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+                          Enviar al cliente
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ── Wellness Panel (Client daily check-ins visible to trainer) ──
+function WellnessPanel({ clientId }: { clientId: number }) {
+  const wellnessQ = trpc.clientMgmt.getClientWellnessData.useQuery({ clientId }, { staleTime: 5 * 60 * 1000 });
+
+  if (wellnessQ.isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  const { hydration = [], sleep = [], wellness = [] } = wellnessQ.data || {};
+
+  const emojiScale = ["", "😫", "😕", "😐", "🙂", "😊"];
+  const qualityLabels = ["", "Muy mal", "Mal", "Normal", "Bien", "Muy bien"];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-[17px] font-bold uppercase tracking-wide">Check-ins de Bienestar del Cliente</h3>
+        <p className="text-[13px] text-muted-foreground mt-1">Datos diarios registrados por el cliente desde su portal</p>
+      </div>
+
+      {/* Hydration */}
+      <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Droplets className="h-5 w-5 text-blue-400" />
+          <h4 className="text-[15px] font-semibold">Hidrataci\u00f3n</h4>
+          <span className="text-[12px] text-muted-foreground ml-auto">\u00daltimos {hydration.length} registros</span>
+        </div>
+        {hydration.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground text-center py-4">Sin registros de hidrataci\u00f3n</p>
+        ) : (
+          <div className="space-y-1.5">
+            {hydration.slice(0, 14).map((h: any) => (
+              <div key={h.id} className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30">
+                <span className="text-[12px] text-muted-foreground">{new Date(h.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 bg-secondary rounded-full h-2">
+                    <div className="bg-blue-400 h-2 rounded-full" style={{ width: `${Math.min(100, (h.glasses / (h.goalGlasses || 8)) * 100)}%` }} />
+                  </div>
+                  <span className="text-[13px] font-medium w-12 text-right">{h.glasses}/{h.goalGlasses || 8}</span>
+                  <span className="text-[11px] text-muted-foreground">vasos</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sleep */}
+      <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Moon className="h-5 w-5 text-indigo-400" />
+          <h4 className="text-[15px] font-semibold">Sue\u00f1o</h4>
+          <span className="text-[12px] text-muted-foreground ml-auto">\u00daltimos {sleep.length} registros</span>
+        </div>
+        {sleep.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground text-center py-4">Sin registros de sue\u00f1o</p>
+        ) : (
+          <div className="space-y-1.5">
+            {sleep.slice(0, 14).map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30">
+                <span className="text-[12px] text-muted-foreground">{new Date(s.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</span>
+                <div className="flex items-center gap-3 text-[13px]">
+                  <span className="font-medium">{(s.hoursSlept / 60).toFixed(1)}h</span>
+                  <span>{emojiScale[s.quality] || ""} {qualityLabels[s.quality] || ""}</span>
+                  {s.notes && <span className="text-[11px] text-muted-foreground italic max-w-[120px] truncate">{s.notes}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Wellness Check-ins */}
+      <div className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Heart className="h-5 w-5 text-rose-400" />
+          <h4 className="text-[15px] font-semibold">Bienestar General</h4>
+          <span className="text-[12px] text-muted-foreground ml-auto">\u00daltimos {wellness.length} registros</span>
+        </div>
+        {wellness.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground text-center py-4">Sin check-ins de bienestar</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="text-left py-2 px-2 text-muted-foreground font-medium">Fecha</th>
+                  <th className="text-center py-2 px-2 text-muted-foreground font-medium">\u26a1 Energ\u00eda</th>
+                  <th className="text-center py-2 px-2 text-muted-foreground font-medium">{"\uD83D\uDE0A"} Ánimo</th>
+                  <th className="text-center py-2 px-2 text-muted-foreground font-medium">{"\u26A0"} Digestión</th>
+                  <th className="text-center py-2 px-2 text-muted-foreground font-medium">{"\uD83C\uDF88"} Hinchazón</th>
+                  <th className="text-left py-2 px-2 text-muted-foreground font-medium">Notas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wellness.slice(0, 30).map((w: any) => (
+                  <tr key={w.id} className="border-b border-border/20 hover:bg-secondary/20">
+                    <td className="py-2 px-2 text-muted-foreground">{new Date(w.date).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })}</td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[12px] font-medium ${w.energy >= 4 ? "bg-green-100 text-green-700" : w.energy >= 3 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{w.energy}/5</span>
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[12px] font-medium ${w.mood >= 4 ? "bg-green-100 text-green-700" : w.mood >= 3 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{w.mood}/5</span>
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[12px] font-medium ${w.digestion >= 4 ? "bg-green-100 text-green-700" : w.digestion >= 3 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{w.digestion}/5</span>
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[12px] font-medium ${w.bloating <= 2 ? "bg-green-100 text-green-700" : w.bloating <= 3 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{w.bloating}/5</span>
+                    </td>
+                    <td className="py-2 px-2 text-muted-foreground text-[12px] max-w-[150px] truncate">{w.notes || "\u2014"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Summary */}
+      {wellness.length > 0 && (
+        <div className="bg-secondary/30 rounded-2xl p-4">
+          <h4 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumen \u00daltimos {Math.min(wellness.length, 7)} D\u00edas</h4>
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Energ\u00eda", key: "energy", icon: "\u26a1" },
+              { label: "Ánimo", key: "mood", icon: "😊" },
+              { label: "Digestión", key: "digestion", icon: "❤" },
+              { label: "Hinchazón", key: "bloating", icon: "🎈" },
+            ].map(({ label, key, icon }) => {
+              const recent = wellness.slice(0, 7);
+              const avg = recent.reduce((sum: number, w: any) => sum + (w[key] || 0), 0) / recent.length;
+              return (
+                <div key={key} className="bg-card rounded-xl border border-border/50 p-3 text-center">
+                  <span className="text-lg">{icon}</span>
+                  <p className="text-[20px] font-bold mt-1">{avg.toFixed(1)}</p>
+                  <p className="text-[11px] text-muted-foreground">{label}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

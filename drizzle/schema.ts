@@ -729,6 +729,9 @@ export const progressReports = mysqlTable("progress_reports", {
   weightEnd: int("weightEnd"), // gramos
   motivationalMessage: text("motivationalMessage"),
   highlights: json("highlights").$type<string[]>(),
+  trainerNotes: text("trainerNotes"),
+  status: varchar("status", { length: 20 }).notNull().default("draft"), // draft | sent
+  sentAt: timestamp("sentAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

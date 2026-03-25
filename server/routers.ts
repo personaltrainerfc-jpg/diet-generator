@@ -492,10 +492,23 @@ export const appRouter = router({
           emailVerificationToken: verificationToken,
         });
 
-        // Send verification email
-        await sendVerificationEmail(input.email.toLowerCase().trim(), verificationToken, input.origin);
+        // Send verification email (don't fail registration if email fails)
+        const emailResult = await sendVerificationEmail(
+          input.email.toLowerCase().trim(),
+          verificationToken,
+          input.origin,
+          input.name.trim()
+        );
 
-        return { success: true, message: "Cuenta creada. Revisa tu email para verificarla." };
+        if (emailResult.sent) {
+          return { success: true, message: "Cuenta creada. Revisa tu email para verificarla.", emailSent: true };
+        } else {
+          return {
+            success: true,
+            message: "Cuenta creada pero hubo un problema al enviar el email de verificacion. Usa la opcion de reenviar verificacion.",
+            emailSent: false,
+          };
+        }
       }),
 
     login: publicProcedure
@@ -616,6 +629,41 @@ export const appRouter = router({
         });
 
         return { success: true, message: "Contraseña actualizada correctamente." };
+      }),
+
+    resendVerification: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        origin: z.string().url(),
+      }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByEmail(input.email.toLowerCase().trim());
+
+        if (!user) {
+          // Don't reveal if user exists
+          return { success: true, message: "Si la cuenta existe y no esta verificada, recibiras un email de verificacion." };
+        }
+
+        if (user.emailVerified) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Esta cuenta ya esta verificada. Puedes iniciar sesion directamente." });
+        }
+
+        // Generate new verification token
+        const newToken = generateSecureToken();
+        await updateUser(user.id, { emailVerificationToken: newToken });
+
+        const emailResult = await sendVerificationEmail(
+          user.email,
+          newToken,
+          input.origin,
+          user.name
+        );
+
+        if (emailResult.sent) {
+          return { success: true, message: "Email de verificacion reenviado. Revisa tu bandeja de entrada." };
+        } else {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No se pudo enviar el email. Intentalo de nuevo mas tarde." });
+        }
       }),
 
     updateProfile: protectedProcedure
@@ -2649,9 +2697,93 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         const existingFoods = await getFoodsByMealId(input.mealId);
         let maxSort = existingFoods.reduce((max, f) => Math.max(max, f.sortOrder || 0), 0);
 
-        // Insert each ingredient as a food in the meal
+        // Helper: check if a food is an oil, condiment, or spice that doesn't need an alternative
+        const isNoAltFood = (name: string) => {
+          const lower = name.toLowerCase();
+          const noAltPatterns = [
+            "aceite", "vinagre", "sal", "pimienta", "especias", "orégano", "comino",
+            "pimentón", "cúrcuma", "canela", "ajo en polvo", "cebolla en polvo",
+            "perejil", "albahaca", "romero", "tomillo", "laurel", "eneldo",
+            "café", "infusión", "té", "agua", "caldo",
+          ];
+          return noAltPatterns.some(p => lower.includes(p));
+        };
+
+        const contextMealName = meal.mealName || "comida";
+
+        // Insert each ingredient as a food in the meal, generating alternatives via LLM
         for (const ing of recipe.ingredients) {
           maxSort++;
+
+          let altName: string | null = null;
+          let altQty: string | null = null;
+          let altCal: number | null = null;
+          let altProt: number | null = null;
+          let altCarbs: number | null = null;
+          let altFats: number | null = null;
+
+          // Skip alternative generation for oils, condiments, spices
+          if (isNoAltFood(ing.name)) {
+            // No alternative needed
+            altName = null;
+            altQty = null;
+            altCal = null;
+            altProt = null;
+            altCarbs = null;
+            altFats = null;
+          } else {
+            try {
+              const altPrompt = `Dado el alimento "${ing.name}" (${ing.quantity}, ${ing.calories}kcal, P${ing.protein}g, C${ing.carbs}g, G${ing.fats}g) que forma parte de la comida "${contextMealName}", sugiere UNA alternativa equivalente que:
+1. Tenga macros similares (misma cantidad aproximada de cal/prot/carbs/grasas)
+2. Sea coherente con el momento del día (si es desayuno, debe ser un alimento de desayuno; si es comida/cena, un alimento de comida/cena; si es snack, un snack)
+3. Sea un alimento real, común y accesible
+4. Sea del MISMO grupo alimentario (proteína→proteína, verdura→verdura, carbohidrato→carbohidrato)
+5. Indique la cantidad precisa en gramos
+Responde SOLO con JSON.`;
+
+              const altSchema = {
+                name: "food_alternative",
+                strict: true,
+                schema: {
+                  type: "object" as const,
+                  properties: {
+                    alternativeName: { type: "string" as const },
+                    alternativeQuantity: { type: "string" as const },
+                    alternativeCalories: { type: "integer" as const },
+                    alternativeProtein: { type: "integer" as const },
+                    alternativeCarbs: { type: "integer" as const },
+                    alternativeFats: { type: "integer" as const },
+                  },
+                  required: ["alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                  additionalProperties: false,
+                },
+              };
+
+              const altResponse = await invokeLLM({
+                messages: [
+                  { role: "system", content: "Eres un nutricionista profesional. Sugiere alternativas de alimentos coherentes con el momento del día. La alternativa SIEMPRE debe pertenecer al MISMO grupo alimentario que el alimento original. Todos los valores numéricos deben ser enteros." },
+                  { role: "user", content: altPrompt },
+                ],
+                maxTokens: 1024,
+                response_format: { type: "json_schema", json_schema: altSchema },
+              });
+
+              const altContent = altResponse.choices[0]?.message?.content;
+              if (altContent && typeof altContent === "string") {
+                const alt = JSON.parse(altContent);
+                altName = alt.alternativeName;
+                altQty = alt.alternativeQuantity;
+                altCal = alt.alternativeCalories;
+                altProt = alt.alternativeProtein;
+                altCarbs = alt.alternativeCarbs;
+                altFats = alt.alternativeFats;
+              }
+            } catch (e) {
+              console.warn(`[addRecipeToMeal] Failed to generate alternative for "${ing.name}":`, e);
+              // Fallback: no alternative
+            }
+          }
+
           await createFood({
             mealId: input.mealId,
             name: ing.name,
@@ -2660,12 +2792,12 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
             protein: ing.protein,
             carbs: ing.carbs,
             fats: ing.fats,
-            alternativeName: ing.name, // same as original (user can edit later)
-            alternativeQuantity: ing.quantity,
-            alternativeCalories: ing.calories,
-            alternativeProtein: ing.protein,
-            alternativeCarbs: ing.carbs,
-            alternativeFats: ing.fats,
+            alternativeName: altName,
+            alternativeQuantity: altQty,
+            alternativeCalories: altCal,
+            alternativeProtein: altProt,
+            alternativeCarbs: altCarbs,
+            alternativeFats: altFats,
             sortOrder: maxSort,
           });
         }
