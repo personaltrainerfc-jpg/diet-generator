@@ -264,6 +264,7 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
     onError: (e) => toast.error(e.message),
   });
   const [exportingPdf, setExportingPdf] = useState(false);
+  const exportPdfMut = trpc.clientPortal.exportDietPDF.useMutation();
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const toggleDay = (idx: number) => setExpandedDays(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; });
@@ -286,16 +287,17 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
   }
 
   const diet = dietQ.data;
+  const showMacros = !!(diet as any).showMacrosToClient;
   return (
     <div className="space-y-4">
       <div className="bg-card text-card-foreground rounded-2xl border border-border/50 p-4 shadow-sm">
         <h2 className="text-[17px] font-bold text-card-foreground">{diet.name}</h2>
         <div className="flex gap-4 mt-2 text-[13px] text-muted-foreground">
-          <span className="font-medium">{diet.totalCalories} kcal</span>
+          {showMacros && <span className="font-medium">{diet.totalCalories} kcal</span>}
           <span>{diet.mealsPerDay} comidas/día</span>
           <span>{diet.menus?.length || 0} días</span>
         </div>
-        {diet.macros && (
+        {showMacros && diet.macros && (
           <div className="flex gap-3 mt-3 text-[12px]">
             <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">P: {diet.macros.protein}g</span>
             <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">C: {diet.macros.carbs}g</span>
@@ -317,7 +319,7 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-bold ${dayExpanded ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>{mi + 1}</div>
                 <div className="text-left">
                   <h3 className="text-[14px] font-semibold">Día {mi + 1}</h3>
-                  <p className="text-[11px] text-muted-foreground">{(menu.meals || []).length} comidas · {dayTotals.cal} kcal</p>
+                  <p className="text-[11px] text-muted-foreground">{(menu.meals || []).length} comidas{showMacros ? ` · ${dayTotals.cal} kcal` : ''}</p>
                 </div>
               </div>
               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dayExpanded ? 'rotate-180' : ''}`} />
@@ -339,7 +341,7 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
                           {meal.description && <span className="text-[11px] text-primary/60 italic hidden sm:inline">{meal.description}</span>}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-muted-foreground">{mealTotals.calories} kcal</span>
+                          {showMacros && <span className="text-[11px] text-muted-foreground">{mealTotals.calories} kcal</span>}
                           <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${mealExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </button>
@@ -353,11 +355,13 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
                               </div>
                             ))}
                           </div>
-                          <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
-                            <span>P: {mealTotals.protein}g</span>
-                            <span>C: {mealTotals.carbs}g</span>
-                            <span>G: {mealTotals.fats}g</span>
-                          </div>
+                          {showMacros && (
+                            <div className="flex gap-3 mt-3 pt-2 border-t border-border/30 text-[11px] text-muted-foreground">
+                              <span>P: {mealTotals.protein}g</span>
+                              <span>C: {mealTotals.carbs}g</span>
+                              <span>G: {mealTotals.fats}g</span>
+                            </div>
+                          )}
                           <Button variant="ghost" size="sm" className="mt-2 gap-1.5 text-[12px] text-primary h-7 px-2"
                             onClick={() => recipeStepsMut.mutate({ clientId: session.clientId, accessCode: session.accessCode, mealName: meal.mealName, foods: (meal.foods || []).map((f: any) => ({ name: f.name, quantity: f.quantity })) })}
                             disabled={recipeStepsMut.isPending}
@@ -376,89 +380,28 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
         );
       })}
 
-      {/* Export PDF button */}
+      {/* Export PDF button - server-side generation */}
       <Button
         variant="outline" className="w-full gap-2 rounded-xl h-11 mt-4"
         onClick={async () => {
           setExportingPdf(true);
           try {
-            const html2pdf = (await import('html2pdf.js')).default;
-            const d = diet;
-            const today = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const fileName = `dieta-${d.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`;
-
-            // Build hidden HTML element for PDF rendering
-            const container = document.createElement('div');
-            container.style.cssText = 'position:absolute;left:-9999px;top:0;width:700px;font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;font-size:13px;line-height:1.5;';
-
-            let content = '';
-            // Header with logo
-            content += `<div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #16a34a;">`;
-            content += `<img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663395627355/JuA5L95oAvQY6eqfSgbwUN/nutriflow_logo_43762e41.webp" style="height:50px;margin-bottom:8px;" crossorigin="anonymous" />`;
-            content += `<h1 style="font-size:22px;color:#16a34a;margin:0;font-weight:700;">${d.name}</h1>`;
-            content += `<div style="display:flex;justify-content:center;gap:24px;margin-top:8px;font-size:13px;color:#555;">`;
-            content += `<span><strong>${d.totalCalories}</strong> kcal/dia</span>`;
-            content += `<span><strong>${d.mealsPerDay}</strong> comidas/dia</span>`;
-            content += `<span>P:${d.proteinPercent}% C:${d.carbsPercent}% G:${d.fatsPercent}%</span>`;
-            content += `</div>`;
-            if (d.macros) {
-              content += `<div style="display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:12px;">`;
-              content += `<span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:12px;">Proteina: ${d.macros.protein}g</span>`;
-              content += `<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:12px;">Carbos: ${d.macros.carbs}g</span>`;
-              content += `<span style="background:#ffe4e6;color:#9f1239;padding:2px 10px;border-radius:12px;">Grasas: ${d.macros.fat}g</span>`;
-              content += `</div>`;
-            }
-            content += `</div>`;
-
-            // Days and meals
-            for (const menu of d.menus || []) {
-              content += `<div style="page-break-inside:avoid;margin-bottom:16px;">`;
-              content += `<h2 style="font-size:17px;color:#16a34a;margin:16px 0 8px;padding:8px 12px;background:#f0fdf4;border-radius:8px;border-left:4px solid #16a34a;">Dia ${menu.menuNumber}</h2>`;
-              for (const meal of menu.meals || []) {
-                const totals = (meal.foods || []).reduce((a: any, f: any) => ({ cal: a.cal + (f.calories||0), p: a.p + (f.protein||0), c: a.c + (f.carbs||0), g: a.g + (f.fats||0) }), { cal:0, p:0, c:0, g:0 });
-                content += `<div style="page-break-inside:avoid;background:#f8f9fa;border-radius:8px;padding:10px 14px;margin:6px 0;border:1px solid #e5e7eb;">`;
-                content += `<h3 style="font-size:14px;margin:0 0 6px;color:#333;font-weight:700;">${meal.mealName} <span style="font-weight:400;color:#888;font-size:12px;">(${totals.cal} kcal)</span></h3>`;
-                for (const food of meal.foods || []) {
-                  content += `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid #eee;">`;
-                  content += `<span>${food.name}</span>`;
-                  content += `<span style="color:#666;white-space:nowrap;">${food.quantity} · ${food.calories} kcal</span>`;
-                  content += `</div>`;
-                  if (food.alternativeName) {
-                    content += `<div style="display:flex;justify-content:space-between;padding:2px 0 2px 16px;font-size:11px;color:#888;font-style:italic;">`;
-                    content += `<span>Alternativa: ${food.alternativeName}</span>`;
-                    content += `<span>${food.alternativeQuantity || ''}</span>`;
-                    content += `</div>`;
-                  }
-                }
-                content += `<div style="display:flex;gap:16px;font-size:11px;color:#666;margin-top:6px;padding-top:6px;border-top:1px solid #ddd;">`;
-                content += `<span>P: ${totals.p}g</span><span>C: ${totals.c}g</span><span>G: ${totals.g}g</span>`;
-                content += `</div></div>`;
-              }
-              content += `</div>`;
-            }
-
-            // Footer
-            content += `<div style="text-align:center;color:#999;margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:10px;">`;
-            content += `Generado con NutriFlow · ${today}`;
-            content += `</div>`;
-
-            container.innerHTML = content;
-            document.body.appendChild(container);
-
-            await html2pdf().set({
-              margin: [10, 10, 10, 10],
-              filename: fileName,
-              image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-            } as any).from(container).save();
-
-            document.body.removeChild(container);
+            const result = await exportPdfMut.mutateAsync({ clientId: session.clientId, accessCode: session.accessCode });
+            // Download the PDF from the S3 URL
+            const response = await fetch(result.url);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = result.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             toast.success("PDF exportado correctamente");
-          } catch (err) {
+          } catch (err: any) {
             console.error('PDF export error:', err);
-            toast.error("Error al exportar PDF");
+            toast.error(err?.message || "Error al exportar PDF");
           }
           setExportingPdf(false);
         }}

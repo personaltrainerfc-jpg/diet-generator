@@ -18,7 +18,7 @@ import {
   Ruler, Trophy, FileText, Send, Loader2, Plus, Trash2, Star,
   Sparkles, Brain, Zap, CheckCircle2, XCircle, Edit2, Save, X,
   TrendingDown, TrendingUp, Minus, BarChart3, Download, UtensilsCrossed, Link2, ExternalLink,
-  Tag, Heart, Copy, Search, Bot, Droplets, Moon
+  Tag, Heart, Copy, Search, Bot, Droplets, Moon, Settings
 } from "lucide-react";
 import { ARCHETYPES } from "@shared/constants";
 
@@ -133,6 +133,7 @@ export default function ClientDetail() {
   const dailyAdherenceQ = trpc.clientMgmt.getAdherenceRange.useQuery({ clientId, startDate: adherenceStartDate, endDate: adherenceEndDate }, { enabled: clientId > 0 });
   const sendInviteMut = trpc.clientMgmt.sendInvitation.useMutation({ onSuccess: (data) => { toast.success(`Invitación enviada. Código: ${data.accessCode}`); invitationsQ.refetch(); setInviteEmail(""); } });
   const resendInviteMut = trpc.clientMgmt.resendInvitation.useMutation({ onSuccess: () => { toast.success("Invitación reenviada"); invitationsQ.refetch(); } });
+  const updateSettingsMut = trpc.clientMgmt.updateClientSettings.useMutation({ onSuccess: () => { toast.success("Configuración actualizada"); clientQ.refetch(); } });
 
   // Local state
   const [newMsg, setNewMsg] = useState("");
@@ -532,6 +533,30 @@ export default function ClientDetail() {
                 </Button>
               </div>
             )}
+          </div>
+          {/* Configuración del Cliente */}
+          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5 space-y-4">
+            <h3 className="text-[15px] font-semibold flex items-center gap-2">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              Configuración del Cliente
+            </h3>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-[14px] font-medium">Mostrar calorías y macros al cliente</p>
+                <p className="text-[12px] text-muted-foreground">Si está desactivado, el cliente verá su dieta sin información nutricional.</p>
+              </div>
+              <button
+                onClick={() => updateSettingsMut.mutate({ clientId, showMacrosToClient: !client.showMacrosToClient })}
+                disabled={updateSettingsMut.isPending}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                  client.showMacrosToClient ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                  client.showMacrosToClient ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
           </div>
         </TabsContent>
 

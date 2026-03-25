@@ -528,3 +528,17 @@
 - [x] CORR9-1: Reconstruir tabs desktop: flex-col, icono arriba (20x20 fijo), texto abajo (11px bold), flex-shrink-0
 - [x] CORR9-2: Línea indicadora centrada con absolute bottom-0 left-1/2 -translate-x-1/2 (24px ancho)
 - [x] CORR9-3: Reconstruir tabs mobile bottom nav con misma estructura (20x20 iconos, 9px bold texto)
+
+## CORR-10: Control visibilidad calorías/macros en app cliente
+
+- [x] CORR10-1: Añadir campo showMacrosToClient (boolean, default false) a tabla clients
+- [x] CORR10-2: Endpoint clientMgmt.updateClientSettings para toggle showMacrosToClient
+- [x] CORR10-3: Incluir showMacrosToClient en respuesta de clientPortal.getActiveDiet
+- [x] CORR10-4: Toggle en perfil cliente del panel entrenador (Configuración del cliente)
+- [x] CORR10-5: Ocultar calorías/macros en DietTab y PDF export cuando showMacrosToClient=false
+
+## CORR-11: Exportar dieta en PDF desde servidor
+
+- [x] CORR11-1: Crear server/pdfTemplates.ts con generateDietPDF usando PDFKit
+- [x] CORR11-2: Endpoint clientPortal.exportDietPDF que genera PDF y sube a S3
+- [x] CORR11-3: Frontend: botón exportar llama al endpoint servidor con estado de carga

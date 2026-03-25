@@ -1,0 +1,1 @@
+ALTER TABLE `clients` ADD `showMacrosToClient` int DEFAULT 0 NOT NULL;

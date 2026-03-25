@@ -99,6 +99,13 @@
       "when": 1774461895009,
       "tag": "0013_new_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1774470866964,
+      "tag": "0014_fuzzy_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

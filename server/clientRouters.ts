@@ -1076,6 +1076,19 @@ Basa tu análisis SOLO en los datos proporcionados. Si no hay datos suficientes 
       ]);
       return { hydration, sleep, wellness };
     }),
+
+  // ── Client Settings (trainer controls) ──
+  updateClientSettings: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      showMacrosToClient: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const client = await getClientById(input.clientId);
+      if (!client || client.trainerId !== ctx.user.id) throw new Error("Cliente no encontrado");
+      await updateClient(input.clientId, { showMacrosToClient: input.showMacrosToClient ? 1 : 0 });
+      return { success: true };
+    }),
 });
 
 // ── Client Portal Router (Client-facing, public with code auth) ──
@@ -1102,7 +1115,9 @@ export const clientPortalRouter = router({
     .query(async ({ input }) => {
       const client = await getClientByAccessCode(input.accessCode);
       if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
-      return getClientActiveDiet(input.clientId);
+      const diet = await getClientActiveDiet(input.clientId);
+      if (!diet) return null;
+      return { ...diet, showMacrosToClient: !!client.showMacrosToClient };
     }),
 
   logAdherence: publicProcedure
@@ -1787,6 +1802,24 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
       const all = await getProgressReportsByClient(input.clientId);
       // Only show sent reports to the client
       return all.filter((r: any) => r.status === "sent");
+    }),
+
+  exportDietPDF: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const diet = await getClientActiveDiet(input.clientId);
+      if (!diet) throw new Error("No hay dieta asignada");
+      const showMacros = !!client.showMacrosToClient;
+      const { generateDietPDF } = await import("./pdfTemplates");
+      const pdfBuffer = await generateDietPDF(diet as any, showMacros);
+      // Upload to S3
+      const { storagePut } = await import("./storage");
+      const fileName = `dieta-${diet.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`;
+      const key = `exports/${input.clientId}/${Date.now()}-${fileName}`;
+      const { url } = await storagePut(key, pdfBuffer, "application/pdf");
+      return { url, fileName };
     }),
 });
 

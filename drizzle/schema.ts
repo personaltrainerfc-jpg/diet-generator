@@ -213,6 +213,7 @@ export const clients = mysqlTable("clients", {
   status: mysqlEnum("status", ["active", "inactive", "paused"]).default("active").notNull(),
   archetype: varchar("archetype", { length: 20 }), // agil, flora, bruto, roca
   accessCode: varchar("accessCode", { length: 32 }).notNull().unique(), // código para que el cliente acceda
+  showMacrosToClient: int("showMacrosToClient").default(0).notNull(), // 0=ocultar, 1=mostrar calorías/macros
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
