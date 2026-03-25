@@ -430,3 +430,10 @@
 - [x] TC-8: Panel completo en TrainerDashboard con alertas, severidad, sugerencias, resolver
 - [x] TC-9: Gráfica de barras adherencia semanal en tab Informes de ClientDetail
 - [x] TC-10: Tests vitest para adherenceEngine y alertas (205 tests pasan)
+
+## U5: Insertar 300 recetas del usuario como recetas del sistema
+- [x] U5-1: Parseadas 300 recetas (60 por categoría: desayuno, snack AM, comida, snack PM, cena)
+- [x] U5-2: Script parse_recipes.py creado con detección de categorías y conversión de ingredientes
+- [x] U5-3: seed-system-recipes.mjs actualizado con 300 recetas + 7 nuevos fallback nutricionales + ejecutado
+- [x] U5-4: 300 recetas verificadas en BD (60 por categoría) + servidor reiniciado
+- [x] U5-5: 205 tests pasan + checkpoint guardado
