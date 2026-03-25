@@ -509,3 +509,4 @@
 - [x] ADMIN-9: Frontend: dialog detalle entrenador con clientes, dietas recientes, conteos
 - [x] ADMIN-10: Frontend: ruta /admin en App.tsx + check role=admin en AdminPanel
 - [x] ADMIN-11: Frontend: botón Admin con corona dorada en sidebar footer (solo role=admin)
+- [x] ADMIN-BUG: Corregir nombres de columnas SQL en subqueries de listTrainers (trainer_id→trainerId, user_id→userId, is_system→isSystem)

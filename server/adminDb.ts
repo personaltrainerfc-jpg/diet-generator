@@ -93,9 +93,9 @@ export async function listTrainers(opts: { search?: string; plan?: string; statu
       emailVerified: users.emailVerified,
       createdAt: users.createdAt,
       lastSignedIn: users.lastSignedIn,
-      clientCount: sql<number>`(SELECT COUNT(*) FROM clients WHERE clients.trainer_id = ${users.id})`,
-      dietCount: sql<number>`(SELECT COUNT(*) FROM diets WHERE diets.user_id = ${users.id})`,
-      recipeCount: sql<number>`(SELECT COUNT(*) FROM recipes WHERE recipes.user_id = ${users.id} AND recipes.is_system = 0)`,
+      clientCount: sql<number>`(SELECT COUNT(*) FROM clients WHERE clients.trainerId = ${users.id})`,
+      dietCount: sql<number>`(SELECT COUNT(*) FROM diets WHERE diets.userId = ${users.id})`,
+      recipeCount: sql<number>`(SELECT COUNT(*) FROM recipes WHERE recipes.userId = ${users.id} AND recipes.isSystem = 0)`,
     })
     .from(users)
     .where(where)

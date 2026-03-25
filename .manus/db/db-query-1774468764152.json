@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, email, name, role, plan, isActive, emailVerified, openId FROM users ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3cKE5Q7ZQPRmheK.root --database JuA5L95oAvQY6eqfSgbwUN --execute SELECT id, email, name, role, plan, isActive, emailVerified, openId FROM users ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "email": "personaltrainerfc@gmail.com",
+      "name": "Raúl Artisén Izquierdo",
+      "role": "admin",
+      "plan": "pro",
+      "isActive": "1",
+      "emailVerified": "1",
+      "openId": "Hyw7UZLiLPXCVJ7SGTbQLw"
+    },
+    {
+      "id": "2010015",
+      "email": "raulartisen@icloud.com",
+      "name": "raul",
+      "role": "trainer",
+      "plan": "basic",
+      "isActive": "1",
+      "emailVerified": "0",
+      "openId": "NULL"
+    },
+    {
+      "id": "2130045",
+      "email": "raulartisen23@gmail.com",
+      "name": "raul",
+      "role": "trainer",
+      "plan": "basic",
+      "isActive": "1",
+      "emailVerified": "1",
+      "openId": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tname\trole\tplan\tisActive\temailVerified\topenId\n1\tpersonaltrainerfc@gmail.com\tRaúl Artisén Izquierdo\tadmin\tpro\t1\t1\tHyw7UZLiLPXCVJ7SGTbQLw\n2010015\traulartisen@icloud.com\traul\ttrainer\tbasic\t1\t0\tNULL\n2130045\traulartisen23@gmail.com\traul\ttrainer\tbasic\t1\t1\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 449
+}
