@@ -542,3 +542,7 @@
 - [x] CORR11-1: Crear server/pdfTemplates.ts con generateDietPDF usando PDFKit
 - [x] CORR11-2: Endpoint clientPortal.exportDietPDF que genera PDF y sube a S3
 - [x] CORR11-3: Frontend: botón exportar llama al endpoint servidor con estado de carga
+
+## BUG: App se queda en skeleton de carga
+- [x] BUG-1: Diagnosticar: sesión expirada + query auth.me no resolvía → skeleton infinito
+- [x] BUG-2: Añadido timeout 5s en DashboardLayout → redirige a /login si carga no completa

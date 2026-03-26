@@ -57,16 +57,27 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading) {
+  // Safety timeout: if loading takes more than 5 seconds, redirect to login
+  useEffect(() => {
+    if (!loading) {
+      setTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setTimedOut(true), 5000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !timedOut) {
     return <DashboardLayoutSkeleton />
   }
 
-  if (!user) {
+  if (!user || timedOut) {
     // Redirect to login page
     window.location.href = "/login";
     return <DashboardLayoutSkeleton />;
