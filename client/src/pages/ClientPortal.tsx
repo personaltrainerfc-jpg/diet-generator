@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown, Bot, Activity, BarChart3, Download, Share2 } from "lucide-react";
+import { Loader2, LogIn, Send, Trophy, CheckCircle2, XCircle, MinusCircle, ArrowLeft, MessageSquare, Calendar, Award, User, Utensils, TrendingUp, Camera, Plus, ImageIcon, Droplets, Moon, Heart, ShoppingCart, ChefHat, Clock, Bell, FileDown, ChevronDown, Bot, Activity, BarChart3, Download, Share2, FileText } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -265,6 +265,8 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
   });
   const [exportingPdf, setExportingPdf] = useState(false);
   const exportPdfMut = trpc.clientPortal.exportDietPDF.useMutation();
+  const [exportingDocx, setExportingDocx] = useState(false);
+  const exportDocxMut = trpc.clientPortal.exportDietDOCX.useMutation();
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
   const toggleDay = (idx: number) => setExpandedDays(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; });
@@ -380,36 +382,65 @@ function DietTab({ dietQ, session, archetype, accentColor }: { dietQ: any; sessi
         );
       })}
 
-      {/* Export PDF button - server-side generation */}
-      <Button
-        variant="outline" className="w-full gap-2 rounded-xl h-11 mt-4"
-        onClick={async () => {
-          setExportingPdf(true);
-          try {
-            const result = await exportPdfMut.mutateAsync({ clientId: session.clientId, accessCode: session.accessCode });
-            // Download the PDF from the S3 URL
-            const response = await fetch(result.url);
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = result.fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success("PDF exportado correctamente");
-          } catch (err: any) {
-            console.error('PDF export error:', err);
-            toast.error(err?.message || "Error al exportar PDF");
-          }
-          setExportingPdf(false);
-        }}
-        disabled={exportingPdf}
-      >
-        {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-        {exportingPdf ? 'Generando PDF...' : 'Exportar Dieta (PDF)'}
-      </Button>
+      {/* Export buttons */}
+      <div className="flex gap-2 mt-4">
+        <Button
+          variant="outline" className="flex-1 gap-2 rounded-xl h-11"
+          onClick={async () => {
+            setExportingPdf(true);
+            try {
+              const result = await exportPdfMut.mutateAsync({ clientId: session.clientId, accessCode: session.accessCode });
+              const response = await fetch(result.url);
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = result.fileName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              toast.success("PDF exportado correctamente");
+            } catch (err: any) {
+              console.error('PDF export error:', err);
+              toast.error(err?.message || "Error al exportar PDF");
+            }
+            setExportingPdf(false);
+          }}
+          disabled={exportingPdf}
+        >
+          {exportingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          {exportingPdf ? 'Generando...' : 'PDF'}
+        </Button>
+        <Button
+          variant="outline" className="flex-1 gap-2 rounded-xl h-11"
+          onClick={async () => {
+            setExportingDocx(true);
+            try {
+              const result = await exportDocxMut.mutateAsync({ clientId: session.clientId, accessCode: session.accessCode });
+              const response = await fetch(result.url);
+              const blob = await response.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = result.fileName;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              toast.success("Word exportado correctamente");
+            } catch (err: any) {
+              console.error('DOCX export error:', err);
+              toast.error(err?.message || "Error al exportar Word");
+            }
+            setExportingDocx(false);
+          }}
+          disabled={exportingDocx}
+        >
+          {exportingDocx ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+          {exportingDocx ? 'Generando...' : 'Word'}
+        </Button>
+      </div>
 
       {/* Recipe Steps Dialog */}
       <Dialog open={!!recipeSteps} onOpenChange={() => setRecipeSteps(null)}>

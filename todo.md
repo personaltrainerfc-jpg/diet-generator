@@ -546,3 +546,12 @@
 ## BUG: App se queda en skeleton de carga
 - [x] BUG-1: Diagnosticar: sesión expirada + query auth.me no resolvía → skeleton infinito
 - [x] BUG-2: Añadido timeout 5s en DashboardLayout → redirige a /login si carga no completa
+
+## EXPORT-WORD: Exportar dieta en formato Word (DOCX)
+- [x] WORD-1: Instalar dependencia docx para generación de documentos Word en servidor
+- [x] WORD-2: Crear función generateDietDOCX en server/docxTemplates.ts
+- [x] WORD-3: Endpoint exportDietDOCX que genera DOCX y sube a S3
+- [x] WORD-4: Frontend: botón exportar Word junto al de PDF (entrenador + cliente)
+- [x] WORD-2b: Reescribir DOCX con formato grid visual (columnas=días, filas=comidas) como el PDF
+- [x] WORD-2c: Exportar Word siempre sin calorías ni macros
+- [x] WORD-5: Tests para la exportación Word (10 tests pasan)

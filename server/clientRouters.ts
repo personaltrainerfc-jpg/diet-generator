@@ -1821,6 +1821,22 @@ ${client.archetype ? `Su personaje NutriFlow es: ${client.archetype.toUpperCase(
       const { url } = await storagePut(key, pdfBuffer, "application/pdf");
       return { url, fileName };
     }),
+
+  exportDietDOCX: publicProcedure
+    .input(z.object({ clientId: z.number(), accessCode: z.string() }))
+    .mutation(async ({ input }) => {
+      const client = await getClientByAccessCode(input.accessCode);
+      if (!client || client.id !== input.clientId) throw new Error("Acceso denegado");
+      const diet = await getClientActiveDiet(input.clientId);
+      if (!diet) throw new Error("No hay dieta asignada");
+      const { generateDietDOCX } = await import("./docxTemplates");
+      const docxBuffer = await generateDietDOCX(diet as any);
+      const { storagePut } = await import("./storage");
+      const fileName = `dieta-${diet.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.docx`;
+      const key = `exports/${input.clientId}/${Date.now()}-${fileName}`;
+      const { url } = await storagePut(key, docxBuffer, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      return { url, fileName };
+    }),
 });
 
 // ── Helper: Extract preferences from AI chat ──

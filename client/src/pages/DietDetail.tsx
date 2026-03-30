@@ -23,7 +23,7 @@ import {
   Loader2, ArrowLeft, ArrowLeftRight, Download, Copy, RefreshCw,
   Trash2, Plus, Search, ShoppingCart, Flame, Beef, Wheat, Droplets,
   Pencil, StickyNote, Settings2, BookOpen, FileDown, ClipboardCopy,
-  AlertCircle, Pill, Save, Eye, EyeOff, GripVertical, FileStack,
+  AlertCircle, Pill, Save, Eye, EyeOff, GripVertical, FileStack, FileText,
 } from "lucide-react";
 import type { FullDiet, FullMenu, FullMeal, FullFood } from "@shared/types";
 import { LOGO_URL } from "@shared/constants";
@@ -696,6 +696,10 @@ export default function DietDetail() {
   }, []);
   const handleOpenAdjustMacros = () => { if (diet) { setAdjustCalories(diet.totalCalories); setAdjustProtein(diet.proteinPercent); setAdjustCarbs(diet.carbsPercent); setAdjustFats(diet.fatsPercent); setShowAdjustMacros(true); } };
 
+  const exportDocxMut = trpc.diet.exportDOCX.useMutation();
+  const exportPdfMut = trpc.diet.exportPDF.useMutation();
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
+
   const handleDownloadPdf = async () => {
     if (!diet) return;
     setDownloading(true);
@@ -708,6 +712,30 @@ export default function DietDetail() {
       printWindow.onload = () => printWindow.print();
     } catch (e) { console.error(e); toast.error("Error al generar el PDF"); }
     finally { setDownloading(false); }
+  };
+
+  const handleDownloadDocx = async () => {
+    if (!diet) return;
+    setDownloadingDocx(true);
+    try {
+      const result = await exportDocxMut.mutateAsync({ dietId });
+      const response = await fetch(result.url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Word exportado correctamente");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Error al exportar Word");
+    } finally {
+      setDownloadingDocx(false);
+    }
   };
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -750,6 +778,10 @@ export default function DietDetail() {
           <Button variant="outline" onClick={handleDownloadPdf} disabled={downloading} className="rounded-xl h-9">
             {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             <span className="text-[13px]">PDF</span>
+          </Button>
+          <Button variant="outline" onClick={handleDownloadDocx} disabled={downloadingDocx} className="rounded-xl h-9">
+            {downloadingDocx ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+            <span className="text-[13px]">Word</span>
           </Button>
         </div>
       </div>

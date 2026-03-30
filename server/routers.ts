@@ -2182,6 +2182,36 @@ Valores numéricos enteros. Solo JSON.`;
 
         return { success: true };
       }),
+
+    // ── Export diet as DOCX (trainer) ──
+    exportDOCX: protectedProcedure
+      .input(z.object({ dietId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getFullDiet(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const { generateDietDOCX } = await import("./docxTemplates");
+        const docxBuffer = await generateDietDOCX(diet as any);
+        const { storagePut } = await import("./storage");
+        const fileName = `dieta-${diet.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.docx`;
+        const key = `exports/trainer/${ctx.user.id}/${Date.now()}-${fileName}`;
+        const { url } = await storagePut(key, docxBuffer, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        return { url, fileName };
+      }),
+
+    // ── Export diet as PDF (trainer, server-side) ──
+    exportPDF: protectedProcedure
+      .input(z.object({ dietId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const diet = await getFullDiet(input.dietId);
+        if (!diet || diet.userId !== ctx.user.id) throw new Error("No tienes acceso");
+        const { generateDietPDF } = await import("./pdfTemplates");
+        const pdfBuffer = await generateDietPDF(diet as any, true);
+        const { storagePut } = await import("./storage");
+        const fileName = `dieta-${diet.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pdf`;
+        const key = `exports/trainer/${ctx.user.id}/${Date.now()}-${fileName}`;
+        const { url } = await storagePut(key, pdfBuffer, "application/pdf");
+        return { url, fileName };
+      }),
   }),
 
   // ── Recipe management ──
