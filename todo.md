@@ -555,3 +555,8 @@
 - [x] WORD-2b: Reescribir DOCX con formato grid visual (columnas=días, filas=comidas) como el PDF
 - [x] WORD-2c: Exportar Word siempre sin calorías ni macros
 - [x] WORD-5: Tests para la exportación Word (10 tests pasan)
+
+## ALTERNATIVAS: Reglas de alternativas en generación de dietas
+- [x] ALT-1: Aceite de oliva NUNCA debe tener alternativa
+- [x] ALT-2: Verduras/hortalizas siempre alternativa "Otra verdura u hortaliza al gusto" con mismos gramos
+- [x] ALT-3: Tests para validar las reglas de alternativas (25 tests pasan)

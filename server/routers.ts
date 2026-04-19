@@ -41,6 +41,73 @@ import {
 } from "./auth";
 import { getUserByEmail, createUser, getUserByVerificationToken, getUserByResetToken, updateUser } from "./db";
 
+// ── Post-processing: enforce alternative rules regardless of LLM output ──
+const NO_ALT_PATTERNS = [
+  "aceite", "vinagre", "sal", "pimienta", "especias", "or\u00e9gano", "comino",
+  "piment\u00f3n", "c\u00farcuma", "canela", "ajo en polvo", "cebolla en polvo",
+  "perejil", "albahaca", "romero", "tomillo", "laurel", "eneldo",
+  "caf\u00e9", "infusi\u00f3n", "t\u00e9", "agua", "caldo",
+];
+const VEGETABLE_PATTERNS = [
+  "br\u00f3coli", "brocoli", "espinaca", "jud\u00eda", "judias", "calabac\u00edn", "calabacin",
+  "tomate", "lechuga", "pimiento", "berenjena", "coliflor", "acelga",
+  "pepino", "zanahoria", "cebolla", "ajo", "champi\u00f1\u00f3n", "champi\u00f1on",
+  "seta", "alcachofa", "espárrago", "esparrago", "r\u00fabano", "rabano",
+  "r\u00facula", "rucula", "remolacha", "nabo", "puerro", "apio",
+  "col ", "col\b", "repollo", "lombarda", "canónigo", "canonigo",
+  "berro", "endivia", "escarola", "guisante", "habas",
+  "verdura", "hortaliza", "ensalada", "mix de hojas",
+];
+
+function isNoAltFood(name: string): boolean {
+  const lower = name.toLowerCase();
+  return NO_ALT_PATTERNS.some(p => {
+    // Use word boundary check to avoid false positives like "sal" matching "salteadas"
+    const idx = lower.indexOf(p);
+    if (idx === -1) return false;
+    const before = idx === 0 || /[\s,.(\-\/]/.test(lower[idx - 1]);
+    const after = (idx + p.length) >= lower.length || /[\s,.)\-\/]/.test(lower[idx + p.length]);
+    return before && after;
+  });
+}
+
+function isVegetableFood(name: string): boolean {
+  const lower = name.toLowerCase();
+  return VEGETABLE_PATTERNS.some(p => lower.includes(p));
+}
+
+function sanitizeAlternatives(food: any): any {
+  const name = (food.name || "").toString();
+  
+  // Rule 1: Oils, condiments, spices → NO alternative (null)
+  if (isNoAltFood(name)) {
+    return {
+      ...food,
+      alternativeName: null,
+      alternativeQuantity: null,
+      alternativeCalories: null,
+      alternativeProtein: null,
+      alternativeCarbs: null,
+      alternativeFats: null,
+    };
+  }
+  
+  // Rule 2: Vegetables/greens → "Otra verdura u hortaliza al gusto" with same quantity & macros
+  if (isVegetableFood(name)) {
+    return {
+      ...food,
+      alternativeName: "Otra verdura u hortaliza al gusto",
+      alternativeQuantity: food.quantity,
+      alternativeCalories: food.calories,
+      alternativeProtein: food.protein,
+      alternativeCarbs: food.carbs,
+      alternativeFats: food.fats,
+    };
+  }
+  
+  return food;
+}
+
 const dietConfigSchema = z.object({
   name: z.string().min(1).max(255),
   totalCalories: z.number().int().min(800).max(10000),
@@ -249,11 +316,11 @@ REGLAS IMPORTANTES:
    REGLA DE GRUPO ALIMENTARIO: La alternativa SIEMPRE debe pertenecer al MISMO grupo alimentario que el alimento original:
    - Proteína → otra proteína (pollo → pavo, salmón → merluza, huevos → atún)
    - Carbohidrato → otro carbohidrato (arroz → pasta, patata → boniato, pan → avena)
-   - Verdura → otra verdura (brócoli → judías verdes, espinacas → acelgas)
+   - Verdura/Hortaliza → alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con los MISMOS gramos y los MISMOS macros que el alimento original. Ejemplo: brócoli 150g → alternativeName: "Otra verdura u hortaliza al gusto", alternativeQuantity: "150g", con los mismos macros.
    - Fruta → otra fruta (manzana → pera, plátano → kiwi)
    - Lácteo → otro lácteo (yogur griego → queso fresco, leche → kefir)
    - Frutos secos → otros frutos secos (almendras → nueces, anacardos → pistachos)
-   EXCEPCIÓN SIN ALTERNATIVA: Los aceites (aceite de oliva, aceite de coco), condimentos (sal, pimienta, especias), y bebidas básicas (café, infusión) NO necesitan alternativa. Para estos, pon el campo "alternative" con el MISMO alimento y los MISMOS macros. Ejemplo: aceite de oliva → alternativa: aceite de oliva (mismos macros).
+   EXCEPCIÓN SIN ALTERNATIVA (OBLIGATORIO): Los aceites (aceite de oliva, aceite de coco), condimentos (sal, pimienta, especias), y bebidas básicas (café, infusión) NO necesitan alternativa. Para estos, pon alternativeName con el MISMO nombre del alimento y los MISMOS macros. Ejemplo: aceite de oliva → alternativeName: "Aceite de oliva", mismos macros y cantidad.
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades). REDONDEO PRÁCTICO: Las cantidades en gramos deben ser múltiplos de 5 (hasta 100g) o múltiplos de 10 (por encima de 100g). Ejemplo: 25g, 40g, 80g, 120g, 150g, 200g. NUNCA uses cantidades como 37g, 123g o 87g.
 6. Usa EXACTAMENTE los nombres de comida indicados en la estructura de comidas.
@@ -1016,7 +1083,8 @@ conservadores y explícalo en el campo reasoning.`;
               description: meal.description || null,
             });
 
-            for (const food of meal.foods) {
+            for (const rawFood of meal.foods) {
+              const food = sanitizeAlternatives(rawFood);
               await createFood({
                 mealId,
                 name: food.name,
@@ -1274,7 +1342,8 @@ conservadores y explícalo en el campo reasoning.`;
           fats: generated.fats,
         });
 
-        for (const food of generated.foods) {
+        for (const rawFood of generated.foods) {
+          const food = sanitizeAlternatives(rawFood);
           await createFood({
             mealId,
             name: food.name,
@@ -1419,7 +1488,8 @@ conservadores y explícalo en el campo reasoning.`;
         }
 
         // If replacing the food (name changed), auto-generate a new alternative
-        if (generateAlternative && updateData.name && updateData.name !== food.name) {
+        // Skip LLM for oils/condiments and vegetables (sanitizeAlternatives handles them)
+        if (generateAlternative && updateData.name && updateData.name !== food.name && !isNoAltFood(updateData.name) && !isVegetableFood(updateData.name)) {
           try {
             const newFoodName = updateData.name;
             const qty = updateData.quantity || food.quantity;
@@ -1480,6 +1550,36 @@ Responde SOLO con JSON.`;
           }
         }
 
+        // Enforce alternative rules (aceite=null, verdura=genérica)
+        const foodNameForSanitize = updateData.name || food.name;
+        const qtyForSanitize = updateData.quantity || food.quantity;
+        const calForSanitize = updateData.calories ?? food.calories;
+        const protForSanitize = updateData.protein ?? food.protein;
+        const carbForSanitize = updateData.carbs ?? food.carbs;
+        const fatForSanitize = updateData.fats ?? food.fats;
+        const sanitizedAlt = sanitizeAlternatives({
+          name: foodNameForSanitize,
+          quantity: qtyForSanitize,
+          calories: calForSanitize,
+          protein: protForSanitize,
+          carbs: carbForSanitize,
+          fats: fatForSanitize,
+          alternativeName: updateData.alternativeName,
+          alternativeQuantity: updateData.alternativeQuantity,
+          alternativeCalories: updateData.alternativeCalories,
+          alternativeProtein: updateData.alternativeProtein,
+          alternativeCarbs: updateData.alternativeCarbs,
+          alternativeFats: updateData.alternativeFats,
+        });
+        if (sanitizedAlt.alternativeName !== updateData.alternativeName) {
+          updateData.alternativeName = sanitizedAlt.alternativeName;
+          updateData.alternativeQuantity = sanitizedAlt.alternativeQuantity;
+          updateData.alternativeCalories = sanitizedAlt.alternativeCalories;
+          updateData.alternativeProtein = sanitizedAlt.alternativeProtein;
+          updateData.alternativeCarbs = sanitizedAlt.alternativeCarbs;
+          updateData.alternativeFats = sanitizedAlt.alternativeFats;
+        }
+
         // Remove undefined values
         const cleanData = Object.fromEntries(
           Object.entries(updateData).filter(([_, v]) => v !== undefined)
@@ -1526,6 +1626,8 @@ Responde SOLO con JSON.`;
         let altCarbs: number | null = null;
         let altFats: number | null = null;
 
+        // Skip LLM call for oils/condiments and vegetables (sanitizeAlternatives handles them)
+        if (!isNoAltFood(input.name) && !isVegetableFood(input.name)) {
         try {
           const contextMealName = mealResult[0].mealName || "comida";
           const altPrompt = `Dado el alimento "${input.name}" (${input.quantity}, ${input.calories}kcal, P${input.protein}g, C${input.carbs}g, G${input.fats}g) que forma parte de la comida "${contextMealName}", sugiere UNA alternativa equivalente que:
@@ -1575,9 +1677,9 @@ Responde SOLO con JSON.`;
         } catch (e) {
           console.warn("Failed to generate alternative for added food:", e);
         }
+        } // end if (!isNoAltFood && !isVegetableFood)
 
-        const foodId = await createFood({
-          mealId: input.mealId,
+        const sanitized = sanitizeAlternatives({
           name: input.name,
           quantity: input.quantity,
           calories: input.calories,
@@ -1590,6 +1692,10 @@ Responde SOLO con JSON.`;
           alternativeProtein: altProt,
           alternativeCarbs: altCarbs,
           alternativeFats: altFats,
+        });
+        const foodId = await createFood({
+          mealId: input.mealId,
+          ...sanitized,
         });
 
         // Recalculate meal and menu macros
@@ -1695,7 +1801,7 @@ ${preferences ? `Preferencias del usuario: ${preferences}.` : ''}
 
 NO uses estos alimentos (ya están en la comida actual): ${currentFoodNames}. Usa alimentos COMPLETAMENTE DIFERENTES.
 Cantidades en gramos, múltiplos de 5 (hasta 100g) o de 10 (>100g). Cocina sencilla (plancha, horno, airfryer, vapor).
-Incluye 2-6 alimentos. Cada alimento con alternativa del MISMO grupo alimentario (proteína→proteína, verdura→verdura). Aceites/condimentos: alternativa = mismo alimento.
+Incluye 2-6 alimentos. Cada alimento con alternativa del MISMO grupo alimentario (proteína→proteína, fruta→fruta). VERDURAS/HORTALIZAS: alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con mismos gramos y macros. Aceites/condimentos: alternativa = mismo alimento con mismos macros.
 Valores numéricos enteros. Solo JSON.`;
 
         const singleMealSchema = {
@@ -1805,7 +1911,8 @@ Valores numéricos enteros. Solo JSON.`;
         await updateMealName(input.mealId, generated.mealName || meal.mealName);
 
         // Create new foods
-        for (const food of generated.foods) {
+        for (const rawFood of generated.foods) {
+          const food = sanitizeAlternatives(rawFood);
           await createFood({
             mealId: input.mealId,
             name: food.name,
@@ -2145,7 +2252,8 @@ Valores numéricos enteros. Solo JSON.`;
               description: meal.description || null,
             });
 
-            for (const food of meal.foods) {
+            for (const rawFood of meal.foods) {
+              const food = sanitizeAlternatives(rawFood);
               await createFood({
                 mealId,
                 name: food.name,
@@ -2728,17 +2836,7 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         const existingFoods = await getFoodsByMealId(input.mealId);
         let maxSort = existingFoods.reduce((max, f) => Math.max(max, f.sortOrder || 0), 0);
 
-        // Helper: check if a food is an oil, condiment, or spice that doesn't need an alternative
-        const isNoAltFood = (name: string) => {
-          const lower = name.toLowerCase();
-          const noAltPatterns = [
-            "aceite", "vinagre", "sal", "pimienta", "especias", "orégano", "comino",
-            "pimentón", "cúrcuma", "canela", "ajo en polvo", "cebolla en polvo",
-            "perejil", "albahaca", "romero", "tomillo", "laurel", "eneldo",
-            "café", "infusión", "té", "agua", "caldo",
-          ];
-          return noAltPatterns.some(p => lower.includes(p));
-        };
+        // Uses global isNoAltFood and isVegetableFood functions
 
         const contextMealName = meal.mealName || "comida";
 
@@ -2753,9 +2851,9 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
           let altCarbs: number | null = null;
           let altFats: number | null = null;
 
-          // Skip alternative generation for oils, condiments, spices
-          if (isNoAltFood(ing.name)) {
-            // No alternative needed
+          // Skip alternative generation for oils, condiments, spices AND vegetables
+          if (isNoAltFood(ing.name) || isVegetableFood(ing.name)) {
+            // sanitizeAlternatives will handle the correct values
             altName = null;
             altQty = null;
             altCal = null;
@@ -2815,8 +2913,7 @@ Responde SOLO con JSON.`;
             }
           }
 
-          await createFood({
-            mealId: input.mealId,
+          const sanitized = sanitizeAlternatives({
             name: ing.name,
             quantity: ing.quantity,
             calories: ing.calories,
@@ -2829,6 +2926,10 @@ Responde SOLO con JSON.`;
             alternativeProtein: altProt,
             alternativeCarbs: altCarbs,
             alternativeFats: altFats,
+          });
+          await createFood({
+            mealId: input.mealId,
+            ...sanitized,
             sortOrder: maxSort,
           });
         }
