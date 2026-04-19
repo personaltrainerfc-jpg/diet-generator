@@ -134,6 +134,7 @@ const dietConfigSchema = z.object({
   preferredFoods: z.array(z.string()).default([]),
   allergies: z.array(z.string()).default([]),
   fastingProtocol: z.string().max(20).optional(),
+  includeAlternatives: z.boolean().default(false),
 });
 
 async function buildSystemRecipesSection(): Promise<string> {
@@ -311,16 +312,21 @@ ${config.preferences ? `PREFERENCIAS DEL USUARIO (CUMPLIMIENTO OBLIGATORIO Y PRI
 ${previousDietFoods && previousDietFoods.length > 0 ? `VARIEDAD GARANTIZADA - PLATOS A EVITAR (ya usados en dietas anteriores, NO repetir):\n${previousDietFoods.join(", ")}\nDEBES usar combinaciones y platos COMPLETAMENTE DIFERENTES a los listados arriba. Rota las fuentes de proteína, carbohidratos y verduras.\n` : ""}
 REGLAS IMPORTANTES:
 1. Cada comida debe tener entre 2 y 6 alimentos.
-2. Para CADA alimento, proporciona SIEMPRE UNA alternativa equivalente con macros similares Y coherente con el momento del día. NUNCA dejes un alimento sin alternativa.
-3. Las alternativas deben ser intercambiables sin alterar significativamente los macros totales.
-   REGLA DE GRUPO ALIMENTARIO: La alternativa SIEMPRE debe pertenecer al MISMO grupo alimentario que el alimento original:
-   - Proteína → otra proteína (pollo → pavo, salmón → merluza, huevos → atún)
-   - Carbohidrato → otro carbohidrato (arroz → pasta, patata → boniato, pan → avena)
-   - Verdura/Hortaliza → alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con los MISMOS gramos y los MISMOS macros que el alimento original. Ejemplo: brócoli 150g → alternativeName: "Otra verdura u hortaliza al gusto", alternativeQuantity: "150g", con los mismos macros.
-   - Fruta → otra fruta (manzana → pera, plátano → kiwi)
-   - Lácteo → otro lácteo (yogur griego → queso fresco, leche → kefir)
+${config.includeAlternatives ? `2. Para CADA alimento, proporciona UNA alternativa que sea CULINARIAMENTE CONGRUENTE con el plato original. La alternativa NO es solo un alimento con macros similares: debe ser un ingrediente que tenga sentido en el mismo contexto culinario.
+3. CONGRUENCIA CULINARIA DE ALTERNATIVAS (MUY IMPORTANTE):
+   - La alternativa debe poder sustituir al alimento original EN EL MISMO PLATO sin que el resultado sea absurdo.
+   - Si el plato es "Salmón al horno con patatas", la alternativa al salmón podría ser "Lubina al horno" o "Merluza al horno" (otro pescado que se hornea igual), NO "Atún en lata" ni "Pechuga de pollo".
+   - Si el plato es "Lentejas estofadas", la alternativa podría ser "Garbanzos estofados" o "Alubias estofadas", NO "Arroz blanco".
+   - Si es una tostada con aguacate, la alternativa al pan podría ser "Pan de centeno" o "Pan integral", NO "Tortitas de arroz".
+   - Piensa: ¿un cocinero real haría esta sustitución en este plato concreto?
+   REGLA DE GRUPO ALIMENTARIO: La alternativa SIEMPRE debe pertenecer al MISMO grupo alimentario:
+   - Proteína → otra proteína DEL MISMO ESTILO DE COCCIÓN (pollo a la plancha → pavo a la plancha, salmón al horno → lubina al horno, huevos revueltos → huevos cocidos)
+   - Carbohidrato → otro carbohidrato SIMILAR EN TEXTURA Y USO (arroz → quinoa o cuscús, pasta → pasta integral, patata → boniato, pan → pan integral)
+   - Verdura/Hortaliza → alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con los MISMOS gramos y los MISMOS macros que el alimento original.
+   - Fruta → otra fruta de textura similar (manzana → pera, plátano → kiwi, naranja → mandarina)
+   - Lácteo → otro lácteo del mismo tipo (yogur griego → skyr, queso fresco → requesón)
    - Frutos secos → otros frutos secos (almendras → nueces, anacardos → pistachos)
-   EXCEPCIÓN SIN ALTERNATIVA (OBLIGATORIO): Los aceites (aceite de oliva, aceite de coco), condimentos (sal, pimienta, especias), y bebidas básicas (café, infusión) NO necesitan alternativa. Para estos, pon alternativeName con el MISMO nombre del alimento y los MISMOS macros. Ejemplo: aceite de oliva → alternativeName: "Aceite de oliva", mismos macros y cantidad.
+   EXCEPCIÓN SIN ALTERNATIVA (OBLIGATORIO): Los aceites (aceite de oliva, aceite de coco), condimentos (sal, pimienta, especias), y bebidas básicas (café, infusión) NO necesitan alternativa. Para estos, pon alternativeName con el MISMO nombre del alimento y los MISMOS macros.` : `2. NO generes alternativas para ningún alimento. Solo incluye el alimento principal con sus macros.`}
 4. Usa alimentos reales, comunes y accesibles. Prioriza los alimentos de la referencia nutricional.
 5. Indica cantidades precisas (en gramos o unidades). REDONDEO PRÁCTICO: Las cantidades en gramos deben ser múltiplos de 5 (hasta 100g) o múltiplos de 10 (por encima de 100g). Ejemplo: 25g, 40g, 80g, 120g, 150g, 200g. NUNCA uses cantidades como 37g, 123g o 87g.
 6. Usa EXACTAMENTE los nombres de comida indicados en la estructura de comidas.
@@ -361,7 +367,8 @@ PLATOS RECONOCIBLES (OBLIGATORIO):
 Responde ÚNICAMENTE con un JSON válido siguiendo exactamente esta estructura (sin texto adicional):`;
 }
 
-const dietJsonSchema = {
+// Schema WITH alternatives
+const dietJsonSchemaWithAlts = {
   name: "generated_diet",
   strict: true,
   schema: {
@@ -426,6 +433,72 @@ const dietJsonSchema = {
     additionalProperties: false,
   },
 };
+
+// Schema WITHOUT alternatives (lighter, faster generation)
+const dietJsonSchemaNoAlts = {
+  name: "generated_diet",
+  strict: true,
+  schema: {
+    type: "object",
+    properties: {
+      menus: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            menuNumber: { type: "integer" },
+            totalCalories: { type: "integer" },
+            totalProtein: { type: "integer" },
+            totalCarbs: { type: "integer" },
+            totalFats: { type: "integer" },
+            meals: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  mealNumber: { type: "integer" },
+                  mealName: { type: "string" },
+                  description: { type: "string" },
+                  calories: { type: "integer" },
+                  protein: { type: "integer" },
+                  carbs: { type: "integer" },
+                  fats: { type: "integer" },
+                  foods: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        quantity: { type: "string" },
+                        calories: { type: "integer" },
+                        protein: { type: "integer" },
+                        carbs: { type: "integer" },
+                        fats: { type: "integer" },
+                      },
+                      required: ["name", "quantity", "calories", "protein", "carbs", "fats"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["mealNumber", "mealName", "description", "calories", "protein", "carbs", "fats", "foods"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["menuNumber", "totalCalories", "totalProtein", "totalCarbs", "totalFats", "meals"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["menus"],
+    additionalProperties: false,
+  },
+};
+
+// Helper to pick the right schema
+function getDietJsonSchema(includeAlternatives: boolean) {
+  return includeAlternatives ? dietJsonSchemaWithAlts : dietJsonSchemaNoAlts;
+}
 
 /**
  * Attempts to repair truncated JSON from LLM by closing open brackets/braces.
@@ -962,7 +1035,7 @@ conservadores y explícalo en el campo reasoning.`;
             maxTokens: dynamicMaxTokens,
             response_format: {
               type: "json_schema",
-              json_schema: dietJsonSchema,
+              json_schema: getDietJsonSchema(input.includeAlternatives),
             },
           });
 
@@ -1047,6 +1120,7 @@ conservadores y explícalo en el campo reasoning.`;
           preferredFoods: input.preferredFoods.length > 0 ? input.preferredFoods : null,
           allergies: input.allergies.length > 0 ? input.allergies : null,
           fastingProtocol: input.fastingProtocol || null,
+          includeAlternatives: input.includeAlternatives ? 1 : 0,
           creationMethod: "ai",
         });
 
@@ -1264,8 +1338,28 @@ conservadores y explícalo en el campo reasoning.`;
         const fatsGrams = Math.round((approxCalories * diet.fatsPercent / 100) / 9);
 
         // Use LLM to generate a single meal
-        const prompt = `Genera UNA comida llamada "${input.mealName}" con aproximadamente ${approxCalories} kcal, ${proteinGrams}g proteína, ${carbsGrams}g carbohidratos, ${fatsGrams}g grasa. Incluye entre 2 y 5 alimentos con una alternativa para cada uno. Responde SOLO con JSON.`;
+        const addMealIncludeAlts = !!(diet as any).includeAlternatives;
+        const altPart = addMealIncludeAlts ? ' Incluye entre 2 y 5 alimentos con una alternativa CULINARIAMENTE CONGRUENTE para cada uno (misma técnica de cocción, mismo grupo alimentario). VERDURAS: alternativa "Otra verdura u hortaliza al gusto" con mismos gramos. Aceites/condimentos: sin alternativa.' : ' Incluye entre 2 y 5 alimentos. NO generes alternativas.';
+        const prompt = `Genera UNA comida llamada "${input.mealName}" con aproximadamente ${approxCalories} kcal, ${proteinGrams}g proteína, ${carbsGrams}g carbohidratos, ${fatsGrams}g grasa.${altPart} Responde SOLO con JSON.`;
 
+        const addMealFoodProps: any = {
+          name: { type: "string" as const },
+          quantity: { type: "string" as const },
+          calories: { type: "integer" as const },
+          protein: { type: "integer" as const },
+          carbs: { type: "integer" as const },
+          fats: { type: "integer" as const },
+        };
+        const addMealFoodRequired = ["name", "quantity", "calories", "protein", "carbs", "fats"];
+        if (addMealIncludeAlts) {
+          addMealFoodProps.alternativeName = { type: "string" as const };
+          addMealFoodProps.alternativeQuantity = { type: "string" as const };
+          addMealFoodProps.alternativeCalories = { type: "integer" as const };
+          addMealFoodProps.alternativeProtein = { type: "integer" as const };
+          addMealFoodProps.alternativeCarbs = { type: "integer" as const };
+          addMealFoodProps.alternativeFats = { type: "integer" as const };
+          addMealFoodRequired.push("alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats");
+        }
         const singleMealSchema = {
           name: "single_meal",
           strict: true,
@@ -1281,21 +1375,8 @@ conservadores y explícalo en el campo reasoning.`;
                 type: "array" as const,
                 items: {
                   type: "object" as const,
-                  properties: {
-                    name: { type: "string" as const },
-                    quantity: { type: "string" as const },
-                    calories: { type: "integer" as const },
-                    protein: { type: "integer" as const },
-                    carbs: { type: "integer" as const },
-                    fats: { type: "integer" as const },
-                    alternativeName: { type: "string" as const },
-                    alternativeQuantity: { type: "string" as const },
-                    alternativeCalories: { type: "integer" as const },
-                    alternativeProtein: { type: "integer" as const },
-                    alternativeCarbs: { type: "integer" as const },
-                    alternativeFats: { type: "integer" as const },
-                  },
-                  required: ["name", "quantity", "calories", "protein", "carbs", "fats", "alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                  properties: addMealFoodProps,
+                  required: addMealFoodRequired,
                   additionalProperties: false,
                 },
               },
@@ -1488,8 +1569,10 @@ conservadores y explícalo en el campo reasoning.`;
         }
 
         // If replacing the food (name changed), auto-generate a new alternative
+        // Only if the diet has includeAlternatives enabled
+        const dietHasAlts = !!(dietResult[0] as any).includeAlternatives;
         // Skip LLM for oils/condiments and vegetables (sanitizeAlternatives handles them)
-        if (generateAlternative && updateData.name && updateData.name !== food.name && !isNoAltFood(updateData.name) && !isVegetableFood(updateData.name)) {
+        if (dietHasAlts && generateAlternative && updateData.name && updateData.name !== food.name && !isNoAltFood(updateData.name) && !isVegetableFood(updateData.name)) {
           try {
             const newFoodName = updateData.name;
             const qty = updateData.quantity || food.quantity;
@@ -1626,8 +1709,10 @@ Responde SOLO con JSON.`;
         let altCarbs: number | null = null;
         let altFats: number | null = null;
 
+        // Only generate alternatives if the diet has includeAlternatives enabled
+        const addFoodDietHasAlts = !!(dietResult[0] as any).includeAlternatives;
         // Skip LLM call for oils/condiments and vegetables (sanitizeAlternatives handles them)
-        if (!isNoAltFood(input.name) && !isVegetableFood(input.name)) {
+        if (addFoodDietHasAlts && !isNoAltFood(input.name) && !isVegetableFood(input.name)) {
         try {
           const contextMealName = mealResult[0].mealName || "comida";
           const altPrompt = `Dado el alimento "${input.name}" (${input.quantity}, ${input.calories}kcal, P${input.protein}g, C${input.carbs}g, G${input.fats}g) que forma parte de la comida "${contextMealName}", sugiere UNA alternativa equivalente que:
@@ -1792,6 +1877,15 @@ Responde SOLO con JSON.`;
           mealTimeContext = 'CENA: Plato más ligero que la comida pero completo. Ejemplos: merluza al horno con verduras, tortilla francesa con ensalada, crema de calabacín con pechuga a la plancha, revuelto de champiñones con jamón. Evita carbohidratos pesados (pasta, arroz abundante).';
         }
 
+        const dietIncludeAlts = !!(diet as any).includeAlternatives;
+
+        const regenAltInstructions = dietIncludeAlts
+          ? `Incluye 2-6 alimentos. Cada alimento con alternativa CULINARIAMENTE CONGRUENTE del MISMO grupo alimentario.
+CONGRUENCIA: La alternativa debe poder sustituir al alimento EN EL MISMO PLATO. Si es salmón al horno, la alternativa es lubina al horno (no atún en lata).
+VERDURAS/HORTALIZAS: alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con mismos gramos y macros.
+Aceites/condimentos: alternativa = mismo alimento con mismos macros.`
+          : `Incluye 2-6 alimentos. NO generes alternativas.`;
+
         const prompt = `Genera UNA comida "${meal.mealName}" con ~${meal.calories}kcal, ${meal.protein}g proteína, ${meal.carbs}g carbs, ${meal.fats}g grasa.
 
 ${mealTimeContext}
@@ -1801,9 +1895,27 @@ ${preferences ? `Preferencias del usuario: ${preferences}.` : ''}
 
 NO uses estos alimentos (ya están en la comida actual): ${currentFoodNames}. Usa alimentos COMPLETAMENTE DIFERENTES.
 Cantidades en gramos, múltiplos de 5 (hasta 100g) o de 10 (>100g). Cocina sencilla (plancha, horno, airfryer, vapor).
-Incluye 2-6 alimentos. Cada alimento con alternativa del MISMO grupo alimentario (proteína→proteína, fruta→fruta). VERDURAS/HORTALIZAS: alternativa SIEMPRE "Otra verdura u hortaliza al gusto" con mismos gramos y macros. Aceites/condimentos: alternativa = mismo alimento con mismos macros.
+${regenAltInstructions}
 Valores numéricos enteros. Solo JSON.`;
 
+        const regenFoodProps: any = {
+          name: { type: "string" as const },
+          quantity: { type: "string" as const },
+          calories: { type: "integer" as const },
+          protein: { type: "integer" as const },
+          carbs: { type: "integer" as const },
+          fats: { type: "integer" as const },
+        };
+        const regenFoodRequired = ["name", "quantity", "calories", "protein", "carbs", "fats"];
+        if (dietIncludeAlts) {
+          regenFoodProps.alternativeName = { type: "string" as const };
+          regenFoodProps.alternativeQuantity = { type: "string" as const };
+          regenFoodProps.alternativeCalories = { type: "integer" as const };
+          regenFoodProps.alternativeProtein = { type: "integer" as const };
+          regenFoodProps.alternativeCarbs = { type: "integer" as const };
+          regenFoodProps.alternativeFats = { type: "integer" as const };
+          regenFoodRequired.push("alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats");
+        }
         const singleMealSchema = {
           name: "single_meal",
           strict: true,
@@ -1819,21 +1931,8 @@ Valores numéricos enteros. Solo JSON.`;
                 type: "array" as const,
                 items: {
                   type: "object" as const,
-                  properties: {
-                    name: { type: "string" as const },
-                    quantity: { type: "string" as const },
-                    calories: { type: "integer" as const },
-                    protein: { type: "integer" as const },
-                    carbs: { type: "integer" as const },
-                    fats: { type: "integer" as const },
-                    alternativeName: { type: "string" as const },
-                    alternativeQuantity: { type: "string" as const },
-                    alternativeCalories: { type: "integer" as const },
-                    alternativeProtein: { type: "integer" as const },
-                    alternativeCarbs: { type: "integer" as const },
-                    alternativeFats: { type: "integer" as const },
-                  },
-                  required: ["name", "quantity", "calories", "protein", "carbs", "fats", "alternativeName", "alternativeQuantity", "alternativeCalories", "alternativeProtein", "alternativeCarbs", "alternativeFats"] as const,
+                  properties: regenFoodProps,
+                  required: regenFoodRequired,
                   additionalProperties: false,
                 },
               },
@@ -2112,6 +2211,7 @@ Valores numéricos enteros. Solo JSON.`;
           preferredFoods: (original as any).preferredFoods || [],
           allergies: (original as any).allergies || [],
           fastingProtocol: (original as any).fastingProtocol || undefined,
+          includeAlternatives: !!(original as any).includeAlternatives,
         };
 
         const basePromptRedo = await buildDietPrompt(config, allPreviousFoods);
@@ -2138,7 +2238,7 @@ Valores numéricos enteros. Solo JSON.`;
             maxTokens: dynamicMaxTokensRedo,
             response_format: {
               type: "json_schema",
-              json_schema: dietJsonSchema,
+              json_schema: getDietJsonSchema(config.includeAlternatives),
             },
           });
 
@@ -2841,6 +2941,7 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
         const contextMealName = meal.mealName || "comida";
 
         // Insert each ingredient as a food in the meal, generating alternatives via LLM
+        const recipeDietHasAlts = !!(diet as any).includeAlternatives;
         for (const ing of recipe.ingredients) {
           maxSort++;
 
@@ -2851,8 +2952,8 @@ Escribe en un tono profesional pero cercano. Usa formato Markdown con encabezado
           let altCarbs: number | null = null;
           let altFats: number | null = null;
 
-          // Skip alternative generation for oils, condiments, spices AND vegetables
-          if (isNoAltFood(ing.name) || isVegetableFood(ing.name)) {
+          // Skip alternative generation entirely if diet doesn't include alternatives
+          if (!recipeDietHasAlts || isNoAltFood(ing.name) || isVegetableFood(ing.name)) {
             // sanitizeAlternatives will handle the correct values
             altName = null;
             altQty = null;

@@ -14,7 +14,7 @@ import {
   Flame, Beef, Wheat, Droplets, UtensilsCrossed, ChefHat,
   Loader2, X, Plus, Sparkles, AlertCircle, Salad, CookingPot, MessageSquare,
   ShoppingCart, Ruler, CalendarDays, BookOpen, ChevronDown, ChevronUp, PenLine, Trash2, Users,
-  MessageCircle, Brain, ArrowLeft, Check, Info
+  MessageCircle, Brain, ArrowLeft, Check, Info, ArrowLeftRight
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { DIET_TYPES, COOKING_LEVELS, QUICK_TEMPLATES, DIET_TYPE_MACROS, NUTRIFLOW_LOGO } from "@shared/constants";
@@ -88,6 +88,7 @@ export default function Home() {
   const [allergies, setAllergies] = useState<string[]>([]);
   const [newAllergy, setNewAllergy] = useState("");
   const [fastingProtocol, setFastingProtocol] = useState("");
+  const [includeAlternatives, setIncludeAlternatives] = useState(false);
 
   const recipesQuery = trpc.recipe.list.useQuery();
 
@@ -146,6 +147,7 @@ export default function Home() {
       preferredFoods: interpretedParams.preferredFoods || [],
       allergies: interpretedParams.allergies || [],
       ...(interpretedParams.fastingProtocol ? { fastingProtocol: interpretedParams.fastingProtocol } : {}),
+      includeAlternatives,
     });
     setDescribeMode(null);
   };
@@ -328,6 +330,7 @@ export default function Home() {
       preferredFoods,
       allergies,
       ...(fastingProtocol ? { fastingProtocol } : {}),
+      includeAlternatives,
     });
   };
 
@@ -953,6 +956,16 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </Section>
+
+            {/* Alternatives toggle */}
+            <Section>
+              <SectionTitle icon={ArrowLeftRight} color="text-emerald-500">Alternativas</SectionTitle>
+              <SectionDesc>Si se activa, cada alimento incluirá una alternativa culinariamente congruente del mismo grupo alimentario.</SectionDesc>
+              <div className="flex items-center justify-between">
+                <Label className="text-[13px] font-medium">Incluir alternativas</Label>
+                <Switch checked={includeAlternatives} onCheckedChange={setIncludeAlternatives} />
               </div>
             </Section>
 

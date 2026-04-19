@@ -560,3 +560,11 @@
 - [x] ALT-1: Aceite de oliva NUNCA debe tener alternativa
 - [x] ALT-2: Verduras/hortalizas siempre alternativa "Otra verdura u hortaliza al gusto" con mismos gramos
 - [x] ALT-3: Tests para validar las reglas de alternativas (25 tests pasan)
+
+## ALTERNATIVAS-OPT: Alternativas opcionales y congruentes
+- [x] ALTOPT-1: Añadir campo includeAlternatives al schema de dieta (DB + Zod + prompt)
+- [x] ALTOPT-2: Si includeAlternatives=false, no generar alternativas (null en todos los campos)
+- [x] ALTOPT-3: Toggle en frontend de creación de dieta (desactivado por defecto)
+- [x] ALTOPT-4: Mejorar prompts de congruencia culinaria de alternativas
+- [x] ALTOPT-5: Condicionar addFood, updateFood, addRecipeToMeal, regenerateMeal según includeAlternatives
+- [x] ALTOPT-6: 278 tests pasan

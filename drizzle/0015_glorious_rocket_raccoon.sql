@@ -1,0 +1,1 @@
+ALTER TABLE `diets` ADD `includeAlternatives` int DEFAULT 0 NOT NULL;

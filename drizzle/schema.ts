@@ -49,6 +49,7 @@ export const diets = mysqlTable("diets", {
   preferredFoods: json("preferredFoods").$type<string[]>(),
   allergies: json("allergies").$type<string[]>(),
   fastingProtocol: varchar("fastingProtocol", { length: 20 }),
+  includeAlternatives: int("includeAlternatives").default(0).notNull(),
   folderId: int("folderId"),
   creationMethod: varchar("creationMethod", { length: 20 }).default("ai").notNull(), // 'ai' | 'manual' | 'duplicate'
   createdAt: timestamp("createdAt").defaultNow().notNull(),
