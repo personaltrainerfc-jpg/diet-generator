@@ -37,7 +37,20 @@ function isVegetableFood(name: string): boolean {
   return VEGETABLE_PATTERNS.some(p => lower.includes(p));
 }
 
-function sanitizeAlternatives(food: any): any {
+function sanitizeAlternatives(food: any, includeAlternatives: boolean = true): any {
+  // If alternatives are disabled for this diet, force ALL alternatives to null
+  if (!includeAlternatives) {
+    return {
+      ...food,
+      alternativeName: null,
+      alternativeQuantity: null,
+      alternativeCalories: null,
+      alternativeProtein: null,
+      alternativeCarbs: null,
+      alternativeFats: null,
+    };
+  }
+
   const name = (food.name || "").toString();
   if (isNoAltFood(name)) {
     return {
@@ -124,7 +137,7 @@ describe("isVegetableFood", () => {
   });
 });
 
-describe("sanitizeAlternatives", () => {
+describe("sanitizeAlternatives with includeAlternatives=true", () => {
   it("should nullify alternative for aceite de oliva", () => {
     const food = {
       name: "Aceite de oliva virgen extra",
@@ -140,13 +153,9 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 0,
       alternativeFats: 10,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBeNull();
     expect(result.alternativeQuantity).toBeNull();
-    expect(result.alternativeCalories).toBeNull();
-    expect(result.alternativeProtein).toBeNull();
-    expect(result.alternativeCarbs).toBeNull();
-    expect(result.alternativeFats).toBeNull();
   });
 
   it("should nullify alternative for café", () => {
@@ -164,7 +173,7 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 0,
       alternativeFats: 0,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBeNull();
   });
 
@@ -183,7 +192,7 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 8,
       alternativeFats: 0,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBe("Otra verdura u hortaliza al gusto");
     expect(result.alternativeQuantity).toBe("150g");
     expect(result.alternativeCalories).toBe(51);
@@ -207,7 +216,7 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 5,
       alternativeFats: 0,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBe("Otra verdura u hortaliza al gusto");
     expect(result.alternativeQuantity).toBe("100g");
     expect(result.alternativeCalories).toBe(23);
@@ -229,7 +238,7 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 0,
       alternativeFats: 3,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBe("Pechuga de pavo");
     expect(result.alternativeQuantity).toBe("150g");
   });
@@ -249,7 +258,7 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 20,
       alternativeFats: 1,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBe("Pasta integral");
   });
 
@@ -268,9 +277,117 @@ describe("sanitizeAlternatives", () => {
       alternativeCarbs: 10,
       alternativeFats: 1,
     };
-    const result = sanitizeAlternatives(food);
+    const result = sanitizeAlternatives(food, true);
     expect(result.alternativeName).toBe("Otra verdura u hortaliza al gusto");
     expect(result.alternativeQuantity).toBe("200g");
     expect(result.alternativeCalories).toBe(62);
+  });
+});
+
+describe("sanitizeAlternatives with includeAlternatives=false", () => {
+  it("should nullify ALL alternatives for pollo when includeAlternatives=false", () => {
+    const food = {
+      name: "Pechuga de pollo a la plancha",
+      quantity: "150g",
+      calories: 165,
+      protein: 31,
+      carbs: 0,
+      fats: 4,
+      alternativeName: "Pechuga de pavo",
+      alternativeQuantity: "150g",
+      alternativeCalories: 160,
+      alternativeProtein: 30,
+      alternativeCarbs: 0,
+      alternativeFats: 3,
+    };
+    const result = sanitizeAlternatives(food, false);
+    expect(result.alternativeName).toBeNull();
+    expect(result.alternativeQuantity).toBeNull();
+    expect(result.alternativeCalories).toBeNull();
+    expect(result.alternativeProtein).toBeNull();
+    expect(result.alternativeCarbs).toBeNull();
+    expect(result.alternativeFats).toBeNull();
+    // Original food data should be preserved
+    expect(result.name).toBe("Pechuga de pollo a la plancha");
+    expect(result.calories).toBe(165);
+  });
+
+  it("should nullify ALL alternatives for brócoli when includeAlternatives=false (no veggie alt)", () => {
+    const food = {
+      name: "Brócoli al vapor",
+      quantity: "150g",
+      calories: 51,
+      protein: 4,
+      carbs: 7,
+      fats: 1,
+      alternativeName: "Coliflor",
+      alternativeQuantity: "200g",
+      alternativeCalories: 50,
+      alternativeProtein: 4,
+      alternativeCarbs: 8,
+      alternativeFats: 0,
+    };
+    const result = sanitizeAlternatives(food, false);
+    expect(result.alternativeName).toBeNull();
+    expect(result.alternativeQuantity).toBeNull();
+    expect(result.alternativeCalories).toBeNull();
+    // Should NOT set "Otra verdura u hortaliza al gusto"
+    expect(result.alternativeName).not.toBe("Otra verdura u hortaliza al gusto");
+  });
+
+  it("should nullify ALL alternatives for aceite when includeAlternatives=false", () => {
+    const food = {
+      name: "Aceite de oliva",
+      quantity: "10g",
+      calories: 90,
+      protein: 0,
+      carbs: 0,
+      fats: 10,
+      alternativeName: "Aceite de coco",
+      alternativeQuantity: "10g",
+      alternativeCalories: 90,
+      alternativeProtein: 0,
+      alternativeCarbs: 0,
+      alternativeFats: 10,
+    };
+    const result = sanitizeAlternatives(food, false);
+    expect(result.alternativeName).toBeNull();
+  });
+
+  it("should nullify ALL alternatives for arroz when includeAlternatives=false", () => {
+    const food = {
+      name: "Arroz blanco",
+      quantity: "80g",
+      calories: 104,
+      protein: 2,
+      carbs: 23,
+      fats: 0,
+      alternativeName: "Pasta integral",
+      alternativeQuantity: "80g",
+      alternativeCalories: 100,
+      alternativeProtein: 4,
+      alternativeCarbs: 20,
+      alternativeFats: 1,
+    };
+    const result = sanitizeAlternatives(food, false);
+    expect(result.alternativeName).toBeNull();
+    expect(result.alternativeQuantity).toBeNull();
+  });
+
+  it("should nullify alternatives even for food with no prior alternative when includeAlternatives=false", () => {
+    const food = {
+      name: "Salmón a la plancha",
+      quantity: "120g",
+      calories: 208,
+      protein: 20,
+      carbs: 0,
+      fats: 13,
+    };
+    const result = sanitizeAlternatives(food, false);
+    expect(result.alternativeName).toBeNull();
+    expect(result.alternativeQuantity).toBeNull();
+    expect(result.alternativeCalories).toBeNull();
+    expect(result.name).toBe("Salmón a la plancha");
+    expect(result.calories).toBe(208);
   });
 });

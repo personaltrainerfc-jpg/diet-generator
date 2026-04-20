@@ -76,7 +76,20 @@ function isVegetableFood(name: string): boolean {
   return VEGETABLE_PATTERNS.some(p => lower.includes(p));
 }
 
-function sanitizeAlternatives(food: any): any {
+function sanitizeAlternatives(food: any, includeAlternatives: boolean = true): any {
+  // If alternatives are disabled for this diet, force ALL alternatives to null
+  if (!includeAlternatives) {
+    return {
+      ...food,
+      alternativeName: null,
+      alternativeQuantity: null,
+      alternativeCalories: null,
+      alternativeProtein: null,
+      alternativeCarbs: null,
+      alternativeFats: null,
+    };
+  }
+
   const name = (food.name || "").toString();
   
   // Rule 1: Oils, condiments, spices → NO alternative (null)
@@ -339,9 +352,9 @@ ${config.includeAlternatives ? `2. Para CADA alimento, proporciona UNA alternati
     ROTACIÓN DE VERDURAS: Usa al menos 6 verduras diferentes a lo largo del plan (brócoli, judías verdes, espinacas, calabacín, tomate, pimiento, berenjena, coliflor, acelgas, champiñones).
     VARIEDAD EN DESAYUNOS: No repitas el mismo desayuno dos días seguidos. Alterna entre tostadas, avena/porridge, yogur con fruta, huevos revueltos, bowl de avena, tortitas, etc.
     VARIEDAD EN SNACKS: Alterna entre fruta, yogur, frutos secos, tostada pequeña, batido de proteínas. No repitas el mismo snack dos días seguidos.
-11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO): Para cada comida, genera un campo "description" con una línea legible que describa el plato de forma natural, como un nombre de receta. Ejemplo: "Judías verdes salteadas con jamón serrano y cebolla pochada + pechuga de pollo a la plancha". NO es un listado de ingredientes, es un nombre de plato cocinado.
+11. DESCRIPCIÓN DE CADA COMIDA (OBLIGATORIO y COHERENTE): Para cada comida, genera un campo "description" que describa EXACTAMENTE los alimentos que has puesto en esa comida. La descripción debe mencionar SOLO los alimentos que aparecen en el array "foods" de esa comida, NO otros. Ejemplo: si los alimentos son "Pechuga de pollo" y "Arroz basmati" y "Brócoli", la descripción debe ser "Pechuga de pollo a la plancha con arroz basmati y brócoli al vapor". NUNCA pongas en la descripción alimentos que NO están en el array foods. NUNCA omitas de la descripción los alimentos principales que SÍ están en foods. La descripción es un resumen natural del plato, no un listado, pero debe reflejar fielmente los ingredientes generados.
 12. SIN REPETICIÓN ENTRE DÍAS: No repitas el mismo alimento principal (proteína, verdura o carbohidrato principal) en dos días/menús distintos del plan. Distribuye verduras, proteínas y carbohidratos de forma variada a lo largo de todos los días del menú. Si un día usas pechuga de pollo, otro día usa lomo de cerdo o merluza. Si un día usas brócoli, otro día usa judías verdes o calabacín. Maximiza la variedad.
-    COHERENCIA CULINARIA: Cada comida debe tener sentido como plato real. Los alimentos dentro de una comida deben combinar bien entre sí. Evita mezclas absurdas como "atún con yogur y plátano" o "salmón con avena y fresas". Piensa en platos que un cocinero real prepararía.
+    COHERENCIA CULINARIA (MUY IMPORTANTE): Cada comida debe ser un PLATO REAL que un cocinero prepararía junto. Los alimentos dentro de una comida deben combinar entre sí como parte del mismo plato o menú. Evita mezclas absurdas como "atún con yogur y plátano" o "salmón con avena y fresas". Piensa PRIMERO en el plato que quieres hacer (ej: "Merluza al horno con patatas y ensalada") y DESPUÉS genera los alimentos que lo componen. La descripción y los alimentos deben coincidir al 100%.
 13. VERIFICACIÓN CALÓRICA OBLIGATORIA: Antes de cerrar el JSON de cada menú, realiza internamente esta comprobación: suma las calorías de todos los alimentos de todas las comidas de ese menú. El resultado debe estar entre ${Math.round(config.totalCalories * 0.95)} y ${Math.round(config.totalCalories * 1.05)} kcal. Si no cumple, redistribuye las cantidades antes de responder.
 
 CANTIDADES REALISTAS (OBLIGATORIO - MUY IMPORTANTE):
@@ -1158,7 +1171,7 @@ conservadores y explícalo en el campo reasoning.`;
             });
 
             for (const rawFood of meal.foods) {
-              const food = sanitizeAlternatives(rawFood);
+              const food = sanitizeAlternatives(rawFood, input.includeAlternatives);
               await createFood({
                 mealId,
                 name: food.name,
@@ -1424,7 +1437,7 @@ conservadores y explícalo en el campo reasoning.`;
         });
 
         for (const rawFood of generated.foods) {
-          const food = sanitizeAlternatives(rawFood);
+          const food = sanitizeAlternatives(rawFood, addMealIncludeAlts);
           await createFood({
             mealId,
             name: food.name,
@@ -1653,7 +1666,7 @@ Responde SOLO con JSON.`;
           alternativeProtein: updateData.alternativeProtein,
           alternativeCarbs: updateData.alternativeCarbs,
           alternativeFats: updateData.alternativeFats,
-        });
+        }, dietHasAlts);
         if (sanitizedAlt.alternativeName !== updateData.alternativeName) {
           updateData.alternativeName = sanitizedAlt.alternativeName;
           updateData.alternativeQuantity = sanitizedAlt.alternativeQuantity;
@@ -1777,7 +1790,7 @@ Responde SOLO con JSON.`;
           alternativeProtein: altProt,
           alternativeCarbs: altCarbs,
           alternativeFats: altFats,
-        });
+        }, addFoodDietHasAlts);
         const foodId = await createFood({
           mealId: input.mealId,
           ...sanitized,
@@ -2011,7 +2024,7 @@ Valores numéricos enteros. Solo JSON.`;
 
         // Create new foods
         for (const rawFood of generated.foods) {
-          const food = sanitizeAlternatives(rawFood);
+          const food = sanitizeAlternatives(rawFood, dietIncludeAlts);
           await createFood({
             mealId: input.mealId,
             name: food.name,
@@ -2353,7 +2366,7 @@ Valores numéricos enteros. Solo JSON.`;
             });
 
             for (const rawFood of meal.foods) {
-              const food = sanitizeAlternatives(rawFood);
+              const food = sanitizeAlternatives(rawFood, config.includeAlternatives);
               await createFood({
                 mealId,
                 name: food.name,
@@ -3027,7 +3040,7 @@ Responde SOLO con JSON.`;
             alternativeProtein: altProt,
             alternativeCarbs: altCarbs,
             alternativeFats: altFats,
-          });
+          }, recipeDietHasAlts);
           await createFood({
             mealId: input.mealId,
             ...sanitized,

@@ -568,3 +568,11 @@
 - [x] ALTOPT-4: Mejorar prompts de congruencia culinaria de alternativas
 - [x] ALTOPT-5: Condicionar addFood, updateFood, addRecipeToMeal, regenerateMeal según includeAlternatives
 - [x] ALTOPT-6: 278 tests pasan
+
+## BUG: Alternativas de verduras aparecen con includeAlternatives=false
+- [x] BUGALT-1: sanitizeAlternatives ahora recibe includeAlternatives en los 7 puntos de llamada
+- [x] BUGALT-2: Cuando includeAlternatives=false, TODAS las alternativas son null (incluidas verduras)
+
+## BUG: Títulos de comidas no concuerdan con ingredientes
+- [x] BUGTIT-1: Prompt mejorado: descripción debe reflejar EXACTAMENTE los alimentos del array foods
+- [x] BUGTIT-2: Coherencia culinaria reforzada: pensar primero en el plato, luego generar ingredientes
